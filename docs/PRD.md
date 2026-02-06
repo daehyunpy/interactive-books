@@ -36,18 +36,27 @@ No backend server. No web interface.
    - iOS: upload from Files picker
    - macOS: upload via file open dialog or drag-and-drop onto window
 
-2. **Ask Questions**
+2. **Reading Position & Page-Aware Q&A**
+   - User sets their current page/position in the book
+   - App uses this as context when answering — answers are scoped to what the user has read so far
+   - Avoids spoilers: LLM is instructed not to reveal content beyond the user's current page
+   - Answers cite specific page numbers (e.g. "As mentioned on p.42...")
+   - Position is saved per book and persists across sessions
+
+3. **Ask Questions**
    - Chat-style interface for asking questions about a book
    - App retrieves relevant passages locally, sends them with the question to an LLM API
-   - Answers include references to the source passages
+   - Answers include page number references to source passages
+   - Users can reference pages in questions (e.g. "What did the author mean on p.73?", "Summarize pages 100-120")
+   - Page references in answers are tappable — jump to that page's context
    - Streaming responses for real-time feel
 
-3. **Book Library**
+4. **Book Library**
    - Grid/list view of uploaded books
    - Users can select which book to chat about
    - Search and filter books
 
-4. **LLM Provider Selection**
+5. **LLM Provider Selection**
    - User chooses their LLM provider in settings:
      - **Anthropic (Claude)** — default provider
      - **OpenAI (GPT)**
@@ -58,34 +67,34 @@ No backend server. No web interface.
 
 ### P1 — Should Have
 
-5. **Large Book Support (1000+ pages)**
+6. **Large Book Support (1000+ pages)**
    - Efficient chunking and indexing for very large books
    - On-disk vector index (not purely in-memory) to handle large embedding sets
    - Background ingestion with progress indicator
    - Incremental embedding (resume if interrupted)
 
-6. **Chapter Summaries**
+7. **Chapter Summaries**
    - Users can request a summary of a specific chapter or section
    - App identifies chapter boundaries and summarizes content
 
-7. **Multi-Book Queries**
+8. **Multi-Book Queries**
    - Users can ask questions across multiple books at once
    - Useful for comparing themes, characters, or ideas across works
 
-8. **Chat History**
+9. **Chat History**
    - Conversation history is persisted locally per book
    - Users can revisit prior Q&A sessions
 
 ### P2 — Nice to Have
 
-9. **EPUB Support**
-   - Support for EPUB format in addition to PDF and TXT
+10. **EPUB Support**
+    - Support for EPUB format in addition to PDF and TXT
 
-10. **Highlights & Notes**
+11. **Highlights & Notes**
     - Users can save interesting passages or answers
     - Export notes as markdown
 
-10. **iCloud Sync**
+12. **iCloud Sync**
     - Sync book metadata and chat history across iOS and macOS via iCloud
     - Book content stays on-device (too large for sync)
 
@@ -157,8 +166,18 @@ The CLI is not a user-facing product.
 
 ### Data Flow
 
-1. **Ingest**: Book file → parsed on-device → chunked (500-1000 tokens) → embedded via LLM API → vectors stored locally
-2. **Query**: User question → embedded via LLM API → local vector similarity search → top-k chunks → sent with question to LLM API → streamed response
+1. **Ingest**: Book file → parsed on-device → page boundaries mapped → chunked (500-1000 tokens, preserving page numbers) → embedded via LLM API → vectors + page metadata stored locally
+2. **Query**: User question + current page position → embedded via LLM API → local vector similarity search (filtered to pages ≤ current position by default) → top-k chunks with page numbers → sent with question to LLM API → streamed response with page citations
+
+### Page Mapping
+
+Each chunk stores its source page number(s). This enables:
+- **Page-scoped retrieval**: only search content up to the user's current page (no spoilers)
+- **Page references in answers**: LLM cites specific pages in responses
+- **Page-based queries**: user can ask about specific pages or page ranges
+- **Tappable citations**: page references in answers link back to the chunk's source content
+
+For PDFs, page numbers come directly from the document structure. For TXT files, pages are estimated by character/line count or user-defined page breaks.
 
 ### LLM Provider Architecture
 
