@@ -158,7 +158,7 @@ The CLI is not a user-facing product.
 | CLI            | Python                  | Fast iteration, rich LLM/RAG library ecosystem   |
 | Vector Search  | SQLite + sqlite-vec     | Native on Apple, single DB, handles large books  |
 | App Storage    | SwiftData               | Modern stack, native, works on both iOS and macOS|
-| CLI Storage    | SQLite + JSON files     | Simple, inspectable, mirrors app data model      |
+| CLI Storage    | SQLite (shared schema)  | Same DB format as app; CLI can inspect app data  |
 | LLM (default)  | Anthropic (Claude)      | High quality, strong reasoning                   |
 | LLM (alt)      | OpenAI / Local LLM      | User choice; local = fully offline               |
 | Embeddings     | Provider-matched        | Use same provider's embedding model              |
@@ -223,6 +223,6 @@ On iOS/macOS, API keys are stored in the Keychain. Local LLM endpoint URL is sto
 - [x] ~~Large book vector index: FAISS on-disk, SQLite with vector extension, or custom solution?~~ **SQLite + sqlite-vec** — native on Apple platforms, everything in one DB.
 - [x] ~~Use Apple's on-device NaturalLanguage framework for embeddings as a fourth "free" option?~~ **Yes** — add as a free, offline embedding option alongside API-based providers.
 - [x] ~~SwiftData vs Core Data?~~ **SwiftData** — prefer modern stack.
-- [ ] How much RAG logic should be shared between app (Swift) and CLI (Python), or are they independent implementations?
+- [x] ~~How much RAG logic should be shared between app (Swift) and CLI (Python), or are they independent implementations?~~ **Shared SQLite DB schema, independent code.** CLI can open the app's DB for inspection. Logic implemented separately in each language.
 - [ ] Anthropic embedding story: use Voyage AI, OpenAI embeddings, or something else?
 - [x] ~~Local LLM: support Ollama only, or also llama.cpp / LM Studio?~~ **Ollama first** (most popular). Others based on market response.
