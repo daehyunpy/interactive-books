@@ -2,7 +2,7 @@
 
 ## Overview
 
-A mobile and web app that lets users upload books and have conversations about them. Users can ask questions, get summaries, find specific passages, and explore themes — all powered by an LLM with retrieval-augmented generation (RAG).
+A local-only iOS and web app that lets users upload books and have conversations about them. All processing happens on-device or via direct API calls to an LLM provider — no backend server required. Users can ask questions, get summaries, find specific passages, and explore themes using RAG (retrieval-augmented generation).
 
 ## Problem
 
@@ -18,9 +18,10 @@ Individual readers who want a faster way to interact with and extract value from
 
 ## Platforms
 
-- **iOS** — native app (Swift/SwiftUI)
-- **Web** — responsive web app (React/Next.js)
-- **Backend API** — shared backend serving both clients
+- **iOS** — native app (Swift/SwiftUI), all data stored on-device
+- **Web** — client-side web app (React/Next.js static export), all data stored in browser
+
+No backend server. Each platform is fully self-contained.
 
 ## Core Features
 
@@ -28,37 +29,37 @@ Individual readers who want a faster way to interact with and extract value from
 
 1. **Book Upload**
    - Users can upload book files (PDF, TXT)
-   - System ingests and indexes the content for search
-   - Upload from device (iOS Files, camera roll) or drag-and-drop (web)
+   - App parses, chunks, and indexes content locally
+   - Upload from device (iOS Files) or drag-and-drop (web)
 
 2. **Ask Questions**
    - Chat-style interface for asking questions about a book
-   - System retrieves relevant passages and generates an answer
+   - App retrieves relevant passages locally, sends them with the question to an LLM API
    - Answers include references to the source passages
    - Streaming responses for real-time feel
 
 3. **Book Library**
-   - Grid/list view of uploaded books with cover thumbnails
+   - Grid/list view of uploaded books
    - Users can select which book to chat about
    - Search and filter books
 
+4. **API Key Configuration**
+   - User provides their own LLM API key (stored locally)
+   - Settings screen to enter/update key
+
 ### P1 — Should Have
 
-4. **Chapter Summaries**
+5. **Chapter Summaries**
    - Users can request a summary of a specific chapter or section
-   - System identifies chapter boundaries and summarizes content
+   - App identifies chapter boundaries and summarizes content
 
-5. **Multi-Book Queries**
+6. **Multi-Book Queries**
    - Users can ask questions across multiple books at once
    - Useful for comparing themes, characters, or ideas across works
 
-6. **Chat History**
-   - Conversation history is persisted per book
+7. **Chat History**
+   - Conversation history is persisted locally per book
    - Users can revisit prior Q&A sessions
-
-7. **User Accounts**
-   - Sign up / sign in (email + social auth)
-   - Books and chat history synced across devices
 
 ### P2 — Nice to Have
 
@@ -69,68 +70,75 @@ Individual readers who want a faster way to interact with and extract value from
    - Users can save interesting passages or answers
    - Export notes as markdown
 
-10. **Push Notifications (iOS)**
-    - Notify when a large book finishes processing
-
-11. **Offline Mode (iOS)**
-    - Cache recent chats and book metadata for offline reading
+10. **iCloud Sync (iOS)**
+    - Sync book metadata and chat history via iCloud
+    - Book content stays on-device (too large for sync)
 
 ## Technical Approach
 
 ### Architecture
 
 ```
-┌──────────────┐    ┌──────────────┐
-│   iOS App    │    │   Web App    │
-│  (SwiftUI)   │    │  (Next.js)   │
-└──────┬───────┘    └──────┬───────┘
-       │                   │
-       └───────┬───────────┘
-               │ REST / WebSocket
+┌─────────────────────────────────────────┐
+│              Client App                  │
+│  (iOS: SwiftUI  /  Web: Next.js static) │
+│                                          │
+│  ┌─────────────┐  ┌──────────────────┐  │
+│  │ Book Ingest  │  │  Q&A Engine      │  │
+│  │ ├─ Parser    │  │  ├─ Retrieval    │  │
+│  │ ├─ Chunker   │  │  │  (local vec   │  │
+│  │ └─ Embedder  │  │  │   search)     │  │
+│  │   (LLM API)  │  │  └─ LLM call    │  │
+│  └─────────────┘  │     (API)         │  │
+│                    └──────────────────┘  │
+│                                          │
+│  ┌──────────────────────────────────┐   │
+│  │         Local Storage             │   │
+│  │  iOS: Core Data / SQLite + files  │   │
+│  │  Web: IndexedDB + localStorage    │   │
+│  └──────────────────────────────────┘   │
+└──────────────────────────────────────────┘
+               │
+               │ HTTPS (only outbound call)
                ▼
        ┌───────────────┐
-       │  Backend API   │
-       │  (Python/Fast  │
-       │    API)        │
-       ├───────────────┤
-       │ Ingestion Svc  │  Book file → parse → chunk → embed → store
-       │ Retrieval Svc  │  Question → embed → vector search → top-k
-       │ Q&A Service    │  Context + question → LLM → answer
-       └───────┬───────┘
-               │
-       ┌───────┴────────┐
-       │  Storage Layer  │
-       ├────────────────┤
-       │ Vector DB       │  (Pinecone / pgvector)
-       │ App Database    │  (PostgreSQL)
-       │ File Storage    │  (S3 / CloudKit)
-       └────────────────┘
+       │   LLM API     │
+       │ (OpenAI /     │
+       │  Anthropic)   │
+       └───────────────┘
 ```
 
 ### Key Technical Decisions
 
-| Decision          | Choice        | Rationale                                    |
-| ----------------- | ------------- | -------------------------------------------- |
-| iOS               | SwiftUI       | Modern, declarative, native performance      |
-| Web Frontend      | Next.js       | SSR, great DX, easy deployment               |
-| Backend           | FastAPI       | Async Python, great for LLM/RAG workloads    |
-| Vector Store      | Pinecone      | Managed, scales without ops burden            |
-| App Database      | PostgreSQL    | Reliable, supports pgvector as alternative    |
-| File Storage      | S3            | Cheap, reliable, pre-signed upload URLs       |
-| Embeddings        | OpenAI        | High quality, easy to set up                  |
-| LLM              | TBD           | OpenAI or Anthropic                           |
-| Auth              | Supabase Auth | Works well with both iOS and web              |
+| Decision          | Choice                 | Rationale                                       |
+| ----------------- | ---------------------- | ----------------------------------------------- |
+| iOS               | SwiftUI                | Modern, declarative, native performance         |
+| Web               | Next.js (static)       | Static export, no server needed, good DX        |
+| Vector Search     | In-memory / on-device  | No server dependency, fast for small datasets   |
+| iOS Storage       | Core Data / SQLite     | Native, reliable, handles structured + blob data|
+| Web Storage       | IndexedDB              | Large storage capacity in browser               |
+| Embeddings        | LLM API (OpenAI)       | Only outbound API call needed                   |
+| LLM              | TBD                    | OpenAI or Anthropic, user provides API key      |
+| Deployment (web)  | Static hosting         | GitHub Pages, Vercel static, or Netlify         |
 
 ### Data Flow
 
-1. **Ingest**: Book file → uploaded to S3 → backend parses text → chunked (500-1000 tokens) → embedded → stored in vector DB
-2. **Query**: User question → embedded → top-k similar chunks retrieved → LLM generates answer with chunks as context → streamed to client
+1. **Ingest**: Book file → parsed on-device → chunked (500-1000 tokens) → embedded via LLM API → vectors stored locally
+2. **Query**: User question → embedded via LLM API → local vector similarity search → top-k chunks → sent with question to LLM API → streamed response
+
+### Embedding Strategy (No Server)
+
+Since there's no backend, embeddings are generated by calling the LLM provider's embedding API directly from the client. For the web app, this means the API key is used client-side — acceptable for a personal tool but noted as a trade-off.
+
+For iOS, the API key is stored in the Keychain. For web, it's stored in localStorage (user's own browser, user's own key).
 
 ## Non-Goals (v1)
 
-- No Android app (iOS and web only)
+- No backend server or database
+- No user accounts or authentication
+- No Android app
 - No support for audiobooks or scanned image PDFs (OCR)
-- No real-time collaboration or shared libraries
+- No cross-device sync (each device is independent)
 - No in-app book reader (this is a Q&A tool, not a reading app)
 
 ## Success Criteria
@@ -138,13 +146,12 @@ Individual readers who want a faster way to interact with and extract value from
 - User can upload a PDF or TXT book and ask questions within 2 minutes
 - Answers are grounded in actual book content (not hallucinated)
 - Source passages are shown alongside answers for verification
-- iOS app feels native and responsive (no web views)
-- Web and iOS share the same backend with feature parity
+- Works fully offline after initial book ingestion (except LLM API calls)
+- No server to deploy or maintain
 
 ## Open Questions
 
 - [ ] Which LLM provider to use? (OpenAI vs Anthropic)
-- [ ] Should we support very large books (1000+ pages)? Chunking strategy may need tuning.
-- [ ] Pinecone vs pgvector? Pinecone is simpler but adds a vendor dependency.
-- [ ] Supabase vs Firebase for auth? Supabase is more open, Firebase has better iOS SDK.
-- [ ] App Store review — any concerns with user-uploaded content?
+- [ ] Should we support very large books (1000+ pages)? In-memory vector search may need optimization.
+- [ ] Web: is client-side embedding API call acceptable, or should we limit to iOS only at first?
+- [ ] iOS: use Apple's on-device NaturalLanguage framework for embeddings to avoid API calls during ingestion?
