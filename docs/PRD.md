@@ -136,7 +136,7 @@ The CLI is not a user-facing product.
 │                                    │
 │  ┌────────────────────────────┐   │
 │  │       Local Storage        │   │
-│  │    Core Data / SwiftData   │   │
+│  │        SwiftData           │   │
 │  └────────────────────────────┘   │
 └────────────────┬───────────────────┘
                  │
@@ -157,7 +157,7 @@ The CLI is not a user-facing product.
 | iOS / macOS    | SwiftUI (multiplatform) | Single codebase, native on both platforms        |
 | CLI            | Python                  | Fast iteration, rich LLM/RAG library ecosystem   |
 | Vector Search  | On-device (disk-backed) | No server dependency; disk index for large books |
-| App Storage    | SwiftData               | Modern, native, works on both iOS and macOS      |
+| App Storage    | SwiftData               | Modern stack, native, works on both iOS and macOS|
 | CLI Storage    | SQLite + JSON files     | Simple, inspectable, mirrors app data model      |
 | LLM (default)  | Anthropic (Claude)      | High quality, strong reasoning                   |
 | LLM (alt)      | OpenAI / Local LLM      | User choice; local = fully offline               |
@@ -187,13 +187,16 @@ The app uses a provider abstraction (Swift protocol / Python base class) so the 
 
 #### Supported Providers
 
-| Provider   | Chat Model         | Embedding Model              | Notes                              |
-| ---------- | ------------------ | ---------------------------- | ---------------------------------- |
-| Anthropic  | Claude Sonnet/Opus | Voyage AI (or OpenAI embed)  | Default. API key required.         |
-| OpenAI     | GPT-4o             | text-embedding-3-small       | API key required.                  |
-| Local LLM  | User's choice      | User's choice                | Ollama / llama.cpp. Fully offline. |
+| Provider        | Chat Model         | Embedding Model              | Notes                              |
+| --------------- | ------------------ | ---------------------------- | ---------------------------------- |
+| Anthropic       | Claude Sonnet/Opus | Voyage AI (or OpenAI embed)  | Default. API key required.         |
+| OpenAI          | GPT-4o             | text-embedding-3-small       | API key required.                  |
+| Local LLM       | User's choice      | User's choice                | Ollama (v1). Fully offline.        |
+| Apple (on-device)| —                 | NaturalLanguage framework    | Free, offline embeddings only.     |
 
-**Note**: Anthropic doesn't have a native embedding API, so embeddings use a compatible provider (Voyage AI or OpenAI's embedding endpoint). This is handled transparently — the user just picks "Anthropic" and it works.
+**Notes**:
+- Anthropic doesn't have a native embedding API, so embeddings use a compatible provider (Voyage AI or OpenAI's embedding endpoint). This is handled transparently — the user just picks "Anthropic" and it works.
+- Apple's on-device NaturalLanguage framework provides free, offline embeddings. Can be used with any chat provider to avoid embedding API costs, or paired with Ollama for a fully offline, zero-cost setup.
 
 On iOS/macOS, API keys are stored in the Keychain. Local LLM endpoint URL is stored in UserDefaults.
 
@@ -218,8 +221,8 @@ On iOS/macOS, API keys are stored in the Keychain. Local LLM endpoint URL is sto
 ## Open Questions
 
 - [ ] Large book vector index: FAISS on-disk, SQLite with vector extension, or custom solution?
-- [ ] Use Apple's on-device NaturalLanguage framework for embeddings as a fourth "free" option?
-- [ ] SwiftData vs Core Data? SwiftData is newer but Core Data is more battle-tested.
+- [x] ~~Use Apple's on-device NaturalLanguage framework for embeddings as a fourth "free" option?~~ **Yes** — add as a free, offline embedding option alongside API-based providers.
+- [x] ~~SwiftData vs Core Data?~~ **SwiftData** — prefer modern stack.
 - [ ] How much RAG logic should be shared between app (Swift) and CLI (Python), or are they independent implementations?
 - [ ] Anthropic embedding story: use Voyage AI, OpenAI embeddings, or something else?
-- [ ] Local LLM: support Ollama only, or also llama.cpp / LM Studio?
+- [x] ~~Local LLM: support Ollama only, or also llama.cpp / LM Studio?~~ **Ollama first** (most popular). Others based on market response.
