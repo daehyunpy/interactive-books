@@ -161,7 +161,7 @@ The CLI is not a user-facing product.
 | CLI Storage    | SQLite (shared schema)  | Same DB format as app; CLI can inspect app data  |
 | LLM (default)  | Anthropic (Claude)      | High quality, strong reasoning                   |
 | LLM (alt)      | OpenAI / Local LLM      | User choice; local = fully offline               |
-| Embeddings     | Provider-matched        | Use same provider's embedding model              |
+| Embeddings     | Independently swappable | Chat + embedding providers configured separately |
 | LLM Abstraction| Protocol/interface      | Swap providers without changing pipeline logic   |
 
 ### Data Flow
@@ -189,13 +189,15 @@ The app uses a provider abstraction (Swift protocol / Python base class) so the 
 
 | Provider        | Chat Model         | Embedding Model              | Notes                              |
 | --------------- | ------------------ | ---------------------------- | ---------------------------------- |
-| Anthropic       | Claude Sonnet/Opus | Voyage AI (or OpenAI embed)  | Default. API key required.         |
+| Anthropic       | Claude Sonnet/Opus | Apple NaturalLanguage (default) | Default. One API key. Embedding provider swappable. |
 | OpenAI          | GPT-4o             | text-embedding-3-small       | API key required.                  |
 | Local LLM       | User's choice      | User's choice                | Ollama (v1). Fully offline.        |
 | Apple (on-device)| —                 | NaturalLanguage framework    | Free, offline embeddings only.     |
 
 **Notes**:
-- Anthropic doesn't have a native embedding API, so embeddings use a compatible provider (Voyage AI or OpenAI's embedding endpoint). This is handled transparently — the user just picks "Anthropic" and it works.
+- Chat provider and embedding provider are independently configurable. Any combination works.
+- Anthropic defaults to Apple NaturalLanguage for embeddings (no second API key needed), but user can switch to Voyage AI, OpenAI embeddings, or Ollama at any time.
+- Switching embedding provider re-indexes books (re-embeds all chunks) since vector dimensions differ across providers.
 - Apple's on-device NaturalLanguage framework provides free, offline embeddings. Can be used with any chat provider to avoid embedding API costs, or paired with Ollama for a fully offline, zero-cost setup.
 
 On iOS/macOS, API keys are stored in the Keychain. Local LLM endpoint URL is stored in UserDefaults.
@@ -224,5 +226,5 @@ On iOS/macOS, API keys are stored in the Keychain. Local LLM endpoint URL is sto
 - [x] ~~Use Apple's on-device NaturalLanguage framework for embeddings as a fourth "free" option?~~ **Yes** — add as a free, offline embedding option alongside API-based providers.
 - [x] ~~SwiftData vs Core Data?~~ **SwiftData** — prefer modern stack.
 - [x] ~~How much RAG logic should be shared between app (Swift) and CLI (Python), or are they independent implementations?~~ **Shared SQLite DB schema, independent code.** CLI can open the app's DB for inspection. Logic implemented separately in each language.
-- [ ] Anthropic embedding story: use Voyage AI, OpenAI embeddings, or something else?
+- [x] ~~Anthropic embedding story: use Voyage AI, OpenAI embeddings, or something else?~~ **Apple NaturalLanguage as default**, but chat and embedding providers are independently swappable. User can switch to Voyage AI, OpenAI, or Ollama embeddings anytime.
 - [x] ~~Local LLM: support Ollama only, or also llama.cpp / LM Studio?~~ **Ollama first** (most popular). Others based on market response.
