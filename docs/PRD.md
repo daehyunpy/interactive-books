@@ -2,9 +2,9 @@
 
 ## Overview
 
-A local-only iOS app that lets users upload books and have conversations about them. All processing happens on-device or via direct API calls to an LLM provider — no backend server required. Users can ask questions, get summaries, find specific passages, and explore themes using RAG (retrieval-augmented generation).
+A local-only iOS and macOS app that lets users upload books and have conversations about them. All processing happens on-device or via direct API calls to an LLM provider — no backend server required. Users can ask questions, get summaries, find specific passages, and explore themes using RAG (retrieval-augmented generation).
 
-A companion CLI tool is provided for debugging and development.
+A Python CLI tool is provided for debugging and rapid prototyping of the RAG pipeline.
 
 ## Problem
 
@@ -21,7 +21,8 @@ Individual readers who want a faster way to interact with and extract value from
 ## Platforms
 
 - **iOS** — native app (Swift/SwiftUI), all data stored on-device
-- **CLI** — Python command-line tool for debugging and testing the RAG pipeline
+- **macOS** — native app (Swift/SwiftUI), shared codebase with iOS via multiplatform target
+- **CLI** — Python command-line tool for debugging and quick prototyping
 
 No backend server. No web interface.
 
@@ -32,7 +33,8 @@ No backend server. No web interface.
 1. **Book Upload**
    - Users can upload book files (PDF, TXT)
    - App parses, chunks, and indexes content locally
-   - Upload from iOS Files picker
+   - iOS: upload from Files picker
+   - macOS: upload via file open dialog or drag-and-drop onto window
 
 2. **Ask Questions**
    - Chat-style interface for asking questions about a book
@@ -73,64 +75,72 @@ No backend server. No web interface.
    - Export notes as markdown
 
 10. **iCloud Sync**
-    - Sync book metadata and chat history via iCloud
+    - Sync book metadata and chat history across iOS and macOS via iCloud
     - Book content stays on-device (too large for sync)
 
-## CLI Tool (Debug / Development)
+## CLI Tool (Debug / Prototyping)
 
-A Python CLI that exercises the same RAG pipeline logic as the iOS app. Used for:
+A Python CLI for debugging and rapid prototyping. Used to iterate on the RAG pipeline quickly before implementing in Swift.
 
-- **Testing ingestion**: `cli ingest <file>` — parse, chunk, embed a book and inspect the results
-- **Testing retrieval**: `cli search <book> <query>` — run vector search and see retrieved chunks
-- **Testing Q&A**: `cli ask <book> <question>` — full end-to-end question answering
-- **Inspecting data**: `cli books` — list ingested books, chunk counts, metadata
-- **Verbose output**: `--verbose` flag to log chunk boundaries, similarity scores, prompt construction, token counts
+### Commands
 
-The CLI is not a user-facing product. It's a developer tool for validating and debugging the core pipeline before integrating into the iOS app.
+- `cli ingest <file>` — parse, chunk, embed a book and inspect the results
+- `cli search <book> <query>` — run vector search and see retrieved chunks with similarity scores
+- `cli ask <book> <question>` — full end-to-end question answering
+- `cli books` — list ingested books, chunk counts, metadata
+- `--verbose` flag — log chunk boundaries, similarity scores, prompt construction, token counts
+
+### Role
+
+The CLI serves two purposes:
+1. **Prototyping** — quickly test different chunking strategies, embedding models, prompt templates, and retrieval parameters without rebuilding an Xcode project
+2. **Debugging** — inspect intermediate pipeline state (chunks, embeddings, retrieved context, final prompt) when something isn't working
+
+The CLI is not a user-facing product.
 
 ## Technical Approach
 
 ### Architecture
 
 ```
-┌──────────────────────────────┐
-│         iOS App              │
-│        (SwiftUI)             │
-│                              │
-│  ┌───────────┐ ┌──────────┐ │
-│  │Book Ingest│ │Q&A Engine│ │
-│  │ ├─ Parser │ │├─Retrieve│ │
-│  │ ├─ Chunker│ ││ (local) │ │
-│  │ └─ Embed  │ │└─LLM call│ │
-│  └───────────┘ └──────────┘ │
-│                              │
-│  ┌──────────────────────┐   │
-│  │    Local Storage      │   │
-│  │  Core Data / SQLite   │   │
-│  └──────────────────────┘   │
-└──────────────┬───────────────┘
-               │
-               │ HTTPS
-               ▼
-       ┌───────────────┐
-       │   LLM API     │
-       │ (OpenAI /     │        ┌──────────────┐
-       │  Anthropic)   │◄───────│  CLI (Python) │
-       └───────────────┘        │  Debug tool   │
-                                └──────────────┘
+┌────────────────────────────────────┐
+│     iOS / macOS App                │
+│     (SwiftUI, multiplatform)       │
+│                                    │
+│  ┌───────────┐  ┌───────────────┐ │
+│  │Book Ingest│  │  Q&A Engine   │ │
+│  │ ├─ Parser │  │  ├─ Retrieve  │ │
+│  │ ├─ Chunker│  │  │  (local)   │ │
+│  │ └─ Embed  │  │  └─ LLM call  │ │
+│  └───────────┘  └───────────────┘ │
+│                                    │
+│  ┌────────────────────────────┐   │
+│  │       Local Storage        │   │
+│  │    Core Data / SwiftData   │   │
+│  └────────────────────────────┘   │
+└────────────────┬───────────────────┘
+                 │
+                 │ HTTPS
+                 ▼
+         ┌───────────────┐
+         │   LLM API     │
+         │  (OpenAI /    │        ┌────────────────┐
+         │   Anthropic)  │◄───────│  CLI (Python)  │
+         └───────────────┘        │  Debug / Proto │
+                                  └────────────────┘
 ```
 
 ### Key Technical Decisions
 
-| Decision       | Choice              | Rationale                                       |
-| -------------- | ------------------- | ----------------------------------------------- |
-| iOS            | SwiftUI             | Modern, declarative, native performance         |
-| CLI            | Python              | Fast to build, same ecosystem as LLM libraries  |
-| Vector Search  | In-memory / on-device| No server dependency, fast for small datasets  |
-| iOS Storage    | Core Data / SQLite  | Native, reliable, handles structured + blob data|
-| CLI Storage    | SQLite + JSON files | Simple, inspectable, mirrors iOS data model     |
-| Embeddings     | LLM API (OpenAI)   | Only outbound API call needed                   |
-| LLM            | TBD                 | OpenAI or Anthropic, user provides API key      |
+| Decision       | Choice                  | Rationale                                        |
+| -------------- | ----------------------- | ------------------------------------------------ |
+| iOS / macOS    | SwiftUI (multiplatform) | Single codebase, native on both platforms        |
+| CLI            | Python                  | Fast iteration, rich LLM/RAG library ecosystem   |
+| Vector Search  | In-memory / on-device   | No server dependency, fast for small datasets    |
+| App Storage    | SwiftData               | Modern, native, works on both iOS and macOS      |
+| CLI Storage    | SQLite + JSON files     | Simple, inspectable, mirrors app data model      |
+| Embeddings     | LLM API (OpenAI)        | Only outbound API call needed                    |
+| LLM            | TBD                     | OpenAI or Anthropic, user provides API key       |
 
 ### Data Flow
 
@@ -139,7 +149,7 @@ The CLI is not a user-facing product. It's a developer tool for validating and d
 
 ### Embedding Strategy
 
-Embeddings are generated by calling the LLM provider's embedding API directly from the client. On iOS, the API key is stored in the Keychain.
+Embeddings are generated by calling the LLM provider's embedding API directly from the client. On iOS/macOS, the API key is stored in the Keychain.
 
 ## Non-Goals (v1)
 
@@ -148,7 +158,6 @@ Embeddings are generated by calling the LLM provider's embedding API directly fr
 - No user accounts or authentication
 - No Android app
 - No support for audiobooks or scanned image PDFs (OCR)
-- No cross-device sync (each device is independent)
 - No in-app book reader (this is a Q&A tool, not a reading app)
 
 ## Success Criteria
@@ -157,11 +166,13 @@ Embeddings are generated by calling the LLM provider's embedding API directly fr
 - Answers are grounded in actual book content (not hallucinated)
 - Source passages are shown alongside answers for verification
 - Works fully offline after initial book ingestion (except LLM API calls)
-- CLI can ingest a book and answer questions end-to-end for debugging
+- CLI can prototype and validate pipeline changes in seconds
+- macOS and iOS share the same codebase with platform-appropriate UI
 
 ## Open Questions
 
 - [ ] Which LLM provider to use? (OpenAI vs Anthropic)
 - [ ] Should we support very large books (1000+ pages)? In-memory vector search may need optimization.
-- [ ] iOS: use Apple's on-device NaturalLanguage framework for embeddings to avoid API calls during ingestion?
-- [ ] How much RAG logic should be shared between iOS (Swift) and CLI (Python), or are they independent implementations?
+- [ ] Use Apple's on-device NaturalLanguage framework for embeddings to avoid API calls during ingestion?
+- [ ] SwiftData vs Core Data? SwiftData is newer but Core Data is more battle-tested.
+- [ ] How much RAG logic should be shared between app (Swift) and CLI (Python), or are they independent implementations?
