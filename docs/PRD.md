@@ -156,7 +156,7 @@ The CLI is not a user-facing product.
 | -------------- | ----------------------- | ------------------------------------------------ |
 | iOS / macOS    | SwiftUI (multiplatform) | Single codebase, native on both platforms        |
 | CLI            | Python                  | Fast iteration, rich LLM/RAG library ecosystem   |
-| Vector Search  | On-device (disk-backed) | No server dependency; disk index for large books |
+| Vector Search  | SQLite + sqlite-vec     | Native on Apple, single DB, handles large books  |
 | App Storage    | SwiftData               | Modern stack, native, works on both iOS and macOS|
 | CLI Storage    | SQLite + JSON files     | Simple, inspectable, mirrors app data model      |
 | LLM (default)  | Anthropic (Claude)      | High quality, strong reasoning                   |
@@ -220,7 +220,7 @@ On iOS/macOS, API keys are stored in the Keychain. Local LLM endpoint URL is sto
 
 ## Open Questions
 
-- [ ] Large book vector index: FAISS on-disk, SQLite with vector extension, or custom solution?
+- [x] ~~Large book vector index: FAISS on-disk, SQLite with vector extension, or custom solution?~~ **SQLite + sqlite-vec** — native on Apple platforms, everything in one DB.
 - [x] ~~Use Apple's on-device NaturalLanguage framework for embeddings as a fourth "free" option?~~ **Yes** — add as a free, offline embedding option alongside API-based providers.
 - [x] ~~SwiftData vs Core Data?~~ **SwiftData** — prefer modern stack.
 - [ ] How much RAG logic should be shared between app (Swift) and CLI (Python), or are they independent implementations?
