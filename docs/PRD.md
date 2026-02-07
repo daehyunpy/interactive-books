@@ -152,17 +152,38 @@ The CLI is not a user-facing product.
 
 ### Key Technical Decisions
 
-| Decision       | Choice                  | Rationale                                        |
-| -------------- | ----------------------- | ------------------------------------------------ |
-| iOS / macOS    | SwiftUI (multiplatform) | Single codebase, native on both platforms        |
-| CLI            | Python                  | Fast iteration, rich LLM/RAG library ecosystem   |
-| Vector Search  | SQLite + sqlite-vec     | Native on Apple, single DB, handles large books  |
-| App Storage    | SwiftData               | Modern stack, native, works on both iOS and macOS|
-| CLI Storage    | SQLite (shared schema)  | Same DB format as app; CLI can inspect app data  |
-| LLM (default)  | Anthropic (Claude)      | High quality, strong reasoning                   |
-| LLM (alt)      | OpenAI / Local LLM      | User choice; local = fully offline               |
-| Embeddings     | Independently swappable | Chat + embedding providers configured separately |
-| LLM Abstraction| Protocol/interface      | Swap providers without changing pipeline logic   |
+| Decision        | Choice                   | Rationale                                        |
+| --------------- | ------------------------ | ------------------------------------------------ |
+| iOS / macOS     | SwiftUI (multiplatform)  | Single codebase, native on both platforms        |
+| CLI             | Python + uv + typer      | Fast iteration, modern tooling                   |
+| Vector Search   | SQLite + sqlite-vec      | Native on Apple, single DB, handles large books  |
+| App Storage     | SwiftData                | Modern stack, native, works on both iOS and macOS|
+| CLI Storage     | SQLite (shared schema)   | Same DB format as app; CLI can inspect app data  |
+| LLM (default)   | Anthropic (Claude)      | High quality, strong reasoning                   |
+| LLM (alt)       | OpenAI / Local LLM      | User choice; local = fully offline               |
+| Embeddings      | Independently swappable | Chat + embedding providers configured separately |
+| LLM Abstraction | Protocol/interface      | Swap providers without changing pipeline logic   |
+| PDF Parsing     | Multiple implementations | PyMuPDF, pdfplumber, pypdf (pluggable)           |
+| Text Chunking   | Multiple implementations | Pluggable: recursive, sentence-based, semantic   |
+| Keychain        | Multiple implementations | Pluggable: KeychainAccess, KeychainSwift, raw Security |
+| Config          | direnv + .env            | Standard, works with uv and local dev            |
+| Testing         | pytest + XCTest          | Standard for each platform                       |
+| Linting         | ruff + SwiftLint         | Fast, modern linters                             |
+| CI              | GitHub Actions           | Standard, free for public repos                  |
+
+### Pluggable Abstractions
+
+The project uses protocol/interface abstractions in several areas, allowing multiple implementations to coexist and be swapped:
+
+| Abstraction       | Protocol / Base Class           | Implementations                                   |
+| ----------------- | ------------------------------- | ------------------------------------------------- |
+| **LLM Chat**      | `ChatProvider`                  | Anthropic, OpenAI, Ollama                         |
+| **Embeddings**    | `EmbeddingProvider`             | Apple NaturalLanguage, OpenAI, Voyage AI, Ollama  |
+| **PDF Parser**    | `BookParser`                    | PyMuPDF, pdfplumber, pypdf (Python) / PDFKit (Swift) |
+| **Text Chunker**  | `TextChunker`                   | Recursive, sentence-based, semantic               |
+| **Keychain**      | `SecureStorage`                 | KeychainAccess, KeychainSwift, raw Security framework |
+
+This lets users (and developers) pick the best implementation for their needs, and makes it easy to add new ones.
 
 ### Data Flow
 
