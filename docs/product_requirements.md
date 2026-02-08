@@ -117,9 +117,6 @@ The CLI is not a user-facing product.
 
 ## Non-Goals (v1)
 
-- No backend server or database
-- No web interface
-- No user accounts or authentication
 - No Android app
 - No support for audiobooks or scanned image PDFs (OCR)
 - No in-app book reader (this is a Q&A tool, not a reading app)
