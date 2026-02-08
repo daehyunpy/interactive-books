@@ -39,9 +39,11 @@
 | Python version  | 3.13               | Latest stable                                    |
 | Package manager | uv                 | Fast, modern                                     |
 | CLI framework   | typer              | Modern, built on click                           |
-| Config          | direnv + .env      | Standard, works with uv and local dev            |
+| Config          | pydantic-settings  | Type-safe env/config validation; direnv as dev convenience |
 | Testing         | pytest             | Standard                                         |
-| Linting         | ruff               | Fast, modern                                     |
+| Linting         | ruff               | Fast, replaces black + flake8 + isort            |
+| Type checking   | pyright            | Fast, strict, powers VS Code Pylance             |
+| HTTP client     | httpx              | Async + sync, HTTP/2, type-annotated             |
 
 ### iOS / macOS App
 
@@ -50,8 +52,12 @@
 | Min deployment     | iOS 26 / macOS 26  | Latest, full SwiftData support                   |
 | UI framework       | SwiftUI            | Multiplatform target (iOS + macOS)               |
 | Storage            | SwiftData          | Modern stack, native                             |
-| Testing            | XCTest             | Standard                                         |
-| Linting            | SwiftLint          | Standard                                         |
+| Testing            | Swift Testing      | Apple's modern test framework (@Test, #expect)   |
+| Linting            | SwiftLint + SwiftFormat | SwiftLint for diagnostics, SwiftFormat for auto-formatting |
+| Networking         | URLSession         | Native async/await, no third-party dependency    |
+| Dependency injection | Manual           | Initializer injection + @Environment; no framework |
+| Concurrency        | Structured         | async/await, actors, AsyncStream; no GCD or Combine |
+| Navigation         | NavigationStack    | Declarative, type-safe routing via Hashable enums |
 
 ### Shared
 
@@ -77,6 +83,14 @@
 | Project structure           | DDD (Domain-Driven Design)    | Clean separation of domains                                |
 | Min deployment              | iOS 26 / macOS 26             | Latest, full SwiftData support                             |
 | Python version              | 3.13                          | Latest stable                                              |
+| Python config               | pydantic-settings             | Type-safe validation; direnv as dev convenience layer      |
+| Python type checking        | pyright                       | Fast, strict, powers Pylance; catches bugs at dev time     |
+| Python HTTP client          | httpx                         | Async + sync, HTTP/2, type-annotated; replaces requests    |
+| Swift testing               | Swift Testing                 | Apple's modern framework (@Test, #expect); no XCTest       |
+| Swift formatting            | SwiftFormat                   | Auto-formatting complement to SwiftLint diagnostics        |
+| Swift networking            | URLSession                    | Native async/await; no Alamofire (Swift 6 friction)        |
+| Swift dependency injection   | Manual (initializer injection)| Protocols + @Environment; no framework needed              |
+| Swift concurrency           | Structured (async/await)      | Actors, AsyncStream; no GCD or Combine                     |
 
 ## Pluggable Abstractions
 
@@ -162,7 +176,7 @@ The app uses a provider abstraction (Swift protocol / Python base class) so the 
 ### Credential Storage
 
 - iOS/macOS: API keys stored in the Keychain. Local LLM endpoint URL stored in UserDefaults.
-- CLI: API keys loaded from `.env` via direnv.
+- CLI: API keys loaded from `.env` via pydantic-settings (direnv as dev convenience).
 
 ## Build Order
 
@@ -193,6 +207,98 @@ For each pluggable abstraction, start with the simplest implementation:
 
 Additional implementations are added after the first end-to-end pipeline works.
 
+## Cross-Platform Contracts
+
+The Python CLI and Swift app are implemented independently but share a database and domain model. These contracts prevent drift between the two codebases.
+
+### Schema Source of Truth
+
+One set of SQL migration files that both codebases reference. Neither side invents schema independently.
+
+```
+docs/schema/
+  001_initial.sql
+  002_add_embeddings.sql
+  ...
+```
+
+- Migrations are numbered sequentially. Both sides apply them in order.
+- Each migration file is plain SQL — no ORM-specific syntax.
+- The CLI applies migrations via raw SQL. The app applies them via a lightweight migration runner (not SwiftData auto-migration).
+- Adding a column, table, or index always starts with a new migration file here, then both sides implement support.
+
+### Domain Glossary
+
+Canonical names for shared concepts. Python uses `snake_case`, Swift uses `camelCase`, but the **base name** is identical.
+
+| Concept | DB column | Python | Swift |
+| --- | --- | --- | --- |
+| Book identity | `id` | `book.id` | `book.id` |
+| Book title | `title` | `book.title` | `book.title` |
+| Chunk text content | `content` | `chunk.content` | `chunk.content` |
+| Chunk start page | `start_page` | `chunk.start_page` | `chunk.startPage` |
+| Chunk end page | `end_page` | `chunk.end_page` | `chunk.endPage` |
+| Embedding provider name | `embedding_provider` | `book.embedding_provider` | `book.embeddingProvider` |
+| Embedding dimensions | `embedding_dimension` | `book.embedding_dimension` | `book.embeddingDimension` |
+| Ingestion status | `status` | `book.status` | `book.status` |
+| Current reading page | `current_page` | `book.current_page` | `book.currentPage` |
+| Chat message role | `role` | `message.role` | `message.role` |
+| Chat message content | `content` | `message.content` | `message.content` |
+
+If a new domain concept is added, add it to this table first, then implement in both codebases.
+
+### Domain Invariants
+
+Rules that both implementations must enforce identically:
+
+- A `Book` must have a non-empty `title`
+- A `Book`'s `status` is one of: `pending`, `ingesting`, `ready`, `failed`
+- A `Chunk` always has `start_page >= 1` and `end_page >= start_page`
+- A `Chunk` always belongs to exactly one `Book`
+- `current_page` defaults to `0` (meaning "no position set" — retrieval returns all pages)
+- When `current_page > 0`, retrieval only returns chunks where `start_page <= current_page`
+- Deleting a `Book` cascades to its chunks, embeddings, and chat history
+- Switching embedding provider sets `status` back to `pending` (requires re-indexing)
+
+### Error Taxonomy
+
+Both codebases use the same error categories with equivalent cases:
+
+| Domain | Python | Swift | Cases |
+| --- | --- | --- | --- |
+| Book | `BookError` | `BookError` | `not_found`, `parse_failed`, `unsupported_format`, `already_exists` |
+| LLM | `LLMError` | `LLMError` | `api_key_missing`, `api_call_failed`, `rate_limited`, `timeout` |
+| Storage | `StorageError` | `StorageError` | `db_corrupted`, `migration_failed`, `write_failed`, `not_found` |
+
+Python uses `snake_case` enum values; Swift uses `camelCase`. The semantic meaning is identical.
+
+### Prompt Templates
+
+System prompts and prompt construction are documented in a shared location so both implementations produce equivalent LLM inputs.
+
+```
+docs/prompts/
+  system_prompt.md        — base system prompt for Q&A
+  query_template.md       — how retrieved chunks + user question are assembled
+  citation_instructions.md — how to instruct the LLM to cite pages
+```
+
+Changes to prompt wording go through these files first, then both sides update their implementation.
+
+### Shared Test Fixtures
+
+A set of known-good test data that both codebases test against to verify compatibility:
+
+```
+tests/fixtures/
+  sample_book.pdf         — a small PDF for ingestion testing
+  sample_book.txt         — a plain text book
+  expected_chunks.json    — expected chunking output for sample_book.pdf
+  expected_schema.sql     — current schema snapshot for validation
+```
+
+Both sides include integration tests that ingest `sample_book.pdf` and verify the resulting chunks match `expected_chunks.json`. This catches drift in parsing, chunking, or page mapping between the two implementations.
+
 ## Decision Log
 
 Resolved during planning:
@@ -211,3 +317,11 @@ Resolved during planning:
 - **Min deployment**: iOS 26 / macOS 26.
 - **Python version**: 3.13.
 - **Build order**: CLI first, bottom-up (scaffold → schema → ingest → embed → retrieve → Q&A → app).
+- **Python config**: pydantic-settings — type-safe env/config with validation at startup. direnv stays as dev convenience.
+- **Python type checking**: pyright — fast, strict, catches bugs at dev time.
+- **Python HTTP client**: httpx — async + sync, HTTP/2, type-annotated. Modern replacement for requests.
+- **Swift testing**: Swift Testing — Apple's modern framework (@Test, #expect). No XCTest.
+- **Swift formatting**: SwiftFormat alongside SwiftLint — auto-formatting vs diagnostics are complementary.
+- **Swift networking**: URLSession with async/await — native, no third-party. Alamofire has Swift 6 strict concurrency friction.
+- **Swift DI**: Manual initializer injection + @Environment — protocols make DI frameworks unnecessary.
+- **Swift concurrency**: Structured concurrency (async/await, actors, AsyncStream) — no GCD or Combine in new code.
