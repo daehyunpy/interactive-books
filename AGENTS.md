@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Instructions for AI agents working on this codebase.
+Instructions for AI agents working on this codebase. `CLAUDE.md` is a symlink to this file — edit here, not there.
 
 ## Project
 
@@ -32,7 +32,30 @@ Build order: CLI first, bottom-up, one feature at a time.
 
 See `docs/technical_design.md` → "Build Order" for details on each phase. See "Directory Layout" for the full project tree.
 
+## First-Time Setup
+
+### Prerequisites
+
+- [uv](https://docs.astral.sh/uv/) — Python package manager
+- [direnv](https://direnv.net/) — required for loading environment variables
+
+### Python CLI
+
+```bash
+cd python/
+cp .env.example .env          # fill in API keys (ANTHROPIC_API_KEY, etc.)
+direnv allow                  # or: eval "$(direnv export zsh)"
+uv sync                       # install dependencies
+uv run pytest -x              # verify everything works
+```
+
+### Swift App (Phase 8)
+
+Setup instructions will be added when the Swift app is scaffolded.
+
 ## Quick Commands
+
+All Python commands run from `python/`. All Swift commands run from `swift/` (Phase 8).
 
 | Task | Command |
 |------|---------|
@@ -41,9 +64,9 @@ See `docs/technical_design.md` → "Build Order" for details on each phase. See 
 | Lint Python | `uv run ruff check .` |
 | Format Python | `uv run ruff format .` |
 | Type check Python | `uv run pyright` |
-| Run Swift tests | `swift test` |
-| Lint Swift | `swiftlint` |
-| Format Swift | `swiftformat .` |
+| Run Swift tests | `swift test` *(Phase 8)* |
+| Lint Swift | `swiftlint` *(Phase 8)* |
+| Format Swift | `swiftformat .` *(Phase 8)* |
 
 ## Coding Disciplines
 
@@ -92,7 +115,27 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 - Don't add DB columns, domain concepts, or error cases without updating the shared contracts first (see `docs/technical_design.md` → "Cross-Platform Contracts")
 - Don't change prompt templates in one codebase without updating `shared/prompts/`
 
+## Git Workflow (Gitflow)
+
+- **`main`** — production-ready code. Only receives merges from `release/` and `hotfix/` branches.
+- **`develop`** — integration branch. All feature branches merge here.
+- **`feature/<name>`** — branch off `develop` for new features. Merge back to `develop` via PR.
+- **`release/<version>`** — branch off `develop` when preparing a release. Merge to both `main` and `develop` when done.
+- **`hotfix/<name>`** — branch off `main` for urgent fixes. Merge to both `main` and `develop`.
+- **Commit style** — conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
+- **Keep commits focused** — one logical change per commit. Separate unrelated changes into separate commits.
+- **No direct pushes** to `main` or `develop`.
+
 ## OpenSpec
 
-This project uses OpenSpec for spec-driven development. Changes go through:
-`/opsx:new` → `/opsx:ff` → `/opsx:apply` → `/opsx:verify` → `/opsx:archive`
+This project uses OpenSpec for spec-driven development. All non-trivial changes go through this workflow. Trivial fixes (typos, single-line bugs) can skip it.
+
+| Step | Command | What it does |
+|------|---------|--------------|
+| 1 | `/opsx:new <name>` | Create a new change with a kebab-case name (e.g., `/opsx:new add-pdf-parser`) |
+| 2 | `/opsx:ff` | Generate all spec artifacts (requirements, design, tasks) in one pass |
+| 3 | `/opsx:apply` | Implement the tasks from the generated spec |
+| 4 | `/opsx:verify` | Verify implementation matches the spec artifacts |
+| 5 | `/opsx:archive` | Archive the completed change |
+
+Artifacts are stored in `openspec/changes/` during development and moved to `openspec/changes/archive/` when done.
