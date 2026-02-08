@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+.venv/
+
+# uv
+.uv/
+
+# Environment
+.env
+.envrc
+
+# macOS
+.DS_Store
+
+# Swift / Xcode
+*.xcodeproj/xcuserdata/
+build/
+DerivedData/
