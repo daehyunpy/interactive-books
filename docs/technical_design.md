@@ -30,6 +30,97 @@
                                   └────────────────┘
 ```
 
+## Directory Layout
+
+```
+interactive-books/
+├── python/                           # Python CLI (debug/prototyping)
+│   ├── pyproject.toml
+│   ├── .envrc
+│   ├── .env.example
+│   ├── source/
+│   │   └── interactive_books/
+│   │       ├── __init__.py
+│   │       ├── main.py              # typer app entry point
+│   │       ├── domain/
+│   │       │   ├── book.py          # Book aggregate root
+│   │       │   ├── chunk.py         # Chunk value object
+│   │       │   ├── chat.py          # ChatMessage model
+│   │       │   ├── errors.py        # BookError, LLMError, StorageError
+│   │       │   └── protocols.py     # ChatProvider, EmbeddingProvider, BookParser, TextChunker
+│   │       ├── app/                  # Use cases
+│   │       │   ├── ingest.py
+│   │       │   ├── search.py
+│   │       │   └── ask.py
+│   │       └── infra/                # Adapters & external dependencies
+│   │           ├── llm/
+│   │           │   ├── anthropic.py
+│   │           │   ├── openai.py
+│   │           │   └── ollama.py
+│   │           ├── embeddings/
+│   │           │   ├── openai.py
+│   │           │   └── ollama.py
+│   │           ├── parsers/
+│   │           │   ├── pdf.py
+│   │           │   └── txt.py
+│   │           ├── chunkers/
+│   │           │   └── recursive.py
+│   │           └── storage/
+│   │               ├── database.py
+│   │               ├── book_repo.py
+│   │               └── chunk_repo.py
+│   └── tests/                        # Mirrors source/ structure
+│       ├── conftest.py
+│       ├── domain/
+│       ├── app/
+│       └── infra/
+│
+├── swift/                            # iOS/macOS app (Phase 8)
+│   └── InteractiveBooks/
+│       ├── InteractiveBooks.xcodeproj
+│       ├── Domain/
+│       ├── App/
+│       ├── Infra/
+│       ├── UI/
+│       └── Tests/
+│           ├── DomainTests/
+│           ├── AppTests/
+│           └── InfraTests/
+│
+├── shared/                           # Cross-platform contracts
+│   ├── schema/                       # SQL migrations (source of truth)
+│   │   ├── 001_initial.sql
+│   │   └── ...
+│   ├── prompts/                      # Prompt templates
+│   │   ├── system_prompt.md
+│   │   ├── query_template.md
+│   │   └── citation_instructions.md
+│   └── fixtures/                     # Shared test data
+│       ├── sample_book.pdf
+│       ├── sample_book.txt
+│       ├── expected_chunks.json
+│       └── expected_schema.sql
+│
+├── docs/                             # Documentation only
+│   ├── product_requirements.md
+│   └── technical_design.md
+│
+├── .github/workflows/                # CI
+├── openspec/                         # OpenSpec workflow
+├── AGENTS.md
+└── CLAUDE.md
+```
+
+### Layout Conventions
+
+- **`python/` + `swift/`** — language-named, symmetric peers
+- **`source/`** — Python src layout; `interactive_books` is the package name
+- **`tests/`** — mirrors `source/` structure (separate from source, not collocated)
+- **DDD layers** — `domain/`, `app/`, `infra/` in both codebases
+- **Protocols in domain** — `protocols.py` defines all abstractions; dependencies point inward
+- **`shared/`** — cross-platform contracts (schema, prompts, fixtures) live here, not in `docs/` or inside either codebase
+- **`docs/`** — documentation only (requirements, technical design)
+
 ## Stack
 
 ### Python CLI
@@ -216,7 +307,7 @@ The Python CLI and Swift app are implemented independently but share a database 
 One set of SQL migration files that both codebases reference. Neither side invents schema independently.
 
 ```
-docs/schema/
+shared/schema/
   001_initial.sql
   002_add_embeddings.sql
   ...
@@ -277,7 +368,7 @@ Python uses `snake_case` enum values; Swift uses `camelCase`. The semantic meani
 System prompts and prompt construction are documented in a shared location so both implementations produce equivalent LLM inputs.
 
 ```
-docs/prompts/
+shared/prompts/
   system_prompt.md        — base system prompt for Q&A
   query_template.md       — how retrieved chunks + user question are assembled
   citation_instructions.md — how to instruct the LLM to cite pages
@@ -290,7 +381,7 @@ Changes to prompt wording go through these files first, then both sides update t
 A set of known-good test data that both codebases test against to verify compatibility:
 
 ```
-tests/fixtures/
+shared/fixtures/
   sample_book.pdf         — a small PDF for ingestion testing
   sample_book.txt         — a plain text book
   expected_chunks.json    — expected chunking output for sample_book.pdf
@@ -299,29 +390,3 @@ tests/fixtures/
 
 Both sides include integration tests that ingest `sample_book.pdf` and verify the resulting chunks match `expected_chunks.json`. This catches drift in parsing, chunking, or page mapping between the two implementations.
 
-## Decision Log
-
-Resolved during planning:
-
-- **Vector index**: SQLite + sqlite-vec — native on Apple platforms, everything in one DB.
-- **On-device embeddings**: Apple NaturalLanguage framework — free, offline embedding option.
-- **App storage**: SwiftData — prefer modern stack.
-- **CLI ↔ App sharing**: Shared SQLite DB schema, independent code.
-- **Anthropic embeddings**: Apple NaturalLanguage as default, but independently swappable.
-- **Local LLM**: Ollama first. Others based on market response.
-- **Embedding dimensions**: Stored per book in DB. Vector tables created per book with correct dimension.
-- **Error handling**: Fail fast, surface clearly. Domain-typed errors (`BookError`, `LLMError`, `StorageError`).
-- **Chunk size & overlap**: Pluggable, default 500 tokens / 100 overlap.
-- **Top-k retrieval**: Pluggable, default 5.
-- **Project structure**: DDD (Domain-Driven Design).
-- **Min deployment**: iOS 26 / macOS 26.
-- **Python version**: 3.13.
-- **Build order**: CLI first, bottom-up (scaffold → schema → ingest → embed → retrieve → Q&A → app).
-- **Python config**: pydantic-settings — type-safe env/config with validation at startup. direnv stays as dev convenience.
-- **Python type checking**: pyright — fast, strict, catches bugs at dev time.
-- **Python HTTP client**: httpx — async + sync, HTTP/2, type-annotated. Modern replacement for requests.
-- **Swift testing**: Swift Testing — Apple's modern framework (@Test, #expect). No XCTest.
-- **Swift formatting**: SwiftFormat alongside SwiftLint — auto-formatting vs diagnostics are complementary.
-- **Swift networking**: URLSession with async/await — native, no third-party. Alamofire has Swift 6 strict concurrency friction.
-- **Swift DI**: Manual initializer injection + @Environment — protocols make DI frameworks unnecessary.
-- **Swift concurrency**: Structured concurrency (async/await, actors, AsyncStream) — no GCD or Combine in new code.
