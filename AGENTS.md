@@ -43,11 +43,19 @@ See `docs/technical_design.md` → "Build Order" for details on each phase. See 
 
 ```bash
 cd python/
-cp .env.example .env          # fill in API keys (ANTHROPIC_API_KEY, etc.)
+cp .env.example .env          # fill in API keys (see below)
 direnv allow                  # or: eval "$(direnv export zsh)"
 uv sync                       # install dependencies
 uv run pytest -x              # verify everything works
 ```
+
+### Environment Variables
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `ANTHROPIC_API_KEY` | Yes | Default chat provider |
+| `OPENAI_API_KEY` | No | For OpenAI embeddings or chat |
+| `OLLAMA_BASE_URL` | No | Local LLM endpoint (default: `http://localhost:11434`) |
 
 ### Swift App (Phase 8)
 
