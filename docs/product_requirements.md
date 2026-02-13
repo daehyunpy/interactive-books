@@ -6,17 +6,28 @@ A local-only iOS and macOS app that lets users upload books and have conversatio
 
 A Python CLI tool is provided for debugging and rapid prototyping.
 
+## Vision
+
+No existing reading platform — Apple Books, Kindle, Google Play Books, Kobo — lets readers use an LLM with the books they own. These platforms treat books as static files to display, not as knowledge to query. Interactive Books fills this gap.
+
+The product starts as a local-only tool for LLM-powered reading. Once the interaction model is proven (ask questions, get spoiler-free answers with page citations, explore themes), it can grow into a broader interactive reading platform — publisher integrations, shared Q&A, curated collections, and eventually a marketplace where "interactive" is the default reading experience.
+
+See [Product Brief](product_brief.md) for the full strategic context.
+
 ## Problem
 
-Reading a book and retaining or finding specific information is time-consuming. Readers often want to:
-- Quickly recall details from a book they've read
-- Get summaries of chapters or sections
-- Ask analytical questions ("What motivates character X?")
-- Find specific passages without manually searching
+Existing reading platforms don't offer LLM-powered interactions despite the technology being ready. Readers are left with passive tools while LLMs sit unused. At the individual level, this means:
+
+- Quickly recalling details from a book requires flipping through pages or relying on memory
+- Getting summaries of chapters or sections means re-reading or using generic AI that doesn't have the actual text
+- Asking analytical questions ("What motivates character X?") has no good answer without the source material
+- Finding specific passages without manually searching is tedious or impossible
+
+Readers already use ChatGPT to discuss books — but without access to the actual text, answers are generic and unreliable. Interactive Books connects the LLM to the real content.
 
 ## Target User
 
-Individual readers who want a faster way to interact with and extract value from books they own.
+Individual readers who want more from the books they already own. Early adopters comfortable with API keys and local apps. Students, researchers, and professionals who read deeply and need to recall, compare, and synthesize across books.
 
 ## Platforms
 
@@ -25,6 +36,26 @@ Individual readers who want a faster way to interact with and extract value from
 - **CLI** — command-line tool for debugging and quick prototyping
 
 No backend server. No web interface.
+
+## User Stories
+
+### Student
+
+- As a student reading a textbook, I want to ask questions about concepts from chapters I've already read so that I can deepen my understanding without spoiling later material.
+- As a student preparing for an exam, I want to get summaries of specific chapters so that I can review efficiently.
+- As a student, I want to ask questions across multiple textbooks so that I can connect ideas from different courses.
+
+### Researcher / Professional
+
+- As a researcher, I want to upload a paper or book and ask about specific arguments so that I can quickly locate evidence without re-reading.
+- As a professional, I want to search across multiple reference books at once so that I can compare approaches to a problem.
+- As a researcher, I want page citations in every answer so that I can verify claims against the source material.
+
+### General Reader
+
+- As a reader midway through a novel, I want to ask "Who is this character?" without getting spoilers from later chapters.
+- As a reader who finished a book weeks ago, I want to recall specific details so that I can discuss the book with others.
+- As a privacy-conscious reader, I want to use a local LLM so that my reading data never leaves my device.
 
 ## Core Features
 
@@ -50,6 +81,12 @@ No backend server. No web interface.
    - Users can reference pages in questions (e.g. "What did the author mean on p.73?", "Summarize pages 100-120")
    - Page references in answers are tappable — jump to that page's context
    - Streaming responses for real-time feel
+
+   **Edge cases:**
+   - PDF with unreliable page numbers (e.g., front matter numbered separately): use physical page index as fallback, note discrepancy to user
+   - Pages that fail to parse (scanned pages in an otherwise text PDF): skip and mark as unparseable; inform user which pages are missing
+   - User asks about a page beyond what was successfully parsed: tell the user that page couldn't be processed and suggest nearby pages
+   - TXT files with no page structure: divide into estimated pages by character count; label as "estimated page" in citations
 
 4. **Book Library**
    - Grid/list view of uploaded books
@@ -115,16 +152,59 @@ The CLI serves two purposes:
 
 The CLI is not a user-facing product.
 
+## Privacy & Data Handling
+
+Local-first is a core value proposition, not just an architecture choice. Users must understand exactly what stays on their device and what doesn't.
+
+| Data | Where it lives | Leaves the device? |
+|------|----------------|-------------------|
+| Book files (PDF, TXT) | Local storage only | Never |
+| Parsed text and chunks | Local SQLite DB | Only when sent to LLM API as context for a question |
+| Embeddings | Local SQLite DB (sqlite-vec) | Never (computed via API, stored locally) |
+| Chat history | Local SQLite DB | Never |
+| API keys | Keychain (app) / `.env` (CLI) | Sent to LLM provider for authentication |
+| Reading position | Local SQLite DB | Never |
+
+**What gets sent to external APIs:**
+- When using a cloud LLM (Anthropic, OpenAI): the user's question and retrieved text chunks are sent to the provider's API. This is the minimum needed to generate an answer.
+- When using a cloud embedding provider: chunk text is sent to generate embeddings. This happens once at ingestion time.
+- When using Ollama (local LLM + local embeddings): nothing leaves the device. Fully offline.
+
+**No telemetry, no analytics, no accounts.** v1 collects nothing. If usage analytics are added later (see Success Criteria), they will be opt-in and local-only.
+
 ## Non-Goals (v1)
 
-- No Android app
-- No support for audiobooks or scanned image PDFs (OCR)
-- No in-app book reader (this is a Q&A tool, not a reading app)
+- **No Android app** — iOS/macOS first to validate the concept
+- **No audiobooks or scanned image PDFs (OCR)** — text-based formats only; OCR adds complexity without validating the core interaction
+- **No in-app book reader** — this is a Q&A tool, not a reading app; users read in their preferred app and come here to interact
+- **No social features** — no shared libraries, collaborative annotations, or public Q&A; local-only in v1
+- **No book purchasing or DRM support** — users bring their own DRM-free files; no store, no rights management
+- **No web app** — native only; web adds deployment complexity without validating the mobile/desktop experience
+- **No user accounts or cloud backend** — no sign-up, no server, no data collection
+- **No custom model fine-tuning** — use off-the-shelf LLMs via standard APIs; fine-tuning is a future optimization
 
 ## Success Criteria
 
-- User can upload a PDF or TXT book and ask questions within 2 minutes
-- Answers are grounded in actual book content (not hallucinated)
+### Leading Indicators (validate during development)
+
+| Metric | Target | How to measure |
+|--------|--------|----------------|
+| Ingestion time | < 2 min for a 300-page PDF | Time from upload to "ready" status |
+| Retrieval accuracy | Top-5 chunks contain the relevant passage ≥ 80% of the time | Manual evaluation on a test set of 20 questions per sample book |
+| Citation rate | ≥ 90% of answers include at least one page citation | Automated check on LLM output |
+| Answer groundedness | < 10% of answers contain claims not traceable to retrieved chunks | Manual spot-check against source passages |
+| Ingestion throughput | ≥ 50 pages/sec for chunking + embedding | Benchmark on sample books |
+
+### Lagging Indicators (validate post-launch)
+
+| Metric | Target | How to measure |
+|--------|--------|----------------|
+| Time to first question | < 5 min from app install to first answered question | Analytics event (if added later) or user testing |
+| Return usage | User asks ≥ 3 questions per book on average | Local usage stats (opt-in) |
+| Multi-book adoption | ≥ 30% of users upload 2+ books within first month | Local usage stats (opt-in) |
+
+### Functional Requirements
+
 - Source passages are shown alongside answers for verification
 - Works fully offline after initial book ingestion (except LLM API calls; local LLM = fully offline)
 - CLI can prototype and validate pipeline changes in seconds
