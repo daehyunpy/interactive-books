@@ -2,14 +2,14 @@ import sqlite3
 from datetime import datetime, timezone
 
 from interactive_books.domain.chunk import Chunk
-from interactive_books.domain import protocols
+from interactive_books.domain.protocols import ChunkRepository as ChunkRepositoryPort
 from interactive_books.infra.storage.database import Database
 
 
 _CHUNK_COLUMNS = "id, book_id, content, start_page, end_page, chunk_index, created_at"
 
 
-class ChunkRepository(protocols.ChunkRepositoryPort):
+class ChunkRepository(ChunkRepositoryPort):
     def __init__(self, db: Database) -> None:
         self._conn = db.connection
 
