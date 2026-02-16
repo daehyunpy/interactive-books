@@ -6,6 +6,9 @@ app = typer.Typer()
 
 VERSION = "0.1.0"
 SCHEMA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "shared" / "schema"
+PROMPTS_DIR = (
+    Path(__file__).resolve().parent.parent.parent.parent / "shared" / "prompts"
+)
 DB_PATH = Path(__file__).resolve().parent.parent.parent.parent / "data" / "books.db"
 CONTENT_PREVIEW_LENGTH = 200
 
@@ -112,6 +115,62 @@ def search(
             typer.echo(f"    {preview}")
             typer.echo()
     except BookError as e:
+        typer.echo(f"Error: {e.message}", err=True)
+        raise typer.Exit(code=1)
+    finally:
+        db.close()
+
+
+@app.command()
+def ask(
+    book_id: str = typer.Argument(..., help="ID of the book to ask about"),
+    question: str = typer.Argument(..., help="Question to ask about the book"),
+    top_k: int = typer.Option(5, "--top-k", "-k", help="Number of context passages"),
+) -> None:
+    """Ask a question about a book using RAG."""
+    import os
+
+    from interactive_books.app.ask import AskBookUseCase
+    from interactive_books.app.search import SearchBooksUseCase
+    from interactive_books.domain.errors import BookError, LLMError
+    from interactive_books.infra.embeddings.openai import EmbeddingProvider
+    from interactive_books.infra.llm.anthropic import ChatProvider
+    from interactive_books.infra.storage.book_repo import BookRepository
+    from interactive_books.infra.storage.chunk_repo import ChunkRepository
+    from interactive_books.infra.storage.database import Database
+    from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
+
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    if not openai_key:
+        typer.echo("Error: OPENAI_API_KEY environment variable is not set", err=True)
+        raise typer.Exit(code=1)
+
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not anthropic_key:
+        typer.echo("Error: ANTHROPIC_API_KEY environment variable is not set", err=True)
+        raise typer.Exit(code=1)
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    db = Database(DB_PATH, enable_vec=True)
+    db.run_migrations(SCHEMA_DIR)
+
+    search_use_case = SearchBooksUseCase(
+        embedding_provider=EmbeddingProvider(api_key=openai_key),
+        book_repo=BookRepository(db),
+        chunk_repo=ChunkRepository(db),
+        embedding_repo=EmbeddingRepository(db),
+    )
+
+    use_case = AskBookUseCase(
+        chat_provider=ChatProvider(api_key=anthropic_key),
+        search_use_case=search_use_case,
+        prompts_dir=PROMPTS_DIR,
+    )
+
+    try:
+        answer = use_case.execute(book_id, question, top_k=top_k)
+        typer.echo(answer)
+    except (BookError, LLMError) as e:
         typer.echo(f"Error: {e.message}", err=True)
         raise typer.Exit(code=1)
     finally:

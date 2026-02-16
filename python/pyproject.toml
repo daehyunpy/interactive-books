@@ -8,6 +8,7 @@ dependencies = [
     "httpx",
     "pymupdf",
     "openai",
+    "anthropic",
     "sqlite-vec",
 ]
 
