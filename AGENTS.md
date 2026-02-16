@@ -20,16 +20,16 @@ Read all three before making changes.
 
 Build order: CLI first, bottom-up, one feature at a time.
 
-| Phase | What                        |
-| ----- | --------------------------- |
-| 1     | Project scaffold            |
-| 2     | DB schema                   |
-| 3     | Book ingestion              |
-| 4     | Embeddings                  |
-| 5     | Retrieval                   |
-| 6     | Q&A                         |
-| 7     | CLI polish                  |
-| 8     | iOS/macOS app               |
+| Phase | What             |
+| ----- | ---------------- |
+| 1     | Project scaffold |
+| 2     | DB schema        |
+| 3     | Book ingestion   |
+| 4     | Embeddings       |
+| 5     | Retrieval        |
+| 6     | Q&A              |
+| 7     | CLI polish       |
+| 8     | iOS/macOS app    |
 
 See `docs/technical_design.md` → "Build Order" for details on each phase. See "Directory Layout" for the full project tree.
 
@@ -43,20 +43,23 @@ See `docs/technical_design.md` → "Build Order" for details on each phase. See 
 ### Python CLI
 
 ```bash
-cd python/
 cp .env.example .env          # fill in API keys (see below)
+cp .envrc.example .envrc      # direnv config
 direnv allow                  # or: eval "$(direnv export zsh)"
+cd python/
 uv sync                       # install dependencies
 uv run pytest -x              # verify everything works
 ```
 
 ### Environment Variables
 
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `ANTHROPIC_API_KEY` | Yes | Default chat provider |
-| `OPENAI_API_KEY` | No | For OpenAI embeddings or chat |
-| `OLLAMA_BASE_URL` | No | Local LLM endpoint (default: `http://localhost:11434`) |
+| Variable            | Required | Notes                                                  |
+| ------------------- | -------- | ------------------------------------------------------ |
+| `ANTHROPIC_API_KEY` | Yes      | Default chat provider                                  |
+| `OPENAI_API_KEY`    | No       | For OpenAI embeddings or chat                          |
+| `OLLAMA_BASE_URL`   | No       | Local LLM endpoint (default: `http://localhost:11434`) |
+| `MILVUS_ADDRESS`    | No       | Milvus vector DB address for claude-context MCP        |
+| `MILVUS_TOKEN`      | No       | Milvus authentication token                            |
 
 ### Swift App (Phase 8)
 
@@ -66,16 +69,16 @@ Setup instructions will be added when the Swift app is scaffolded.
 
 All Python commands run from `python/`. All Swift commands run from `swift/` (Phase 8).
 
-| Task | Command |
-|------|---------|
-| Install Python deps | `uv sync` |
-| Run Python tests | `uv run pytest -x` |
-| Lint Python | `uv run ruff check .` |
-| Format Python | `uv run ruff format .` |
-| Type check Python | `uv run pyright` |
-| Run Swift tests | `swift test` *(Phase 8)* |
-| Lint Swift | `swiftlint` *(Phase 8)* |
-| Format Swift | `swiftformat .` *(Phase 8)* |
+| Task                | Command                     |
+| ------------------- | --------------------------- |
+| Install Python deps | `uv sync`                   |
+| Run Python tests    | `uv run pytest -x`          |
+| Lint Python         | `uv run ruff check .`       |
+| Format Python       | `uv run ruff format .`      |
+| Type check Python   | `uv run pyright`            |
+| Run Swift tests     | `swift test` _(Phase 8)_    |
+| Lint Swift          | `swiftlint` _(Phase 8)_     |
+| Format Swift        | `swiftformat .` _(Phase 8)_ |
 
 ## Coding Disciplines
 
@@ -140,12 +143,12 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 
 This project uses OpenSpec for spec-driven development. All non-trivial changes go through this workflow. Trivial fixes (typos, single-line bugs) can skip it.
 
-| Step | Command | What it does |
-|------|---------|--------------|
-| 1 | `/opsx:new <name>` | Create a new change with a kebab-case name (e.g., `/opsx:new add-pdf-parser`) |
-| 2 | `/opsx:ff` | Generate all spec artifacts (requirements, design, tasks) in one pass |
-| 3 | `/opsx:apply` | Implement the tasks from the generated spec |
-| 4 | `/opsx:verify` | Verify implementation matches the spec artifacts |
-| 5 | `/opsx:archive` | Archive the completed change |
+| Step | Command            | What it does                                                                  |
+| ---- | ------------------ | ----------------------------------------------------------------------------- |
+| 1    | `/opsx:new <name>` | Create a new change with a kebab-case name (e.g., `/opsx:new add-pdf-parser`) |
+| 2    | `/opsx:ff`         | Generate all spec artifacts (requirements, design, tasks) in one pass         |
+| 3    | `/opsx:apply`      | Implement the tasks from the generated spec                                   |
+| 4    | `/opsx:verify`     | Verify implementation matches the spec artifacts                              |
+| 5    | `/opsx:archive`    | Archive the completed change                                                  |
 
 Artifacts are stored in `openspec/changes/` during development and moved to `openspec/changes/archive/` when done.
