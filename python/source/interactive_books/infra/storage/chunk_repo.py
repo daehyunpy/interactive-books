@@ -8,7 +8,7 @@ from interactive_books.infra.storage.database import Database
 _CHUNK_COLUMNS = "id, book_id, content, start_page, end_page, chunk_index, created_at"
 
 
-class SqliteChunkRepository:
+class ChunkRepository:
     def __init__(self, db: Database) -> None:
         self._conn = db.connection
 

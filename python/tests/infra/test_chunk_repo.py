@@ -1,19 +1,19 @@
 from interactive_books.domain.book import Book
 from interactive_books.domain.chunk import Chunk
-from interactive_books.infra.storage.book_repo import SqliteBookRepository
-from interactive_books.infra.storage.chunk_repo import SqliteChunkRepository
+from interactive_books.infra.storage.book_repo import BookRepository
+from interactive_books.infra.storage.chunk_repo import ChunkRepository
 from interactive_books.infra.storage.database import Database
 
 
 def _make_book(db: Database, book_id: str = "b1") -> None:
-    repo = SqliteBookRepository(db)
+    repo = BookRepository(db)
     repo.save(Book(id=book_id, title="Test Book"))
 
 
-class TestSqliteChunkRepository:
+class TestChunkRepository:
     def test_save_and_get_by_book(self, db: Database) -> None:
         _make_book(db)
-        repo = SqliteChunkRepository(db)
+        repo = ChunkRepository(db)
         chunks = [
             Chunk(id="c1", book_id="b1", content="First", start_page=1, end_page=1, chunk_index=0),
             Chunk(id="c2", book_id="b1", content="Second", start_page=2, end_page=3, chunk_index=1),
@@ -27,7 +27,7 @@ class TestSqliteChunkRepository:
 
     def test_get_by_book_ordered_by_chunk_index(self, db: Database) -> None:
         _make_book(db)
-        repo = SqliteChunkRepository(db)
+        repo = ChunkRepository(db)
         # Insert in reverse order
         chunks = [
             Chunk(id="c2", book_id="b1", content="Second", start_page=2, end_page=2, chunk_index=1),
@@ -41,12 +41,12 @@ class TestSqliteChunkRepository:
 
     def test_get_by_book_empty(self, db: Database) -> None:
         _make_book(db)
-        repo = SqliteChunkRepository(db)
+        repo = ChunkRepository(db)
         assert repo.get_by_book("b1") == []
 
     def test_get_up_to_page(self, db: Database) -> None:
         _make_book(db)
-        repo = SqliteChunkRepository(db)
+        repo = ChunkRepository(db)
         chunks = [
             Chunk(id="c1", book_id="b1", content="Page 1", start_page=1, end_page=1, chunk_index=0),
             Chunk(id="c2", book_id="b1", content="Page 2", start_page=2, end_page=3, chunk_index=1),
@@ -60,7 +60,7 @@ class TestSqliteChunkRepository:
 
     def test_get_up_to_page_returns_all_when_page_is_high(self, db: Database) -> None:
         _make_book(db)
-        repo = SqliteChunkRepository(db)
+        repo = ChunkRepository(db)
         chunks = [
             Chunk(id="c1", book_id="b1", content="A", start_page=1, end_page=1, chunk_index=0),
             Chunk(id="c2", book_id="b1", content="B", start_page=2, end_page=2, chunk_index=1),
@@ -72,7 +72,7 @@ class TestSqliteChunkRepository:
 
     def test_get_up_to_page_ordered_by_chunk_index(self, db: Database) -> None:
         _make_book(db)
-        repo = SqliteChunkRepository(db)
+        repo = ChunkRepository(db)
         chunks = [
             Chunk(id="c2", book_id="b1", content="B", start_page=2, end_page=2, chunk_index=1),
             Chunk(id="c1", book_id="b1", content="A", start_page=1, end_page=1, chunk_index=0),
@@ -85,7 +85,7 @@ class TestSqliteChunkRepository:
 
     def test_delete_by_book(self, db: Database) -> None:
         _make_book(db)
-        repo = SqliteChunkRepository(db)
+        repo = ChunkRepository(db)
         chunks = [
             Chunk(id="c1", book_id="b1", content="A", start_page=1, end_page=1, chunk_index=0),
         ]
@@ -96,7 +96,7 @@ class TestSqliteChunkRepository:
     def test_chunks_scoped_to_book(self, db: Database) -> None:
         _make_book(db, "b1")
         _make_book(db, "b2")
-        repo = SqliteChunkRepository(db)
+        repo = ChunkRepository(db)
         repo.save_chunks("b1", [
             Chunk(id="c1", book_id="b1", content="Book 1", start_page=1, end_page=1, chunk_index=0),
         ])

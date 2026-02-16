@@ -1,15 +1,15 @@
 from interactive_books.domain.book import Book
 from interactive_books.domain.chat import ChatMessage, MessageRole
 from interactive_books.domain.chunk import Chunk
-from interactive_books.infra.storage.book_repo import SqliteBookRepository
-from interactive_books.infra.storage.chunk_repo import SqliteChunkRepository
+from interactive_books.infra.storage.book_repo import BookRepository
+from interactive_books.infra.storage.chunk_repo import ChunkRepository
 from interactive_books.infra.storage.database import Database
 
 
 class TestCascadeDelete:
     def test_deleting_book_cascades_to_chunks(self, db: Database) -> None:
-        book_repo = SqliteBookRepository(db)
-        chunk_repo = SqliteChunkRepository(db)
+        book_repo = BookRepository(db)
+        chunk_repo = ChunkRepository(db)
 
         book_repo.save(Book(id="b1", title="Cascade Test"))
         chunk_repo.save_chunks("b1", [
@@ -21,7 +21,7 @@ class TestCascadeDelete:
         assert chunk_repo.get_by_book("b1") == []
 
     def test_deleting_book_cascades_to_chat_messages(self, db: Database) -> None:
-        book_repo = SqliteBookRepository(db)
+        book_repo = BookRepository(db)
 
         book_repo.save(Book(id="b1", title="Cascade Test"))
 
@@ -39,8 +39,8 @@ class TestCascadeDelete:
         assert cursor.fetchone()[0] == 0
 
     def test_deleting_book_does_not_affect_other_books(self, db: Database) -> None:
-        book_repo = SqliteBookRepository(db)
-        chunk_repo = SqliteChunkRepository(db)
+        book_repo = BookRepository(db)
+        chunk_repo = ChunkRepository(db)
 
         book_repo.save(Book(id="b1", title="Delete Me"))
         book_repo.save(Book(id="b2", title="Keep Me"))
