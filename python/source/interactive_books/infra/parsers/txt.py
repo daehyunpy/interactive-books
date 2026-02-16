@@ -8,7 +8,7 @@ from interactive_books.domain.protocols import BookParser as BookParserPort
 DEFAULT_CHARS_PER_PAGE = 3000
 
 
-class PlainTextParser(BookParserPort):
+class BookParser(BookParserPort):
     def __init__(self, chars_per_page: int = DEFAULT_CHARS_PER_PAGE) -> None:
         self._chars_per_page = chars_per_page
 

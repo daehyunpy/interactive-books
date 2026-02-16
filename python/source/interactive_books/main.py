@@ -28,9 +28,9 @@ def ingest(
     """Parse, chunk, and ingest a book file."""
     from interactive_books.app.ingest import IngestBookUseCase
     from interactive_books.domain.errors import BookError
-    from interactive_books.infra.chunkers.recursive import RecursiveChunker
-    from interactive_books.infra.parsers.pdf import PyMuPdfParser
-    from interactive_books.infra.parsers.txt import PlainTextParser
+    from interactive_books.infra.chunkers.recursive import TextChunker
+    from interactive_books.infra.parsers.pdf import BookParser as PdfBookParser
+    from interactive_books.infra.parsers.txt import BookParser as TxtBookParser
     from interactive_books.infra.storage.book_repo import BookRepository
     from interactive_books.infra.storage.chunk_repo import ChunkRepository
     from interactive_books.infra.storage.database import Database
@@ -44,9 +44,9 @@ def ingest(
 
     chunk_repo = ChunkRepository(db)
     use_case = IngestBookUseCase(
-        pdf_parser=PyMuPdfParser(),
-        txt_parser=PlainTextParser(),
-        chunker=RecursiveChunker(),
+        pdf_parser=PdfBookParser(),
+        txt_parser=TxtBookParser(),
+        chunker=TextChunker(),
         book_repo=BookRepository(db),
         chunk_repo=chunk_repo,
     )
