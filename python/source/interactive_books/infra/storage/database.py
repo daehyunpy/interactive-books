@@ -8,8 +8,8 @@ MIGRATION_PATTERN = re.compile(r"^(\d{3,})_.+\.sql$")
 
 
 class Database:
-    def __init__(self, path: str) -> None:
-        self._connection = sqlite3.connect(path)
+    def __init__(self, path: str | Path) -> None:
+        self._connection = sqlite3.connect(str(path))
         self._connection.execute("PRAGMA journal_mode=WAL")
         self._connection.execute("PRAGMA foreign_keys=ON")
 
