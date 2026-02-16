@@ -2,6 +2,7 @@ import re
 
 from interactive_books.domain.chunk_data import ChunkData
 from interactive_books.domain.page_content import PageContent
+from interactive_books.domain.protocols import TextChunker as TextChunkerPort
 
 DEFAULT_MAX_TOKENS = 500
 DEFAULT_OVERLAP_TOKENS = 100
@@ -9,7 +10,7 @@ DEFAULT_OVERLAP_TOKENS = 100
 SEPARATORS = ("\n\n", "\n", ". ", " ")
 
 
-class RecursiveChunker:
+class RecursiveChunker(TextChunkerPort):
     def __init__(
         self,
         max_tokens: int = DEFAULT_MAX_TOKENS,

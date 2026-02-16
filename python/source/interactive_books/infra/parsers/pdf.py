@@ -3,9 +3,10 @@ from pathlib import Path
 import pymupdf
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.domain.page_content import PageContent
+from interactive_books.domain.protocols import BookParser as BookParserPort
 
 
-class PyMuPdfParser:
+class PyMuPdfParser(BookParserPort):
     def parse(self, file_path: Path) -> list[PageContent]:
         if not file_path.exists():
             raise BookError(
