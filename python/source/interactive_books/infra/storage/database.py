@@ -2,7 +2,6 @@ import re
 import sqlite3
 from pathlib import Path
 
-import sqlite_vec
 from interactive_books.domain.errors import StorageError, StorageErrorCode
 
 MIGRATION_PATTERN = re.compile(r"^(\d{3,})_.+\.sql$")
@@ -14,6 +13,8 @@ class Database:
         self._connection.execute("PRAGMA journal_mode=WAL")
         self._connection.execute("PRAGMA foreign_keys=ON")
         if enable_vec:
+            import sqlite_vec
+
             self._connection.enable_load_extension(True)
             sqlite_vec.load(self._connection)
             self._connection.enable_load_extension(False)

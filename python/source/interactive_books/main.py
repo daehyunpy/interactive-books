@@ -74,15 +74,11 @@ def embed(
 
     from interactive_books.app.embed import EmbedBookUseCase
     from interactive_books.domain.errors import BookError
-    from interactive_books.infra.embeddings.openai import (
-        EmbeddingProvider,
-    )
+    from interactive_books.infra.embeddings.openai import EmbeddingProvider
     from interactive_books.infra.storage.book_repo import BookRepository
     from interactive_books.infra.storage.chunk_repo import ChunkRepository
     from interactive_books.infra.storage.database import Database
-    from interactive_books.infra.storage.embedding_repo import (
-        EmbeddingRepository,
-    )
+    from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
 
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
