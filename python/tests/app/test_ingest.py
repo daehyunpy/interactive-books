@@ -44,21 +44,11 @@ class FakeChunkRepository:
         self.chunks.pop(book_id, None)
 
 
-class FakePdfParser:
+class FakeParser:
     def __init__(self, pages: list[PageContent] | None = None) -> None:
         self._pages = pages or [
             PageContent(page_number=1, text="Page one content."),
             PageContent(page_number=2, text="Page two content."),
-        ]
-
-    def parse(self, file_path: Path) -> list[PageContent]:
-        return self._pages
-
-
-class FakeTxtParser:
-    def __init__(self, pages: list[PageContent] | None = None) -> None:
-        self._pages = pages or [
-            PageContent(page_number=1, text="Text file content."),
         ]
 
     def parse(self, file_path: Path) -> list[PageContent]:
@@ -102,8 +92,8 @@ def make_use_case(
     cr = chunk_repo or FakeChunkRepository()
     return (
         IngestBookUseCase(
-            pdf_parser=pdf_parser or FakePdfParser(),
-            txt_parser=txt_parser or FakeTxtParser(),
+            pdf_parser=pdf_parser or FakeParser(),
+            txt_parser=txt_parser or FakeParser(),
             chunker=chunker or FakeChunker(),
             book_repo=br,
             chunk_repo=cr,
@@ -115,7 +105,7 @@ def make_use_case(
 
 class TestIngestSuccess:
     def test_successful_pdf_ingest_returns_ready_book(self, tmp_path: Path) -> None:
-        use_case, book_repo, _ = make_use_case()
+        use_case, _, _ = make_use_case()
         pdf_path = tmp_path / "test.pdf"
         pdf_path.touch()
         book = use_case.execute(pdf_path, "Test Book")
@@ -123,7 +113,7 @@ class TestIngestSuccess:
         assert book.title == "Test Book"
 
     def test_successful_txt_ingest_returns_ready_book(self, tmp_path: Path) -> None:
-        use_case, book_repo, _ = make_use_case()
+        use_case, _, _ = make_use_case()
         txt_path = tmp_path / "test.txt"
         txt_path.touch()
         book = use_case.execute(txt_path, "Text Book")

@@ -51,12 +51,12 @@ class IngestBookUseCase:
                 Chunk(
                     id=str(uuid.uuid4()),
                     book_id=book.id,
-                    content=cd.content,
-                    start_page=cd.start_page,
-                    end_page=cd.end_page,
-                    chunk_index=cd.chunk_index,
+                    content=chunk_data.content,
+                    start_page=chunk_data.start_page,
+                    end_page=chunk_data.end_page,
+                    chunk_index=chunk_data.chunk_index,
                 )
-                for cd in chunk_data_list
+                for chunk_data in chunk_data_list
             ]
 
             self._chunk_repo.save_chunks(book.id, chunks)
