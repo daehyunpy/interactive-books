@@ -63,3 +63,52 @@ def ingest(
         raise typer.Exit(code=1)
     finally:
         db.close()
+
+
+@app.command()
+def embed(
+    book_id: str = typer.Argument(..., help="ID of the book to embed"),
+) -> None:
+    """Generate embeddings for a book's chunks."""
+    import os
+
+    from interactive_books.app.embed import EmbedBookUseCase
+    from interactive_books.domain.errors import BookError
+    from interactive_books.infra.embeddings.openai import (
+        EmbeddingProvider,
+    )
+    from interactive_books.infra.storage.book_repo import BookRepository
+    from interactive_books.infra.storage.chunk_repo import ChunkRepository
+    from interactive_books.infra.storage.database import Database
+    from interactive_books.infra.storage.embedding_repo import (
+        EmbeddingRepository,
+    )
+
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        typer.echo("Error: OPENAI_API_KEY environment variable is not set", err=True)
+        raise typer.Exit(code=1)
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    db = Database(DB_PATH, enable_vec=True)
+    db.run_migrations(SCHEMA_DIR)
+
+    provider = EmbeddingProvider(api_key=api_key)
+    use_case = EmbedBookUseCase(
+        embedding_provider=provider,
+        book_repo=BookRepository(db),
+        chunk_repo=ChunkRepository(db),
+        embedding_repo=EmbeddingRepository(db),
+    )
+
+    try:
+        book = use_case.execute(book_id)
+        typer.echo(f"Book ID:     {book.id}")
+        typer.echo(f"Title:       {book.title}")
+        typer.echo(f"Provider:    {book.embedding_provider}")
+        typer.echo(f"Dimension:   {book.embedding_dimension}")
+    except BookError as e:
+        typer.echo(f"Error: {e.message}", err=True)
+        raise typer.Exit(code=1)
+    finally:
+        db.close()
