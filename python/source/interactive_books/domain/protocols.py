@@ -4,6 +4,7 @@ from typing import Protocol
 from interactive_books.domain.book import Book
 from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.chunk_data import ChunkData
+from interactive_books.domain.embedding_vector import EmbeddingVector
 from interactive_books.domain.page_content import PageContent
 
 
@@ -27,3 +28,28 @@ class BookParser(Protocol):
 
 class TextChunker(Protocol):
     def chunk(self, pages: list[PageContent]) -> list[ChunkData]: ...
+
+
+class EmbeddingProvider(Protocol):
+    @property
+    def provider_name(self) -> str: ...
+    @property
+    def dimension(self) -> int: ...
+    def embed(self, texts: list[str]) -> list[list[float]]: ...
+
+
+class EmbeddingRepository(Protocol):
+    def ensure_table(self, provider_name: str, dimension: int) -> None: ...
+    def save_embeddings(
+        self,
+        provider_name: str,
+        dimension: int,
+        book_id: str,
+        embeddings: list[EmbeddingVector],
+    ) -> None: ...
+    def delete_by_book(
+        self, provider_name: str, dimension: int, book_id: str
+    ) -> None: ...
+    def has_embeddings(
+        self, book_id: str, provider_name: str, dimension: int
+    ) -> bool: ...

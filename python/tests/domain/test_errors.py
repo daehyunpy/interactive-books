@@ -25,7 +25,14 @@ class TestDomainErrorBase:
 
 class TestBookError:
     def test_all_codes_exist(self) -> None:
-        expected = {"not_found", "parse_failed", "unsupported_format", "already_exists", "invalid_state"}
+        expected = {
+            "not_found",
+            "parse_failed",
+            "unsupported_format",
+            "already_exists",
+            "invalid_state",
+            "embedding_failed",
+        }
         actual = {code.value for code in BookErrorCode}
         assert actual == expected
 
