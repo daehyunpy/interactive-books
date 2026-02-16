@@ -102,6 +102,16 @@ class FakeEmbeddingRepository:
         key = f"{provider_name}_{dimension}"
         return any(bid == book_id for bid, _ in self.embeddings.get(key, []))
 
+    def search(
+        self,
+        provider_name: str,
+        dimension: int,
+        book_id: str,
+        query_vector: list[float],
+        top_k: int,
+    ) -> list[tuple[str, float]]:
+        return []
+
     def count_for_book(self, book_id: str, provider_name: str, dimension: int) -> int:
         key = f"{provider_name}_{dimension}"
         return sum(1 for bid, _ in self.embeddings.get(key, []) if bid == book_id)

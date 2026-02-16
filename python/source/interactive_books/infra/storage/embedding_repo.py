@@ -50,6 +50,22 @@ class EmbeddingRepository(EmbeddingRepositoryPort):
         self._conn.execute(f"DELETE FROM {table} WHERE book_id = ?", (book_id,))
         self._conn.commit()
 
+    def search(
+        self,
+        provider_name: str,
+        dimension: int,
+        book_id: str,
+        query_vector: list[float],
+        top_k: int,
+    ) -> list[tuple[str, float]]:
+        table = _table_name(provider_name, dimension)
+        cursor = self._conn.execute(
+            f"SELECT chunk_id, distance FROM {table} "
+            "WHERE vector MATCH ? AND k = ? AND book_id = ?",
+            (_serialize_f32(query_vector), top_k, book_id),
+        )
+        return [(row[0], row[1]) for row in cursor.fetchall()]
+
     def has_embeddings(self, book_id: str, provider_name: str, dimension: int) -> bool:
         table = _table_name(provider_name, dimension)
         cursor = self._conn.execute(

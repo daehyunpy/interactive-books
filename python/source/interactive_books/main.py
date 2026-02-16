@@ -66,6 +66,58 @@ def ingest(
 
 
 @app.command()
+def search(
+    book_id: str = typer.Argument(..., help="ID of the book to search"),
+    query: str = typer.Argument(..., help="Search query text"),
+    top_k: int = typer.Option(5, "--top-k", "-k", help="Number of results to return"),
+) -> None:
+    """Search a book's chunks using vector similarity."""
+    import os
+
+    from interactive_books.app.search import SearchBooksUseCase
+    from interactive_books.domain.errors import BookError
+    from interactive_books.infra.embeddings.openai import EmbeddingProvider
+    from interactive_books.infra.storage.book_repo import BookRepository
+    from interactive_books.infra.storage.chunk_repo import ChunkRepository
+    from interactive_books.infra.storage.database import Database
+    from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
+
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        typer.echo("Error: OPENAI_API_KEY environment variable is not set", err=True)
+        raise typer.Exit(code=1)
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    db = Database(DB_PATH, enable_vec=True)
+    db.run_migrations(SCHEMA_DIR)
+
+    use_case = SearchBooksUseCase(
+        embedding_provider=EmbeddingProvider(api_key=api_key),
+        book_repo=BookRepository(db),
+        chunk_repo=ChunkRepository(db),
+        embedding_repo=EmbeddingRepository(db),
+    )
+
+    try:
+        results = use_case.execute(book_id, query, top_k=top_k)
+        if not results:
+            typer.echo("No results found.")
+            raise typer.Exit()
+        for i, r in enumerate(results, 1):
+            typer.echo(
+                f"[{i}] pages {r.start_page}-{r.end_page}  (distance: {r.distance:.4f})"
+            )
+            preview = r.content[:200].replace("\n", " ")
+            typer.echo(f"    {preview}")
+            typer.echo()
+    except BookError as e:
+        typer.echo(f"Error: {e.message}", err=True)
+        raise typer.Exit(code=1)
+    finally:
+        db.close()
+
+
+@app.command()
 def embed(
     book_id: str = typer.Argument(..., help="ID of the book to embed"),
 ) -> None:

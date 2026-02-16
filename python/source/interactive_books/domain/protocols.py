@@ -53,3 +53,11 @@ class EmbeddingRepository(Protocol):
     def has_embeddings(
         self, book_id: str, provider_name: str, dimension: int
     ) -> bool: ...
+    def search(
+        self,
+        provider_name: str,
+        dimension: int,
+        book_id: str,
+        query_vector: list[float],
+        top_k: int,
+    ) -> list[tuple[str, float]]: ...
