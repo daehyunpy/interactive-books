@@ -9,7 +9,7 @@ from interactive_books.infra.storage.database import Database
 _BOOK_COLUMNS = "id, title, status, current_page, embedding_provider, embedding_dimension, created_at, updated_at"
 
 
-class BookRepository(protocols.BookRepository):
+class BookRepository(protocols.BookRepositoryPort):
     def __init__(self, db: Database) -> None:
         self._conn = db.connection
 
