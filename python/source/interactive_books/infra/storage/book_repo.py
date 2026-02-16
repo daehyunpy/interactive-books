@@ -2,14 +2,14 @@ import sqlite3
 from datetime import datetime, timezone
 
 from interactive_books.domain.book import Book, BookStatus
-from interactive_books.domain import protocols
+from interactive_books.domain.protocols import BookRepository as BookRepositoryPort
 from interactive_books.infra.storage.database import Database
 
 
 _BOOK_COLUMNS = "id, title, status, current_page, embedding_provider, embedding_dimension, created_at, updated_at"
 
 
-class BookRepository(protocols.BookRepositoryPort):
+class BookRepository(BookRepositoryPort):
     def __init__(self, db: Database) -> None:
         self._conn = db.connection
 
