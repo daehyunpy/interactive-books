@@ -6,6 +6,7 @@ dependencies = [
     "typer",
     "pydantic-settings",
     "httpx",
+    "pymupdf",
 ]
 
 [project.scripts]
@@ -20,6 +21,9 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    "ignore:builtin type Swig:DeprecationWarning",
+]
 
 [tool.pyright]
 pythonVersion = "3.13"
