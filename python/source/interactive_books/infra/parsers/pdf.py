@@ -6,7 +6,7 @@ from interactive_books.domain.page_content import PageContent
 from interactive_books.domain.protocols import BookParser as BookParserPort
 
 
-class PyMuPdfParser(BookParserPort):
+class BookParser(BookParserPort):
     def parse(self, file_path: Path) -> list[PageContent]:
         if not file_path.exists():
             raise BookError(

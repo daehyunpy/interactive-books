@@ -10,7 +10,7 @@ DEFAULT_OVERLAP_TOKENS = 100
 SEPARATORS = ("\n\n", "\n", ". ", " ")
 
 
-class RecursiveChunker(TextChunkerPort):
+class TextChunker(TextChunkerPort):
     def __init__(
         self,
         max_tokens: int = DEFAULT_MAX_TOKENS,
