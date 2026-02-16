@@ -1,7 +1,10 @@
+from pathlib import Path
 from typing import Protocol
 
 from interactive_books.domain.book import Book
 from interactive_books.domain.chunk import Chunk
+from interactive_books.domain.chunk_data import ChunkData
+from interactive_books.domain.page_content import PageContent
 
 
 class BookRepository(Protocol):
@@ -16,3 +19,11 @@ class ChunkRepository(Protocol):
     def get_by_book(self, book_id: str) -> list[Chunk]: ...
     def get_up_to_page(self, book_id: str, page: int) -> list[Chunk]: ...
     def delete_by_book(self, book_id: str) -> None: ...
+
+
+class BookParser(Protocol):
+    def parse(self, file_path: Path) -> list[PageContent]: ...
+
+
+class TextChunker(Protocol):
+    def chunk(self, pages: list[PageContent]) -> list[ChunkData]: ...
