@@ -6,6 +6,7 @@ from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.chunk_data import ChunkData
 from interactive_books.domain.embedding_vector import EmbeddingVector
 from interactive_books.domain.page_content import PageContent
+from interactive_books.domain.prompt_message import PromptMessage
 
 
 class BookRepository(Protocol):
@@ -28,6 +29,12 @@ class BookParser(Protocol):
 
 class TextChunker(Protocol):
     def chunk(self, pages: list[PageContent]) -> list[ChunkData]: ...
+
+
+class ChatProvider(Protocol):
+    @property
+    def model_name(self) -> str: ...
+    def chat(self, messages: list[PromptMessage]) -> str: ...
 
 
 class EmbeddingProvider(Protocol):
