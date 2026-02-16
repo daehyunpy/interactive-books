@@ -6,6 +6,19 @@ from interactive_books.infra.embeddings.openai import EmbeddingProvider
 from openai import APIConnectionError, AuthenticationError
 
 
+def _mock_embedding(index: int, vector: list[float]) -> MagicMock:
+    emb = MagicMock()
+    emb.index = index
+    emb.embedding = vector
+    return emb
+
+
+def _mock_response(embeddings: list[MagicMock]) -> MagicMock:
+    response = MagicMock()
+    response.data = embeddings
+    return response
+
+
 class TestEmbeddingProviderMetadata:
     def test_provider_name_is_openai(self) -> None:
         provider = EmbeddingProvider(api_key="test-key")
@@ -18,37 +31,22 @@ class TestEmbeddingProviderMetadata:
 
 class TestEmbedBatch:
     def test_embed_single_text(self) -> None:
-        mock_embedding = MagicMock()
-        mock_embedding.embedding = [0.1] * 1536
-        mock_embedding.index = 0
-
-        mock_response = MagicMock()
-        mock_response.data = [mock_embedding]
+        response = _mock_response([_mock_embedding(0, [0.1] * 1536)])
 
         provider = EmbeddingProvider(api_key="test-key")
-        with patch.object(
-            provider._client.embeddings, "create", return_value=mock_response
-        ):
+        with patch.object(provider._client.embeddings, "create", return_value=response):
             result = provider.embed(["Hello world"])
 
         assert len(result) == 1
         assert len(result[0]) == 1536
 
     def test_embed_multiple_texts(self) -> None:
-        mock_embeddings = []
-        for i in range(3):
-            mock_emb = MagicMock()
-            mock_emb.embedding = [0.1 * (i + 1)] * 1536
-            mock_emb.index = i
-            mock_embeddings.append(mock_emb)
-
-        mock_response = MagicMock()
-        mock_response.data = mock_embeddings
+        response = _mock_response(
+            [_mock_embedding(i, [0.1 * (i + 1)] * 1536) for i in range(3)]
+        )
 
         provider = EmbeddingProvider(api_key="test-key")
-        with patch.object(
-            provider._client.embeddings, "create", return_value=mock_response
-        ):
+        with patch.object(provider._client.embeddings, "create", return_value=response):
             result = provider.embed(["text one", "text two", "text three"])
 
         assert len(result) == 3
@@ -56,20 +54,12 @@ class TestEmbedBatch:
             assert len(vec) == 1536
 
     def test_results_ordered_by_index(self) -> None:
-        mock_embeddings = []
-        for i in [2, 0, 1]:
-            mock_emb = MagicMock()
-            mock_emb.embedding = [float(i)] * 4
-            mock_emb.index = i
-            mock_embeddings.append(mock_emb)
-
-        mock_response = MagicMock()
-        mock_response.data = mock_embeddings
+        response = _mock_response(
+            [_mock_embedding(i, [float(i)] * 4) for i in [2, 0, 1]]
+        )
 
         provider = EmbeddingProvider(api_key="test-key")
-        with patch.object(
-            provider._client.embeddings, "create", return_value=mock_response
-        ):
+        with patch.object(provider._client.embeddings, "create", return_value=response):
             result = provider.embed(["a", "b", "c"])
 
         assert result[0][0] == 0.0
@@ -78,14 +68,14 @@ class TestEmbedBatch:
 
 
 class TestEmbedErrors:
-    def test_api_key_missing_raises_embedding_failed(self) -> None:
+    def test_authentication_error_raises_embedding_failed(self) -> None:
         provider = EmbeddingProvider(api_key="bad-key")
 
-        mock_response = MagicMock()
-        mock_response.status_code = 401
+        mock_http_response = MagicMock()
+        mock_http_response.status_code = 401
         error = AuthenticationError(
             message="Incorrect API key",
-            response=mock_response,
+            response=mock_http_response,
             body=None,
         )
 
@@ -94,7 +84,7 @@ class TestEmbedErrors:
                 provider.embed(["Hello"])
             assert exc_info.value.code == BookErrorCode.EMBEDDING_FAILED
 
-    def test_api_connection_error_raises_embedding_failed(self) -> None:
+    def test_connection_error_raises_embedding_failed(self) -> None:
         provider = EmbeddingProvider(api_key="test-key")
 
         error = APIConnectionError(request=MagicMock())

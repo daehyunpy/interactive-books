@@ -1,4 +1,5 @@
 from interactive_books.domain.book import Book
+from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.embedding_vector import EmbeddingVector
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.domain.protocols import (
@@ -46,21 +47,9 @@ class EmbedBookUseCase:
         self._embedding_repo.delete_by_book(provider_name, dimension, book_id)
 
         try:
-            all_vectors: list[EmbeddingVector] = []
-
-            for i in range(0, len(chunks), self._batch_size):
-                batch = chunks[i : i + self._batch_size]
-                texts = [c.content for c in batch]
-                vectors = self._provider.embed(texts)
-
-                batch_vectors = [
-                    EmbeddingVector(chunk_id=chunk.id, vector=vec)
-                    for chunk, vec in zip(batch, vectors)
-                ]
-                all_vectors.extend(batch_vectors)
-
+            vectors = self._embed_in_batches(chunks)
             self._embedding_repo.save_embeddings(
-                provider_name, dimension, book_id, all_vectors
+                provider_name, dimension, book_id, vectors
             )
         except Exception:
             self._embedding_repo.delete_by_book(provider_name, dimension, book_id)
@@ -71,3 +60,15 @@ class EmbedBookUseCase:
         self._book_repo.save(book)
 
         return book
+
+    def _embed_in_batches(self, chunks: list[Chunk]) -> list[EmbeddingVector]:
+        all_vectors: list[EmbeddingVector] = []
+        for i in range(0, len(chunks), self._batch_size):
+            batch = chunks[i : i + self._batch_size]
+            texts = [c.content for c in batch]
+            vectors = self._provider.embed(texts)
+            all_vectors.extend(
+                EmbeddingVector(chunk_id=chunk.id, vector=vec)
+                for chunk, vec in zip(batch, vectors)
+            )
+        return all_vectors

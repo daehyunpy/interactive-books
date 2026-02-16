@@ -39,11 +39,10 @@ class EmbeddingRepository(EmbeddingRepositoryPort):
         embeddings: list[EmbeddingVector],
     ) -> None:
         table = _table_name(provider_name, dimension)
-        for ev in embeddings:
-            self._conn.execute(
-                f"INSERT INTO {table}(book_id, chunk_id, vector) VALUES (?, ?, ?)",
-                (book_id, ev.chunk_id, _serialize_f32(ev.vector)),
-            )
+        self._conn.executemany(
+            f"INSERT INTO {table}(book_id, chunk_id, vector) VALUES (?, ?, ?)",
+            [(book_id, ev.chunk_id, _serialize_f32(ev.vector)) for ev in embeddings],
+        )
         self._conn.commit()
 
     def delete_by_book(self, provider_name: str, dimension: int, book_id: str) -> None:
