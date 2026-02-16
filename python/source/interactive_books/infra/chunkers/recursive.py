@@ -1,5 +1,4 @@
 import re
-from collections.abc import Sequence
 
 from interactive_books.domain.chunk_data import ChunkData
 from interactive_books.domain.page_content import PageContent
@@ -38,8 +37,7 @@ class RecursiveChunker:
             (word, page.page_number) for page in pages for word in page.text.split()
         ]
 
-    def _recursive_split(self, text: str, separators: Sequence[str]) -> list[str]:
-        """Split text recursively using a hierarchy of separators."""
+    def _recursive_split(self, text: str, separators: tuple[str, ...]) -> list[str]:
         if not separators:
             words = text.split()
             return self._group_words(words)
@@ -84,7 +82,8 @@ class RecursiveChunker:
         overlap_prefix = ""
 
         for i, segment in enumerate(merged):
-            if i > 0 and self._overlap_tokens > 0 and overlap_prefix:
+            has_overlap = i > 0 and self._overlap_tokens > 0 and overlap_prefix
+            if has_overlap:
                 content = overlap_prefix + " " + segment
             else:
                 content = segment
@@ -100,7 +99,7 @@ class RecursiveChunker:
             start_page = word_page_pairs[segment_start][1]
             end_page = word_page_pairs[segment_end][1]
 
-            if i > 0 and self._overlap_tokens > 0 and overlap_prefix:
+            if has_overlap:
                 overlap_word_count = len(overlap_prefix.split())
                 overlap_start = max(0, segment_start - overlap_word_count)
                 start_page = min(start_page, word_page_pairs[overlap_start][1])
@@ -114,9 +113,8 @@ class RecursiveChunker:
                 )
             )
 
-            segment_words = segment.split()
-            if self._overlap_tokens > 0 and len(segment_words) > self._overlap_tokens:
-                overlap_prefix = " ".join(segment_words[-self._overlap_tokens :])
+            if self._overlap_tokens > 0 and len(chunk_words) > self._overlap_tokens:
+                overlap_prefix = " ".join(chunk_words[-self._overlap_tokens :])
             elif self._overlap_tokens > 0:
                 overlap_prefix = segment
             else:

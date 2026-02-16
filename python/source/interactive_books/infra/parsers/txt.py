@@ -26,10 +26,10 @@ class PlainTextParser:
             )
 
         total_pages = math.ceil(len(text) / self._chars_per_page)
-        pages: list[PageContent] = []
-        for i in range(total_pages):
-            start = i * self._chars_per_page
-            end = start + self._chars_per_page
-            pages.append(PageContent(page_number=i + 1, text=text[start:end]))
-
-        return pages
+        return [
+            PageContent(
+                page_number=i + 1,
+                text=text[i * self._chars_per_page : (i + 1) * self._chars_per_page],
+            )
+            for i in range(total_pages)
+        ]
