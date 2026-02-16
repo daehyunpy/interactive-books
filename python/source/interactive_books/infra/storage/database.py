@@ -24,14 +24,9 @@ class Database:
         self._ensure_migration_table()
         applied = self._get_applied_versions()
 
-        for path in self._sorted_migration_files(schema_dir):
-            match = MIGRATION_PATTERN.match(path.name)
-            if not match:
-                continue
-            version = int(match.group(1))
-            if version in applied:
-                continue
-            self._apply_migration(path, version)
+        for path, version in self._sorted_migration_files(schema_dir):
+            if version not in applied:
+                self._apply_migration(path, version)
 
     def _ensure_migration_table(self) -> None:
         self._connection.execute(
@@ -49,12 +44,13 @@ class Database:
         cursor = self._connection.execute("SELECT version FROM schema_migrations")
         return {row[0] for row in cursor.fetchall()}
 
-    def _sorted_migration_files(self, schema_dir: Path) -> list[Path]:
-        files = [
-            f for f in sorted(schema_dir.iterdir())
-            if f.is_file() and MIGRATION_PATTERN.match(f.name)
-        ]
-        return files
+    def _sorted_migration_files(self, schema_dir: Path) -> list[tuple[Path, int]]:
+        results = []
+        for path in sorted(schema_dir.iterdir()):
+            match = MIGRATION_PATTERN.match(path.name) if path.is_file() else None
+            if match:
+                results.append((path, int(match.group(1))))
+        return results
 
     def _apply_migration(self, path: Path, version: int) -> None:
         sql = path.read_text()

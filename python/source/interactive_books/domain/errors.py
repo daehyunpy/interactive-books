@@ -2,8 +2,6 @@ from enum import Enum
 
 
 class DomainError(Exception):
-    """Base class for all domain errors."""
-
     def __init__(self, code: Enum, message: str) -> None:
         self.code = code
         self.message = message

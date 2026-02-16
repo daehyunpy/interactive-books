@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 
+from interactive_books.domain._time import utc_now
 from interactive_books.domain.errors import BookError, BookErrorCode
 
 
@@ -12,10 +13,6 @@ class BookStatus(Enum):
     FAILED = "failed"
 
 
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 @dataclass
 class Book:
     id: str
@@ -24,8 +21,8 @@ class Book:
     current_page: int = 0
     embedding_provider: str | None = None
     embedding_dimension: int | None = None
-    created_at: datetime = field(default_factory=_utc_now)
-    updated_at: datetime = field(default_factory=_utc_now)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
 
     def __post_init__(self) -> None:
         if not self.title.strip():

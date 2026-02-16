@@ -5,15 +5,17 @@ from interactive_books.domain.book import Book, BookStatus
 from interactive_books.infra.storage.database import Database
 
 
+_BOOK_COLUMNS = "id, title, status, current_page, embedding_provider, embedding_dimension, created_at, updated_at"
+
+
 class SqliteBookRepository:
     def __init__(self, db: Database) -> None:
         self._conn = db.connection
 
     def save(self, book: Book) -> None:
         self._conn.execute(
-            """
-            INSERT OR REPLACE INTO books
-                (id, title, status, current_page, embedding_provider, embedding_dimension, created_at, updated_at)
+            f"""
+            INSERT OR REPLACE INTO books ({_BOOK_COLUMNS})
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -31,7 +33,7 @@ class SqliteBookRepository:
 
     def get(self, book_id: str) -> Book | None:
         cursor = self._conn.execute(
-            "SELECT id, title, status, current_page, embedding_provider, embedding_dimension, created_at, updated_at FROM books WHERE id = ?",
+            f"SELECT {_BOOK_COLUMNS} FROM books WHERE id = ?",
             (book_id,),
         )
         row = cursor.fetchone()
@@ -40,9 +42,7 @@ class SqliteBookRepository:
         return self._row_to_book(row)
 
     def get_all(self) -> list[Book]:
-        cursor = self._conn.execute(
-            "SELECT id, title, status, current_page, embedding_provider, embedding_dimension, created_at, updated_at FROM books"
-        )
+        cursor = self._conn.execute(f"SELECT {_BOOK_COLUMNS} FROM books")
         return [self._row_to_book(row) for row in cursor.fetchall()]
 
     def delete(self, book_id: str) -> None:
