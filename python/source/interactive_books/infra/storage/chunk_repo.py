@@ -5,14 +5,17 @@ from interactive_books.domain.chunk import Chunk
 from interactive_books.infra.storage.database import Database
 
 
+_CHUNK_COLUMNS = "id, book_id, content, start_page, end_page, chunk_index, created_at"
+
+
 class SqliteChunkRepository:
     def __init__(self, db: Database) -> None:
         self._conn = db.connection
 
     def save_chunks(self, book_id: str, chunks: list[Chunk]) -> None:
         self._conn.executemany(
-            """
-            INSERT INTO chunks (id, book_id, content, start_page, end_page, chunk_index, created_at)
+            f"""
+            INSERT INTO chunks ({_CHUNK_COLUMNS})
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             [
@@ -32,14 +35,14 @@ class SqliteChunkRepository:
 
     def get_by_book(self, book_id: str) -> list[Chunk]:
         cursor = self._conn.execute(
-            "SELECT id, book_id, content, start_page, end_page, chunk_index, created_at FROM chunks WHERE book_id = ? ORDER BY chunk_index",
+            f"SELECT {_CHUNK_COLUMNS} FROM chunks WHERE book_id = ? ORDER BY chunk_index",
             (book_id,),
         )
         return [self._row_to_chunk(row) for row in cursor.fetchall()]
 
     def get_up_to_page(self, book_id: str, page: int) -> list[Chunk]:
         cursor = self._conn.execute(
-            "SELECT id, book_id, content, start_page, end_page, chunk_index, created_at FROM chunks WHERE book_id = ? AND start_page <= ? ORDER BY chunk_index",
+            f"SELECT {_CHUNK_COLUMNS} FROM chunks WHERE book_id = ? AND start_page <= ? ORDER BY chunk_index",
             (book_id, page),
         )
         return [self._row_to_chunk(row) for row in cursor.fetchall()]
