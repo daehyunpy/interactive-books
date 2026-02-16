@@ -7,6 +7,7 @@ app = typer.Typer()
 VERSION = "0.1.0"
 SCHEMA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "shared" / "schema"
 DB_PATH = Path(__file__).resolve().parent.parent.parent.parent / "data" / "books.db"
+CONTENT_PREVIEW_LENGTH = 200
 
 
 @app.callback(invoke_without_command=True)
@@ -103,11 +104,11 @@ def search(
         if not results:
             typer.echo("No results found.")
             raise typer.Exit()
-        for i, r in enumerate(results, 1):
+        for i, result in enumerate(results, 1):
             typer.echo(
-                f"[{i}] pages {r.start_page}-{r.end_page}  (distance: {r.distance:.4f})"
+                f"[{i}] pages {result.start_page}-{result.end_page}  (distance: {result.distance:.4f})"
             )
-            preview = r.content[:200].replace("\n", " ")
+            preview = result.content[:CONTENT_PREVIEW_LENGTH].replace("\n", " ")
             typer.echo(f"    {preview}")
             typer.echo()
     except BookError as e:

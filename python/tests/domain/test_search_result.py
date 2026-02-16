@@ -1,3 +1,4 @@
+import pytest
 from interactive_books.domain.search_result import SearchResult
 
 
@@ -25,8 +26,6 @@ class TestSearchResult:
             end_page=1,
             distance=0.1,
         )
-
-        import pytest
 
         with pytest.raises(AttributeError):
             result.distance = 0.9  # type: ignore[misc]

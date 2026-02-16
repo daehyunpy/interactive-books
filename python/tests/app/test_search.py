@@ -64,14 +64,10 @@ class FakeEmbeddingRepository:
 
     def __init__(self) -> None:
         self._search_results: list[tuple[str, float]] = []
-        self._has_embeddings: bool = True
         self.last_search_top_k: int | None = None
 
     def set_search_results(self, results: list[tuple[str, float]]) -> None:
         self._search_results = results
-
-    def set_has_embeddings(self, value: bool) -> None:
-        self._has_embeddings = value
 
     def ensure_table(self, provider_name: str, dimension: int) -> None:
         pass
@@ -89,7 +85,7 @@ class FakeEmbeddingRepository:
         pass
 
     def has_embeddings(self, book_id: str, provider_name: str, dimension: int) -> bool:
-        return self._has_embeddings
+        return False
 
     def search(
         self,
