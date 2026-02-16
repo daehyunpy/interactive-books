@@ -101,6 +101,7 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 
 ### Clean Code
 
+- **Port naming** — domain Protocol classes keep clean names (`BookRepository`, not `BookRepositoryPort`). Infra adapters alias at import: `from ...protocols import BookRepository as BookRepositoryPort`. Never rename the protocol definition itself.
 - **Naming** — names reveal intent. `chunks_up_to_page(page)` not `get_filtered(p)`. Booleans read as assertions: `is_ingested`, `has_embeddings`.
 - **Functions** — do one thing. If it has "and" in its description, split it. Aim for < 20 lines.
 - **No dead code** — no commented-out code, no unused imports. Delete it; git remembers.
