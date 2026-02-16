@@ -5,7 +5,6 @@ from interactive_books.domain.book import Book, BookStatus
 from interactive_books.domain.protocols import BookRepository as BookRepositoryPort
 from interactive_books.infra.storage.database import Database
 
-
 _BOOK_COLUMNS = "id, title, status, current_page, embedding_provider, embedding_dimension, created_at, updated_at"
 
 
@@ -16,8 +15,16 @@ class BookRepository(BookRepositoryPort):
     def save(self, book: Book) -> None:
         self._conn.execute(
             f"""
-            INSERT OR REPLACE INTO books ({_BOOK_COLUMNS})
+            INSERT INTO books ({_BOOK_COLUMNS})
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                status = excluded.status,
+                current_page = excluded.current_page,
+                embedding_provider = excluded.embedding_provider,
+                embedding_dimension = excluded.embedding_dimension,
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at
             """,
             (
                 book.id,
