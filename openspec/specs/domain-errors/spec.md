@@ -6,7 +6,7 @@ Typed domain exceptions matching the cross-platform error taxonomy. Located in `
 
 ### DE-1: BookError
 
-`BookError` exception class with enumerated cases: `not_found`, `parse_failed`, `unsupported_format`, `already_exists`, `invalid_state` (for invalid status transitions). Each case has a descriptive message. Uses an inner enum `BookErrorCode` for case identification.
+`BookError` exception class with enumerated cases: `not_found`, `parse_failed`, `unsupported_format`, `already_exists`, `invalid_state` (for invalid status transitions), `embedding_failed` (for embedding generation or storage failures). Each case has a descriptive message. Uses an inner enum `BookErrorCode` for case identification.
 
 ### DE-2: LLMError
 
