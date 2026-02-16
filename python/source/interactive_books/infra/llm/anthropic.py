@@ -17,14 +17,12 @@ class ChatProvider(ChatProviderPort):
         return self._model
 
     def chat(self, messages: list[PromptMessage]) -> str:
-        system_text = None
-        api_messages: list[dict[str, str]] = []
-
-        for msg in messages:
-            if msg.role == "system":
-                system_text = msg.content
-            else:
-                api_messages.append({"role": msg.role, "content": msg.content})
+        system_messages = [m.content for m in messages if m.role == "system"]
+        api_messages = [
+            {"role": m.role, "content": m.content}
+            for m in messages
+            if m.role != "system"
+        ]
 
         try:
             kwargs: dict = {
@@ -32,8 +30,8 @@ class ChatProvider(ChatProviderPort):
                 "max_tokens": MAX_TOKENS,
                 "messages": api_messages,
             }
-            if system_text is not None:
-                kwargs["system"] = system_text
+            if system_messages:
+                kwargs["system"] = system_messages[0]
 
             response = self._client.messages.create(**kwargs)
         except APIError as e:

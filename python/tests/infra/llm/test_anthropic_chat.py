@@ -60,9 +60,6 @@ class TestChat:
 
         provider = ChatProvider(api_key="test-key")
 
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.headers = {}
         error = APIError(
             message="Internal server error",
             request=MagicMock(),

@@ -45,7 +45,7 @@ class AskBookUseCase:
         if not results:
             return NO_CONTEXT_MESSAGE
 
-        passages: list[str] = []
-        for r in results:
-            passages.append(f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}")
+        passages = [
+            f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}" for r in results
+        ]
         return "\n\n".join(passages)
