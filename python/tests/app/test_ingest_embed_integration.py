@@ -100,6 +100,8 @@ def _make_ingest_use_case(
     return IngestBookUseCase(
         pdf_parser=TxtBookParser(),  # unused for .txt files, but required
         txt_parser=TxtBookParser(),
+        epub_parser=TxtBookParser(),  # unused for .txt files, but required
+        docx_parser=TxtBookParser(),  # unused for .txt files, but required
         chunker=TextChunker(),
         book_repo=book_repo,
         chunk_repo=chunk_repo,

@@ -55,7 +55,9 @@ def main(
 
 @app.command()
 def ingest(
-    file_path: Path = typer.Argument(..., help="Path to the book file (PDF or TXT)"),
+    file_path: Path = typer.Argument(
+        ..., help="Path to the book file (PDF, TXT, EPUB, or DOCX)"
+    ),
     title: str = typer.Option(
         "", "--title", "-t", help="Book title (defaults to filename)"
     ),
@@ -65,6 +67,8 @@ def ingest(
     from interactive_books.app.ingest import IngestBookUseCase
     from interactive_books.domain.errors import BookError
     from interactive_books.infra.chunkers.recursive import TextChunker
+    from interactive_books.infra.parsers.docx import BookParser as DocxBookParser
+    from interactive_books.infra.parsers.epub import BookParser as EpubBookParser
     from interactive_books.infra.parsers.pdf import BookParser as PdfBookParser
     from interactive_books.infra.parsers.txt import BookParser as TxtBookParser
     from interactive_books.infra.storage.book_repo import BookRepository
@@ -102,6 +106,8 @@ def ingest(
     use_case = IngestBookUseCase(
         pdf_parser=PdfBookParser(),
         txt_parser=TxtBookParser(),
+        epub_parser=EpubBookParser(),
+        docx_parser=DocxBookParser(),
         chunker=TextChunker(),
         book_repo=book_repo,
         chunk_repo=chunk_repo,

@@ -17,7 +17,7 @@ from interactive_books.domain.protocols import (
 if TYPE_CHECKING:
     from interactive_books.app.embed import EmbedBookUseCase
 
-SUPPORTED_EXTENSIONS = {".pdf", ".txt"}
+SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".epub", ".docx"}
 
 
 class IngestBookUseCase:
@@ -26,13 +26,19 @@ class IngestBookUseCase:
         *,
         pdf_parser: BookParser,
         txt_parser: BookParser,
+        epub_parser: BookParser,
+        docx_parser: BookParser,
         chunker: TextChunker,
         book_repo: BookRepository,
         chunk_repo: ChunkRepository,
         embed_use_case: EmbedBookUseCase | None = None,
     ) -> None:
-        self._pdf_parser = pdf_parser
-        self._txt_parser = txt_parser
+        self._parsers: dict[str, BookParser] = {
+            ".pdf": pdf_parser,
+            ".txt": txt_parser,
+            ".epub": epub_parser,
+            ".docx": docx_parser,
+        }
         self._chunker = chunker
         self._book_repo = book_repo
         self._chunk_repo = chunk_repo
@@ -51,7 +57,7 @@ class IngestBookUseCase:
         self._book_repo.save(book)
 
         try:
-            parser = self._pdf_parser if extension == ".pdf" else self._txt_parser
+            parser = self._parsers[extension]
             pages = parser.parse(file_path)
             chunk_data_list = self._chunker.chunk(pages)
 

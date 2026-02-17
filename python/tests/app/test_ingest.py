@@ -99,6 +99,8 @@ def make_use_case(
     *,
     pdf_parser: BookParser | None = None,
     txt_parser: BookParser | None = None,
+    epub_parser: BookParser | None = None,
+    docx_parser: BookParser | None = None,
     chunker: TextChunker | None = None,
     book_repo: FakeBookRepository | None = None,
     chunk_repo: FakeChunkRepository | None = None,
@@ -110,6 +112,8 @@ def make_use_case(
         IngestBookUseCase(
             pdf_parser=pdf_parser or FakeParser(),
             txt_parser=txt_parser or FakeParser(),
+            epub_parser=epub_parser or FakeParser(),
+            docx_parser=docx_parser or FakeParser(),
             chunker=chunker or FakeChunker(),
             book_repo=br,
             chunk_repo=cr,
@@ -146,15 +150,72 @@ class TestIngestSuccess:
         assert book_repo.get(book.id).status == BookStatus.READY  # type: ignore[union-attr]
 
 
+class TestIngestEpubSuccess:
+    def test_successful_epub_ingest_returns_ready_book(
+        self, tmp_path: Path
+    ) -> None:
+        use_case, _, _ = make_use_case()
+        epub_path = tmp_path / "test.epub"
+        epub_path.touch()
+        book, embed_error = use_case.execute(epub_path, "EPUB Book")
+        assert book.status == BookStatus.READY
+        assert embed_error is None
+
+    def test_epub_format_no_longer_rejected_as_unsupported(
+        self, tmp_path: Path
+    ) -> None:
+        use_case, book_repo, _ = make_use_case()
+        epub_path = tmp_path / "test.epub"
+        epub_path.touch()
+        book, _ = use_case.execute(epub_path, "EPUB Book")
+        assert book_repo.get(book.id) is not None
+
+
+class TestIngestDocxSuccess:
+    def test_successful_docx_ingest_returns_ready_book(
+        self, tmp_path: Path
+    ) -> None:
+        use_case, _, _ = make_use_case()
+        docx_path = tmp_path / "test.docx"
+        docx_path.touch()
+        book, embed_error = use_case.execute(docx_path, "DOCX Book")
+        assert book.status == BookStatus.READY
+        assert embed_error is None
+
+    def test_docx_format_no_longer_rejected_as_unsupported(
+        self, tmp_path: Path
+    ) -> None:
+        use_case, book_repo, _ = make_use_case()
+        docx_path = tmp_path / "test.docx"
+        docx_path.touch()
+        book, _ = use_case.execute(docx_path, "DOCX Book")
+        assert book_repo.get(book.id) is not None
+
+
+class DrmProtectedParser:
+    def parse(self, file_path: Path) -> list[PageContent]:
+        raise BookError(BookErrorCode.DRM_PROTECTED, "EPUB is DRM-protected")
+
+
+class TestIngestDrmProtectedEpub:
+    def test_drm_protected_epub_raises_drm_error(self, tmp_path: Path) -> None:
+        use_case, _, _ = make_use_case(epub_parser=DrmProtectedParser())
+        epub_path = tmp_path / "test.epub"
+        epub_path.touch()
+        with pytest.raises(BookError) as exc_info:
+            use_case.execute(epub_path, "DRM Book")
+        assert exc_info.value.code == BookErrorCode.DRM_PROTECTED
+
+
 class TestIngestUnsupportedFormat:
     def test_unsupported_format_raises_before_book_creation(
         self, tmp_path: Path
     ) -> None:
         use_case, book_repo, _ = make_use_case()
-        path = tmp_path / "test.epub"
+        path = tmp_path / "test.xyz"
         path.touch()
         with pytest.raises(BookError) as exc_info:
-            use_case.execute(path, "EPUB Book")
+            use_case.execute(path, "Unknown Book")
         assert exc_info.value.code == BookErrorCode.UNSUPPORTED_FORMAT
         assert len(book_repo.books) == 0
 
