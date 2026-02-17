@@ -16,9 +16,9 @@ Read all three before making changes.
 
 ## Current State
 
-**Phases 1–5 complete.** Entering Phase 6 (Q&A / Agentic Chat).
+**Phases 1–6 complete.** Entering Phase 7 (CLI polish).
 
-The Python CLI can ingest books (PDF/TXT), generate embeddings, and run vector search with page filtering. The `AskBookUseCase` exists as a single-turn RAG pipeline but will be replaced by agentic conversation in Phase 6.
+The Python CLI can ingest books (PDF/TXT), generate embeddings, run vector search, and have multi-turn agentic conversations about books. The agent decides when to retrieve via tool-use, maintains conversation history, and persists sessions.
 
 Build order: CLI first, bottom-up, one feature at a time.
 
@@ -29,60 +29,46 @@ Build order: CLI first, bottom-up, one feature at a time.
 | 3     | Book ingestion     | Done     |
 | 4     | Embeddings         | Done     |
 | 5     | Retrieval          | Done     |
-| 6     | Q&A (Agentic Chat) | **Next** |
-| 7     | CLI polish         | —        |
+| 6     | Q&A (Agentic Chat) | Done     |
+| 7     | CLI polish         | **Next** |
 | 8     | iOS/macOS app      | —        |
 
 See `docs/technical_design.md` → "Build Order" for details on each phase. See "Directory Layout" for the full project tree.
 
-### Phase 6: Agentic Chat
+### Agentic Chat Architecture (Phase 6 — completed)
 
-Phase 6 replaces single-turn RAG with an agentic conversation system. See `docs/technical_design.md` → "Tool-Use Support" and "Data Flow" for architecture details.
+The conversation system uses tool-use to let the LLM decide when retrieval is needed. Key components:
+
+| Component                                          | File                                 | Role                                                                       |
+| -------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------- |
+| `Conversation` entity                              | `domain/conversation.py`             | Aggregate root owning ChatMessages; one book per conversation              |
+| `ChatMessage`                                      | `domain/chat.py`                     | Has `conversation_id` (not `book_id`); roles: user, assistant, tool_result |
+| `ToolDefinition`, `ToolInvocation`, `ChatResponse` | `domain/tool.py`                     | Tool-use value objects                                                     |
+| `RetrievalStrategy` protocol                       | `domain/protocols.py`                | Pluggable retrieval — default: tool-use; fallback: always-retrieve         |
+| `ConversationContextStrategy` protocol             | `domain/protocols.py`                | Pluggable context — default: full history capped at 20 messages            |
+| `ChatWithBookUseCase`                              | `app/chat.py`                        | Agent loop orchestrator (replaces `AskBookUseCase`)                        |
+| `ManageConversationsUseCase`                       | `app/conversations.py`               | Create, list, rename, delete conversations                                 |
+| `chat_with_tools()`                                | `infra/llm/anthropic.py`             | Anthropic native tool-use API                                              |
+| `ToolUseRetrievalStrategy`                         | `infra/retrieval/tool_use.py`        | Agent loop with max 3 iterations                                           |
+| `AlwaysRetrieveStrategy`                           | `infra/retrieval/always_retrieve.py` | Ollama fallback — reformulates + always searches                           |
+| `FullHistoryStrategy`                              | `infra/context/full_history.py`      | Last N messages (default 20)                                               |
+| `conversation_system_prompt.md`                    | `shared/prompts/`                    | Agentic system prompt with search_book tool                                |
+| `reformulation_prompt.md`                          | `shared/prompts/`                    | Query rewriting for always-retrieve strategy                               |
 
 #### Key Decisions (already resolved — do not re-ask)
 
-| Decision                 | Choice                                                                                                               |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| Retrieval strategy       | Formal tool-use API (Anthropic/OpenAI). Pluggable `RetrievalStrategy` protocol.                                      |
-| Context management       | Full conversation history in prompt, capped at N messages (N TBD). Pluggable `ConversationContextStrategy` protocol. |
-| Session structure        | Multiple named conversations per book. Auto-generated title from first message; user can rename.                     |
-| Domain entity name       | `Conversation` — NOT `Session`.                                                                                      |
-| ChatMessage FK           | `conversation_id` only — NO `book_id` on ChatMessage. Book reachable via `message → conversation → book`.            |
-| Multi-book conversations | One book per conversation for now. May evolve for multi-book queries later.                                          |
-| Ollama tool-use          | Deferred post-MVP. Ollama falls back to always-retrieve.                                                             |
-| Tool results visibility  | Hidden in production. Visible with `--verbose` (CLI) / debug toggle (app).                                           |
-| CLI `ask` command        | Remove entirely (not released). Replace with `cli chat <book>`.                                                      |
-| Feature naming           | "Book Conversations" — ubiquitous language is "conversation", not "question" or "ask".                               |
-
-#### Tasks
-
-Build order is bottom-up, TDD (write failing tests first). Each task is one commit. **Tasks must be done in order** — later tasks depend on earlier ones (e.g., 6.7 needs the schema from 6.1 and the protocol from 6.5).
-
-- [ ] **6.1 Schema migration** — Update `shared/schema/001_initial.sql`: add `conversations` table (`id`, `book_id`, `title`, `created_at`), change `chat_messages.book_id` → `conversation_id` FK, add `'tool_result'` to role CHECK constraint. Modify in-place (nothing released).
-- [ ] **6.2 Domain: Conversation aggregate** — Create `domain/conversation.py` with `Conversation` entity (id, book_id, title, created_at). Validate non-empty title. Tests in `tests/domain/test_conversation.py`.
-- [ ] **6.3 Domain: Update ChatMessage** — In `domain/chat.py`, replace `book_id` with `conversation_id`. Add `TOOL_RESULT` to `MessageRole`. Update `tests/domain/test_chat.py`.
-- [ ] **6.4 Domain: Update errors** — Add `UNSUPPORTED_FEATURE` to `LLMErrorCode` in `domain/errors.py`.
-- [ ] **6.5 Domain: New protocols** — In `domain/protocols.py`, add: `ConversationRepository`, `ChatMessageRepository`, `RetrievalStrategy`, `ConversationContextStrategy`. Extend `ChatProvider` with `chat_with_tools(messages, tools) -> ChatResponse`.
-- [ ] **6.6 Domain: Tool-use value objects** — Add `ToolDefinition`, `ToolInvocation`, `ChatResponse` to domain (in `domain/tool_use.py` or extend `domain/prompt_message.py`).
-- [ ] **6.7 Infra: ConversationRepository** — SQLite implementation in `infra/storage/conversation_repo.py`. Tests in `tests/infra/storage/test_conversation_repo.py`.
-- [ ] **6.8 Infra: ChatMessageRepository** — SQLite implementation in `infra/storage/chat_message_repo.py`. Tests in `tests/infra/storage/test_chat_message_repo.py`.
-- [ ] **6.9 Infra: Anthropic tool-use** — Implement `chat_with_tools()` in `infra/llm/anthropic.py` using Anthropic's tool-use API. Tests in `tests/infra/llm/test_anthropic_chat.py`.
-- [ ] **6.10 Infra: RetrievalStrategy implementations** — `infra/strategies/tool_use_retrieval.py` (default) and `infra/strategies/always_retrieve.py` (Ollama fallback). Tests for each.
-- [ ] **6.11 Infra: ConversationContextStrategy** — `infra/strategies/full_history_context.py` (full history, capped at N). Tests.
-- [ ] **6.12 Prompt templates** — Create `shared/prompts/conversation_system_prompt.md` (agentic system prompt with tool-use instructions) and `shared/prompts/reformulation_prompt.md` (query reformulation).
-- [ ] **6.13 App: ChatWithBookUseCase** — Agent loop in `app/chat.py`: build messages from conversation history → call `chat_with_tools()` → execute tool if invoked → persist turn → return response. Tests in `tests/app/test_chat.py`.
-- [ ] **6.14 Remove AskBookUseCase** — Delete `app/ask.py` and `tests/app/test_ask.py`. Nothing released, clean removal.
-- [ ] **6.15 CLI: Replace `ask` with `chat`** — In `main.py`, remove `ask` command, add `chat <book>` with interactive conversation loop, session persistence, `--verbose` for tool results.
-- [ ] **6.16 End-to-end verification** — Run full pipeline: ingest → embed → `cli chat` → multi-turn conversation. Verify tool-use, context awareness, persistence.
-
-#### Key Files (for implementation reference)
-
-- `domain/chat.py` — `ChatMessage` (has `book_id`, needs `conversation_id` in 6.3)
-- `domain/protocols.py` — `ChatProvider` (has `chat()`, needs `chat_with_tools()` in 6.5)
-- `app/ask.py` — `AskBookUseCase` (replaced by `ChatWithBookUseCase` in 6.14)
-- `app/search.py` — `SearchBooksUseCase` (becomes the tool the agent invokes)
-- `infra/llm/anthropic.py` — Anthropic adapter (needs `chat_with_tools()` in 6.9)
-- `shared/schema/001_initial.sql` — schema (needs `conversations` table in 6.1)
+| Decision                 | Choice                                                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Retrieval strategy       | Formal tool-use API (Anthropic). Pluggable `RetrievalStrategy` protocol.                                  |
+| Context management       | Full conversation history in prompt, capped at 20 messages. Pluggable `ConversationContextStrategy`.      |
+| Session structure        | Multiple named conversations per book. Auto-titled from first message; user can rename.                   |
+| Domain entity name       | `Conversation` — NOT `Session`.                                                                           |
+| ChatMessage FK           | `conversation_id` only — NO `book_id` on ChatMessage. Book reachable via `message → conversation → book`. |
+| Multi-book conversations | One book per conversation for now. May evolve later.                                                      |
+| Ollama tool-use          | Deferred post-MVP. Falls back to `AlwaysRetrieveStrategy`.                                                |
+| Tool results visibility  | Hidden in production. Visible with `--verbose` (CLI) / debug toggle (app).                                |
+| CLI command              | `cli chat <book>` — interactive REPL with conversation selection.                                         |
+| Feature naming           | "Book Conversations" — ubiquitous language is "conversation", not "question" or "ask".                    |
 
 ## First-Time Setup
 
@@ -120,10 +106,12 @@ After first-time setup, verify the full pipeline works:
 cd python/
 uv run pytest -x                                           # all tests pass
 uv run ruff check .                                        # no lint errors
+uv run pyright                                             # no type errors
 uv run interactive-books ingest ../shared/fixtures/sample_book.pdf --title "Test"
 uv run interactive-books books                             # shows the ingested book
 uv run interactive-books embed <book_id>                   # requires OPENAI_API_KEY
 uv run interactive-books search <book_id> "test query"     # returns ranked chunks
+uv run interactive-books chat <book_id>                    # interactive conversation
 ```
 
 ### Swift App (Phase 8)
@@ -153,7 +141,7 @@ All Python commands run from `python/`. All Swift commands run from `swift/` (Ph
 uv run interactive-books ingest <file> --title "Book Title"
 uv run interactive-books embed <book_id>
 uv run interactive-books search <book_id> <query> --top-k 5
-uv run interactive-books ask <book_id> <question>       # will be replaced by chat in Phase 6
+uv run interactive-books chat <book_id>                  # interactive conversation REPL
 uv run interactive-books books
 uv run interactive-books show <book_id>
 uv run interactive-books delete <book_id> --yes
