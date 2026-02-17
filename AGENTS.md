@@ -56,7 +56,7 @@ Phase 6 replaces single-turn RAG with an agentic conversation system. See `docs/
 
 #### Tasks
 
-Build order is bottom-up, TDD (write failing tests first). Each task is one commit.
+Build order is bottom-up, TDD (write failing tests first). Each task is one commit. **Tasks must be done in order** — later tasks depend on earlier ones (e.g., 6.7 needs the schema from 6.1 and the protocol from 6.5).
 
 - [ ] **6.1 Schema migration** — Update `shared/schema/001_initial.sql`: add `conversations` table (`id`, `book_id`, `title`, `created_at`), change `chat_messages.book_id` → `conversation_id` FK, add `'tool_result'` to role CHECK constraint. Modify in-place (nothing released).
 - [ ] **6.2 Domain: Conversation aggregate** — Create `domain/conversation.py` with `Conversation` entity (id, book_id, title, created_at). Validate non-empty title. Tests in `tests/domain/test_conversation.py`.
