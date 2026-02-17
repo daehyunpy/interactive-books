@@ -206,18 +206,18 @@ Two new protocols in `domain/protocols.py`:
 
 ```python
 class ConversationRepository(Protocol):
-    def save(self, conversation: Conversation) -> None: ...
+    def save(self, conversation: Conversation) -> None: ...  # UPSERT — handles create and update
     def get(self, conversation_id: str) -> Conversation | None: ...
     def get_by_book(self, book_id: str) -> list[Conversation]: ...
     def delete(self, conversation_id: str) -> None: ...
-    def update_title(self, conversation_id: str, title: str) -> None: ...
 
 class ChatMessageRepository(Protocol):
     def save(self, message: ChatMessage) -> None: ...
-    def save_batch(self, messages: list[ChatMessage]) -> None: ...
     def get_by_conversation(self, conversation_id: str) -> list[ChatMessage]: ...
     def delete_by_conversation(self, conversation_id: str) -> None: ...
 ```
+
+`ConversationRepository.save()` uses UPSERT semantics — a single method handles both creation and title updates. This is simpler than a separate `update_title()` method. `ChatMessageRepository` uses individual `save()` calls rather than `save_batch()` — messages are persisted one at a time as they are produced by the agent loop.
 
 SQLite adapters in `infra/storage/conversation_repo.py` and `infra/storage/chat_message_repo.py`.
 
@@ -237,6 +237,7 @@ Auto-titling: the title is derived from the first user message (truncated to a r
 Two new templates in `shared/prompts/`:
 
 **`conversation_system_prompt.md`** — Replaces `system_prompt.md` for the agentic flow. Instructs the agent that it is a reading companion with access to a `search_book` tool. Includes rules:
+
 - Answer only from retrieved passages or prior conversation context
 - Use the `search_book` tool when you need information from the book
 - Do not retrieve when the answer is already in the conversation context
@@ -251,16 +252,16 @@ Two new templates in `shared/prompts/`:
 Replace `cli ask` with `cli chat <book_id>`:
 
 ```
-cli chat <book_id> [--conversation <id>] [--new] [--verbose]
+cli chat <book_id> [--verbose]
 ```
 
 Behavior:
-1. If `--conversation <id>` is provided, resume that conversation
-2. If `--new` is provided, create a new conversation
-3. Otherwise, list existing conversations for the book and let the user select one, or create a new one
-4. Enter a REPL loop: prompt for input, call `ChatWithBookUseCase.execute()`, print the response
-5. With `--verbose`, print tool invocations and results between the user message and assistant response
-6. Exit on `quit`, `exit`, or Ctrl+D
+
+1. Verify the book exists
+2. List existing conversations for the book and let the user select one interactively, or create a new one (interactive prompt — no flags needed for MVP)
+3. Enter a REPL loop: prompt for input, call `ChatWithBookUseCase.execute()`, print the response
+4. With `--verbose` (global flag), print tool invocations and results between the user message and assistant response
+5. Exit on `quit`, `exit`, Ctrl+C, or Ctrl+D
 
 ### 12. Error handling
 
@@ -290,27 +291,27 @@ ChatWithBookUseCase
 
 ## File changes summary
 
-| Action | Path | Description |
-|--------|------|-------------|
-| Create | `domain/conversation.py` | `Conversation` entity |
-| Modify | `domain/chat.py` | `ChatMessage`: replace `book_id` with `conversation_id`, add `TOOL_RESULT` to `MessageRole` |
-| Modify | `domain/prompt_message.py` | Add optional `tool_use_id` and `tool_invocations` fields |
-| Create | `domain/tool.py` | `ToolDefinition`, `ToolInvocation`, `ChatResponse` value objects |
-| Modify | `domain/protocols.py` | Add `chat_with_tools()` to `ChatProvider`, add `RetrievalStrategy`, `ConversationContextStrategy`, `ConversationRepository`, `ChatMessageRepository` |
-| Modify | `domain/errors.py` | Add `UNSUPPORTED_FEATURE` to `LLMErrorCode` |
-| Create | `app/chat.py` | `ChatWithBookUseCase` |
-| Create | `app/conversations.py` | Conversation management use cases |
-| Delete | `app/ask.py` | Replaced by `app/chat.py` |
-| Modify | `infra/llm/anthropic.py` | Implement `chat_with_tools()` |
-| Create | `infra/retrieval/tool_use.py` | `ToolUseRetrievalStrategy` |
-| Create | `infra/retrieval/always_retrieve.py` | `AlwaysRetrieveStrategy` |
-| Create | `infra/context/full_history.py` | `FullHistoryStrategy` |
-| Create | `infra/storage/conversation_repo.py` | SQLite `ConversationRepository` adapter |
-| Create | `infra/storage/chat_message_repo.py` | SQLite `ChatMessageRepository` adapter |
-| Modify | `main.py` | Remove `ask` command, add `chat` command with REPL |
-| Modify | `shared/schema/001_initial.sql` | Add `conversations` table, rewrite `chat_messages` |
-| Create | `shared/prompts/conversation_system_prompt.md` | Agentic system prompt |
-| Create | `shared/prompts/reformulation_prompt.md` | Query reformulation instructions |
+| Action | Path                                           | Description                                                                                                                                          |
+| ------ | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create | `domain/conversation.py`                       | `Conversation` entity                                                                                                                                |
+| Modify | `domain/chat.py`                               | `ChatMessage`: replace `book_id` with `conversation_id`, add `TOOL_RESULT` to `MessageRole`                                                          |
+| Modify | `domain/prompt_message.py`                     | Add optional `tool_use_id` and `tool_invocations` fields                                                                                             |
+| Create | `domain/tool.py`                               | `ToolDefinition`, `ToolInvocation`, `ChatResponse` value objects                                                                                     |
+| Modify | `domain/protocols.py`                          | Add `chat_with_tools()` to `ChatProvider`, add `RetrievalStrategy`, `ConversationContextStrategy`, `ConversationRepository`, `ChatMessageRepository` |
+| Modify | `domain/errors.py`                             | Add `UNSUPPORTED_FEATURE` to `LLMErrorCode`                                                                                                          |
+| Create | `app/chat.py`                                  | `ChatWithBookUseCase`                                                                                                                                |
+| Create | `app/conversations.py`                         | Conversation management use cases                                                                                                                    |
+| Delete | `app/ask.py`                                   | Replaced by `app/chat.py`                                                                                                                            |
+| Modify | `infra/llm/anthropic.py`                       | Implement `chat_with_tools()`                                                                                                                        |
+| Create | `infra/retrieval/tool_use.py`                  | `ToolUseRetrievalStrategy`                                                                                                                           |
+| Create | `infra/retrieval/always_retrieve.py`           | `AlwaysRetrieveStrategy`                                                                                                                             |
+| Create | `infra/context/full_history.py`                | `FullHistoryStrategy`                                                                                                                                |
+| Create | `infra/storage/conversation_repo.py`           | SQLite `ConversationRepository` adapter                                                                                                              |
+| Create | `infra/storage/chat_message_repo.py`           | SQLite `ChatMessageRepository` adapter                                                                                                               |
+| Modify | `main.py`                                      | Remove `ask` command, add `chat` command with REPL                                                                                                   |
+| Modify | `shared/schema/001_initial.sql`                | Add `conversations` table, rewrite `chat_messages`                                                                                                   |
+| Create | `shared/prompts/conversation_system_prompt.md` | Agentic system prompt                                                                                                                                |
+| Create | `shared/prompts/reformulation_prompt.md`       | Query reformulation instructions                                                                                                                     |
 
 ## Risks / Trade-offs
 
