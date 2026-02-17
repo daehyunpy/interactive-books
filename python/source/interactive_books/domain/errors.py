@@ -27,6 +27,7 @@ class LLMErrorCode(Enum):
     API_CALL_FAILED = "api_call_failed"
     RATE_LIMITED = "rate_limited"
     TIMEOUT = "timeout"
+    UNSUPPORTED_FEATURE = "unsupported_feature"
 
 
 class LLMError(DomainError):
