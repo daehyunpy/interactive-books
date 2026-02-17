@@ -75,11 +75,10 @@ def ingest(
 
     try:
         book = use_case.execute(file_path, title)
-        chunk_count = len(chunk_repo.get_by_book(book.id))
         typer.echo(f"Book ID:     {book.id}")
         typer.echo(f"Title:       {book.title}")
         typer.echo(f"Status:      {book.status.value}")
-        typer.echo(f"Chunks:      {chunk_count}")
+        typer.echo(f"Chunks:      {chunk_repo.count_by_book(book.id)}")
     except BookError as e:
         typer.echo(f"Error: {e.message}", err=True)
         raise typer.Exit(code=1)
@@ -94,6 +93,8 @@ def search(
     top_k: int = typer.Option(5, "--top-k", "-k", help="Number of results to return"),
 ) -> None:
     """Search a book's chunks using vector similarity."""
+    import time
+
     from interactive_books.app.search import SearchBooksUseCase
     from interactive_books.domain.errors import BookError
     from interactive_books.infra.embeddings.openai import EmbeddingProvider
@@ -117,8 +118,6 @@ def search(
             typer.echo(
                 f"[verbose] Provider: {provider.provider_name}, Dimension: {provider.dimension}"
             )
-        import time
-
         t0 = time.monotonic()
         results = use_case.execute(book_id, query, top_k=top_k)
         elapsed = time.monotonic() - t0
@@ -150,6 +149,8 @@ def ask(
     top_k: int = typer.Option(5, "--top-k", "-k", help="Number of context passages"),
 ) -> None:
     """Ask a question about a book using RAG."""
+    import time
+
     from interactive_books.app.ask import AskBookUseCase
     from interactive_books.app.search import SearchBooksUseCase
     from interactive_books.domain.errors import BookError, LLMError
@@ -182,8 +183,6 @@ def ask(
             typer.echo(
                 f"[verbose] Chat model: {chat_provider.model_name}, top_k: {top_k}"
             )
-        import time
-
         t0 = time.monotonic()
         answer = use_case.execute(book_id, question, top_k=top_k)
         elapsed = time.monotonic() - t0
