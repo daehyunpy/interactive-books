@@ -108,7 +108,7 @@ def ingest(
         typer.echo(f"Status:      {book.status.value}")
         typer.echo(f"Chunks:      {chunk_count}")
         if _verbose:
-            typer.echo(f"[verbose] {chunk_count} chunks created")
+            typer.echo(f"[verbose] Ingested {chunk_count} chunks")
         if embed_error is not None:
             typer.echo(
                 f"Warning: Embedding failed: {embed_error}",
@@ -191,6 +191,12 @@ def chat(
     from interactive_books.app.chat import ChatWithBookUseCase
     from interactive_books.app.conversations import ManageConversationsUseCase
     from interactive_books.app.search import SearchBooksUseCase
+    from interactive_books.domain.chat_event import (
+        ChatEvent,
+        TokenUsageEvent,
+        ToolInvocationEvent,
+        ToolResultEvent,
+    )
     from interactive_books.domain.errors import BookError, LLMError
     from interactive_books.infra.context.full_history import ConversationContextStrategy
     from interactive_books.infra.embeddings.openai import EmbeddingProvider
@@ -226,13 +232,7 @@ def chat(
 
         chat_provider = ChatProvider(api_key=anthropic_key)
 
-        def _on_event(event: object) -> None:
-            from interactive_books.domain.chat_event import (
-                TokenUsageEvent,
-                ToolInvocationEvent,
-                ToolResultEvent,
-            )
-
+        def _on_event(event: ChatEvent) -> None:
             if isinstance(event, ToolInvocationEvent):
                 typer.echo(f"[verbose] Tool call: {event.tool_name}({event.arguments})")
             elif isinstance(event, ToolResultEvent):

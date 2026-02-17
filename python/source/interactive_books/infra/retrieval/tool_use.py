@@ -11,7 +11,7 @@ from interactive_books.domain.chat_event import (
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.protocols import ChatProvider
 from interactive_books.domain.search_result import SearchResult
-from interactive_books.domain.tool import ChatResponse, ToolDefinition, ToolInvocation
+from interactive_books.domain.tool import ChatResponse, ToolDefinition
 
 MAX_TOOL_ITERATIONS = 3
 NO_CONTEXT_MESSAGE = "No relevant passages found in the book for this query."
@@ -54,7 +54,7 @@ class RetrievalStrategy:
                 current_messages.append(assistant_msg)
 
                 query = str(invocation.arguments.get("query", ""))
-                results = self._execute_tool(invocation, search_fn)
+                results = search_fn(query)
 
                 if on_event:
                     on_event(
@@ -99,14 +99,6 @@ class RetrievalStrategy:
                     output_tokens=response.usage.output_tokens,
                 )
             )
-
-    @staticmethod
-    def _execute_tool(
-        invocation: ToolInvocation,
-        search_fn: Callable[[str], list[SearchResult]],
-    ) -> list[SearchResult]:
-        query = str(invocation.arguments.get("query", ""))
-        return search_fn(query)
 
     @staticmethod
     def _format_results(results: list[SearchResult]) -> str:
