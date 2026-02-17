@@ -12,6 +12,10 @@ OPF_NAMESPACE = "http://www.idpf.org/2007/opf"
 CONTAINER_NAMESPACE = "urn:oasis:names:tc:opendocument:xmlns:container"
 CONTAINER_PATH = "META-INF/container.xml"
 ENCRYPTION_PATH = "META-INF/encryption.xml"
+BLOCK_TAGS = frozenset({
+    "p", "div", "h1", "h2", "h3", "h4", "h5", "h6",
+    "li", "blockquote", "tr", "br", "section", "article",
+})
 
 
 class BookParser(BookParserPort):
@@ -23,7 +27,7 @@ class BookParser(BookParserPort):
             )
         try:
             epub = zipfile.ZipFile(file_path, "r")
-        except (zipfile.BadZipFile, Exception) as e:
+        except Exception as e:
             raise BookError(
                 BookErrorCode.PARSE_FAILED,
                 f"Failed to open EPUB: {e}",
@@ -121,11 +125,6 @@ class BookParser(BookParserPort):
 
 
 def _extract_block_text(node: object) -> str:
-    """Extract text from an HTML node, preserving block-level line breaks."""
-    BLOCK_TAGS = frozenset({
-        "p", "div", "h1", "h2", "h3", "h4", "h5", "h6",
-        "li", "blockquote", "tr", "br", "section", "article",
-    })
     parts: list[str] = []
     for child in node.iter():  # type: ignore[union-attr]
         if child.tag in BLOCK_TAGS and parts and parts[-1] != "\n":
