@@ -65,10 +65,20 @@ No backend server. No web interface.
 ### P0 — Must Have
 
 1. **Book Upload**
-   - Users can upload book files (PDF, TXT)
+   - Users can upload book files in supported formats: PDF, TXT, EPUB, DOCX, HTML, Markdown
+   - Users can import content from a URL (fetches the single page; no crawling or link-following in v1)
    - App parses, chunks, and indexes content locally
    - iOS: upload from Files picker
    - macOS: upload via file open dialog or drag-and-drop onto window
+
+   **Format-specific behavior:**
+   - **PDF**: page numbers from document structure; scanned/image-only pages skipped
+   - **TXT**: pages estimated by character count; labeled as "estimated page" in citations
+   - **EPUB**: each chapter = one logical page; metadata (title, author) extracted from OPF; DRM-free only
+   - **DOCX**: H1 and H2 headings define page boundaries; images and embedded objects ignored
+   - **HTML**: tags stripped, text extracted; single file only (no linked resources in v1)
+   - **Markdown**: rendered to plain text; H1 and H2 headings define page boundaries; single file only (no linked images or includes in v1)
+   - **URL**: fetches one page, extracts text content; no crawling, depth limits, or multi-page assembly in v1
 
 2. **Reading Position & Page-Aware Q&A**
    - User sets their current page/position in the book
@@ -92,6 +102,10 @@ No backend server. No web interface.
    - Pages that fail to parse (scanned pages in an otherwise text PDF): skip and mark as unparseable; inform user which pages are missing
    - User asks about a page beyond what was successfully parsed: tell the user that page couldn't be processed and suggest nearby pages
    - TXT files with no page structure: divide into estimated pages by character count; label as "estimated page" in citations
+   - EPUB with DRM: reject with clear message (DRM-free only)
+   - DOCX with complex formatting (tables, formulas): extract text content only; formatting lost
+   - HTML with JavaScript-rendered content: not supported in v1 (static HTML only)
+   - URL that requires authentication or returns non-HTML: reject with clear error message
 
 4. **Book Library**
    - Grid/list view of uploaded books
@@ -131,8 +145,10 @@ No backend server. No web interface.
 
 ### P2 — Nice to Have
 
-10. **EPUB Support**
-    - Support for EPUB format in addition to PDF and TXT
+10. **Nested Resource Support for HTML, URL, and Markdown**
+    - URL: crawl linked pages with configurable depth limits; assemble multi-page content
+    - HTML: resolve linked resources (stylesheets, images) and embedded content
+    - Markdown: resolve linked files, images, and includes into a unified document
 
 11. **Highlights & Notes**
     - Users can save interesting passages or answers
@@ -148,7 +164,7 @@ A CLI for debugging and rapid prototyping. Used to iterate on the RAG pipeline q
 
 ### Commands
 
-- `cli ingest <file>` — parse, chunk, embed a book and inspect the results
+- `cli ingest <file|url>` — parse, chunk, embed a book and inspect the results (supports PDF, TXT, EPUB, DOCX, HTML, Markdown, URL)
 - `cli search <book> <query>` — run vector search and see retrieved chunks with similarity scores
 - `cli chat <book>` — interactive conversation mode with session persistence
 - `cli books` — list ingested books, chunk counts, metadata
@@ -169,7 +185,7 @@ Local-first is a core value proposition, not just an architecture choice. Users 
 
 | Data                   | Where it lives                | Leaves the device?                                         |
 | ---------------------- | ----------------------------- | ---------------------------------------------------------- |
-| Book files (PDF, TXT)  | Local storage only            | Never                                                      |
+| Book files             | Local storage only            | Never (URL content is fetched once and stored locally)     |
 | Parsed text and chunks | Local SQLite DB               | Only when sent to LLM API as context for a question        |
 | Embeddings             | Local SQLite DB (sqlite-vec)  | Never (computed via API, stored locally)                   |
 | Conversation history   | Local SQLite DB               | Message content is sent to LLM API as conversation context |
@@ -187,7 +203,7 @@ Local-first is a core value proposition, not just an architecture choice. Users 
 ## Non-Goals (v1)
 
 - **No Android app** — iOS/macOS first to validate the concept
-- **No audiobooks or scanned image PDFs (OCR)** — text-based formats only; OCR adds complexity without validating the core interaction
+- **No audiobooks or scanned image PDFs (OCR)** — all supported formats must contain extractable text; OCR adds complexity without validating the core interaction
 - **No in-app book reader** — this is a Q&A tool, not a reading app; users read in their preferred app and come here to interact
 - **No social features** — no shared libraries, collaborative annotations, or public Q&A; local-only in v1
 - **No book purchasing or DRM support** — users bring their own DRM-free files; no store, no rights management

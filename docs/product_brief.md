@@ -54,7 +54,7 @@ Revenue comes later, once the product has proven value. Possible directions incl
 
 A local-only iOS/macOS app and Python CLI that lets readers:
 
-1. Upload books (PDF, TXT)
+1. Upload books (PDF, TXT, EPUB, DOCX, HTML, Markdown) or import from a URL
 2. Set their reading position (page-aware, spoiler-free)
 3. Have conversations about books — ask questions, get follow-ups, and explore ideas, all grounded in the actual text with page citations
 4. Choose their LLM provider (Anthropic, OpenAI, or local via Ollama)

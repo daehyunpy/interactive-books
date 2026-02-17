@@ -64,7 +64,12 @@ interactive-books/
 │   │           │   └── ollama.py
 │   │           ├── parsers/
 │   │           │   ├── pdf.py
-│   │           │   └── txt.py
+│   │           │   ├── txt.py
+│   │           │   ├── epub.py
+│   │           │   ├── docx.py
+│   │           │   ├── html.py
+│   │           │   ├── markdown.py
+│   │           │   └── url.py
 │   │           ├── chunkers/
 │   │           │   └── recursive.py
 │   │           └── storage/
@@ -129,16 +134,20 @@ interactive-books/
 
 ### Python CLI
 
-| Category        | Choice            | Notes                                                      |
-| --------------- | ----------------- | ---------------------------------------------------------- |
-| Python version  | 3.13              | Latest stable                                              |
-| Package manager | uv                | Fast, modern                                               |
-| CLI framework   | typer             | Modern, built on click                                     |
-| Config          | pydantic-settings | Type-safe env/config validation; direnv as dev convenience |
-| Testing         | pytest            | Standard                                                   |
-| Linting         | ruff              | Fast, replaces black + flake8 + isort                      |
-| Type checking   | pyright           | Fast, strict, powers VS Code Pylance                       |
-| HTTP client     | httpx             | Async + sync, HTTP/2, type-annotated                       |
+| Category        | Choice                      | Notes                                                                |
+| --------------- | --------------------------- | -------------------------------------------------------------------- |
+| Python version  | 3.13                        | Latest stable                                                        |
+| Package manager | uv                          | Fast, modern                                                         |
+| CLI framework   | typer                       | Modern, built on click                                               |
+| Config          | pydantic-settings           | Type-safe env/config validation; direnv as dev convenience           |
+| Testing         | pytest                      | Standard                                                             |
+| Linting         | ruff                        | Fast, replaces black + flake8 + isort                                |
+| Type checking   | pyright                     | Fast, strict, powers VS Code Pylance                                 |
+| HTTP client     | httpx                       | Async + sync, HTTP/2, type-annotated                                 |
+| EPUB parsing    | stdlib zipfile + selectolax | EPUB is zip of XHTML; parse OPF manifest, strip tags with selectolax |
+| DOCX parsing    | python-docx                 | Extracts text from .docx paragraphs and tables                       |
+| HTML parsing    | selectolax                  | Fast (Lexbor-based), modern, clean API for text extraction           |
+| Markdown        | markdown-it-py              | CommonMark-compliant parser; strip to plain text                     |
 
 ### iOS / macOS App
 
@@ -154,6 +163,17 @@ interactive-books/
 | Concurrency          | Structured              | async/await, actors, AsyncStream; no GCD or Combine        |
 | Navigation           | NavigationStack         | Declarative, type-safe routing via Hashable enums          |
 
+**Swift parser candidates (evaluate during Phase 8):**
+
+| Format   | Candidate              | Notes                                        |
+| -------- | ---------------------- | -------------------------------------------- |
+| PDF      | PDFKit                 | Native, already decided                      |
+| EPUB     | EPUBKit                | Popular, Swift-native                        |
+| DOCX     | DocX or direct XML     | No dominant Swift library; may parse raw XML |
+| HTML     | SwiftSoup              | Port of Java's jsoup; well-maintained        |
+| Markdown | swift-markdown (Apple) | Apple's official CommonMark parser           |
+| URL      | URLSession + SwiftSoup | Fetch + extract; reuses HTML parser          |
+
 ### Shared
 
 | Category      | Choice              | Notes                                           |
@@ -163,50 +183,57 @@ interactive-books/
 
 ## Key Decisions
 
-| Decision                   | Choice                          | Rationale                                                                               |
-| -------------------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
-| LLM (default)              | Anthropic (Claude)              | High quality, strong reasoning                                                          |
-| LLM (alternatives)         | OpenAI, Ollama (local)          | User choice; local = fully offline                                                      |
-| Embeddings                 | Independently swappable         | Chat + embedding providers configured separately                                        |
-| Default embeddings         | Apple NaturalLanguage           | Free, offline, no second API key needed                                                 |
-| Vector index               | SQLite + sqlite-vec             | Native on Apple, everything in one DB                                                   |
-| App storage                | SwiftData                       | Prefer modern stack                                                                     |
-| CLI ↔ App data sharing    | Shared SQLite DB schema         | CLI can inspect app data; logic implemented independently                               |
-| Local LLM                  | Ollama first                    | Most popular. Others based on market response.                                          |
-| Chunk size & overlap       | Pluggable (configurable)        | Default: 500 tokens, 100 overlap. Adjustable per strategy.                              |
-| Top-k retrieval            | Pluggable (configurable)        | Default: 5. Adjustable per query.                                                       |
-| Project structure          | DDD (Domain-Driven Design)      | Clean separation of domains                                                             |
-| Min deployment             | iOS 26 / macOS 26               | Latest, full SwiftData support                                                          |
-| Python version             | 3.13                            | Latest stable                                                                           |
-| Python config              | pydantic-settings               | Type-safe validation; direnv as dev convenience layer                                   |
-| Python type checking       | pyright                         | Fast, strict, powers Pylance; catches bugs at dev time                                  |
-| Python HTTP client         | httpx                           | Async + sync, HTTP/2, type-annotated; replaces requests                                 |
-| Swift testing              | Swift Testing                   | Apple's modern framework (@Test, #expect); no XCTest                                    |
-| Swift formatting           | SwiftFormat                     | Auto-formatting complement to SwiftLint diagnostics                                     |
-| Swift networking           | URLSession                      | Native async/await; no Alamofire (Swift 6 friction)                                     |
-| Swift dependency injection | Manual (initializer injection)  | Protocols + @Environment; no framework needed                                           |
-| Swift concurrency          | Structured (async/await)        | Actors, AsyncStream; no GCD or Combine                                                  |
-| Agent architecture         | Tool-use with retrieval as tool | LLM decides when/what to retrieve; pluggable `RetrievalStrategy` for alternatives       |
-| Context management         | Full history (capped at N)      | Pluggable `ConversationContextStrategy`; sliding window + summary as future alternative |
-| Conversation model         | Multiple per book               | Auto-titled from first message, user-renamable; one book per conversation for now       |
-| ChatMessage FK             | `conversation_id` only          | No `book_id` on message; book reachable via conversation                                |
-| Ollama tool-use            | Deferred post-MVP               | Falls back to always-retrieve; tool-use unreliable on local models                      |
-| Tool result visibility     | Hidden in production            | Visible in debug mode (`--verbose` / app debug toggle)                                  |
+| Decision                   | Choice                                     | Rationale                                                                               |
+| -------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| LLM (default)              | Anthropic (Claude)                         | High quality, strong reasoning                                                          |
+| LLM (alternatives)         | OpenAI, Ollama (local)                     | User choice; local = fully offline                                                      |
+| Embeddings                 | Independently swappable                    | Chat + embedding providers configured separately                                        |
+| Default embeddings         | Apple NaturalLanguage                      | Free, offline, no second API key needed                                                 |
+| Vector index               | SQLite + sqlite-vec                        | Native on Apple, everything in one DB                                                   |
+| App storage                | SwiftData                                  | Prefer modern stack                                                                     |
+| CLI ↔ App data sharing    | Shared SQLite DB schema                    | CLI can inspect app data; logic implemented independently                               |
+| Local LLM                  | Ollama first                               | Most popular. Others based on market response.                                          |
+| Chunk size & overlap       | Pluggable (configurable)                   | Default: 500 tokens, 100 overlap. Adjustable per strategy.                              |
+| Top-k retrieval            | Pluggable (configurable)                   | Default: 5. Adjustable per query.                                                       |
+| Project structure          | DDD (Domain-Driven Design)                 | Clean separation of domains                                                             |
+| Min deployment             | iOS 26 / macOS 26                          | Latest, full SwiftData support                                                          |
+| Python version             | 3.13                                       | Latest stable                                                                           |
+| Python config              | pydantic-settings                          | Type-safe validation; direnv as dev convenience layer                                   |
+| Python type checking       | pyright                                    | Fast, strict, powers Pylance; catches bugs at dev time                                  |
+| Python HTTP client         | httpx                                      | Async + sync, HTTP/2, type-annotated; replaces requests                                 |
+| Swift testing              | Swift Testing                              | Apple's modern framework (@Test, #expect); no XCTest                                    |
+| Swift formatting           | SwiftFormat                                | Auto-formatting complement to SwiftLint diagnostics                                     |
+| Swift networking           | URLSession                                 | Native async/await; no Alamofire (Swift 6 friction)                                     |
+| Swift dependency injection | Manual (initializer injection)             | Protocols + @Environment; no framework needed                                           |
+| Swift concurrency          | Structured (async/await)                   | Actors, AsyncStream; no GCD or Combine                                                  |
+| Agent architecture         | Tool-use with retrieval as tool            | LLM decides when/what to retrieve; pluggable `RetrievalStrategy` for alternatives       |
+| Context management         | Full history (capped at N)                 | Pluggable `ConversationContextStrategy`; sliding window + summary as future alternative |
+| Conversation model         | Multiple per book                          | Auto-titled from first message, user-renamable; one book per conversation for now       |
+| ChatMessage FK             | `conversation_id` only                     | No `book_id` on message; book reachable via conversation                                |
+| Ollama tool-use            | Deferred post-MVP                          | Falls back to always-retrieve; tool-use unreliable on local models                      |
+| Tool result visibility     | Hidden in production                       | Visible in debug mode (`--verbose` / app debug toggle)                                  |
+| Supported formats          | PDF, TXT, EPUB, DOCX, HTML, MD, URL        | Single-file parsing in v1; nested resource resolution deferred to v2                    |
+| EPUB page mapping          | One page per chapter                       | Pluggable `PageMappingStrategy`; may subdivide long chapters in future                  |
+| DOCX/MD page mapping       | H1 + H2 headings                           | Pluggable `PageMappingStrategy`; heading levels configurable in future                  |
+| Format detection           | Extension for files, Content-Type for URLs | Simple and correct; URLs often lack meaningful extensions                               |
+| Format build order         | Two batches                                | Batch 1: EPUB + DOCX. Batch 2: HTML + MD + URL. Natural groupings.                      |
+| Swift parser libraries     | Candidates noted, not committed            | Evaluate EPUBKit, SwiftSoup, swift-markdown, etc. during Phase 8                        |
 
 ## Pluggable Abstractions
 
 The project uses protocol/interface abstractions in several areas, allowing multiple implementations to coexist and be swapped:
 
-| Abstraction            | Protocol / Base Class         | Implementations                                         |
-| ---------------------- | ----------------------------- | ------------------------------------------------------- |
-| **LLM Chat**           | `ChatProvider`                | Anthropic, OpenAI, Ollama                               |
-| **Embeddings**         | `EmbeddingProvider`           | Apple NaturalLanguage, OpenAI, Voyage AI, Ollama        |
-| **PDF Parser**         | `BookParser`                  | PyMuPDF, pdfplumber, pypdf (Python) / PDFKit (Swift)    |
-| **Text Chunker**       | `TextChunker`                 | Recursive, sentence-based, semantic                     |
-| **Keychain**           | `SecureStorage`               | KeychainAccess, KeychainSwift, raw Security framework   |
-| **Retrieval Strategy** | `RetrievalStrategy`           | Tool-use (Anthropic/OpenAI), always-retrieve (fallback) |
-| **Context Strategy**   | `ConversationContextStrategy` | Full history (capped), sliding window + summary         |
-| **Message Store**      | `ChatMessageRepository`       | SQLite                                                  |
+| Abstraction            | Protocol / Base Class         | Implementations                                                                                                                                              |
+| ---------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **LLM Chat**           | `ChatProvider`                | Anthropic, OpenAI, Ollama                                                                                                                                    |
+| **Embeddings**         | `EmbeddingProvider`           | Apple NaturalLanguage, OpenAI, Voyage AI, Ollama                                                                                                             |
+| **Book Parser**        | `BookParser`                  | PDF (PyMuPDF), TXT, EPUB (zipfile + selectolax), DOCX (python-docx), HTML (selectolax), Markdown (markdown-it-py), URL (httpx + selectolax) / PDFKit (Swift) |
+| **Text Chunker**       | `TextChunker`                 | Recursive, sentence-based, semantic                                                                                                                          |
+| **Keychain**           | `SecureStorage`               | KeychainAccess, KeychainSwift, raw Security framework                                                                                                        |
+| **Retrieval Strategy** | `RetrievalStrategy`           | Tool-use (Anthropic/OpenAI), always-retrieve (fallback)                                                                                                      |
+| **Context Strategy**   | `ConversationContextStrategy` | Full history (capped), sliding window + summary                                                                                                              |
+| **Page Mapping**       | `PageMappingStrategy`         | Chapter-per-page (EPUB), heading-based H1+H2 (DOCX/MD), char-count (TXT), single-page (HTML/URL)                                                             |
+| **Message Store**      | `ChatMessageRepository`       | SQLite                                                                                                                                                       |
 
 This lets users (and developers) pick the best implementation for their needs, and makes it easy to add new ones.
 
@@ -235,14 +262,17 @@ Fail fast, surface clearly, never silently degrade.
 | API call fails (rate limit) | Show "rate limited" message with wait time.                          |
 | Book parsing fails          | Show which pages/sections failed. Ingest what you can, mark partial. |
 | Embedding call timeout      | Resume from last successful chunk (incremental embedding).           |
-| Unsupported file format     | Reject at upload with clear message.                                 |
+| Unsupported file format     | Reject at upload with clear message listing supported formats.       |
+| DRM-protected EPUB          | Reject with clear message (DRM-free only).                           |
+| URL fetch fails             | Show error (network, auth required, non-HTML). Don't retry.          |
+| URL returns non-text        | Reject with message explaining only text content is supported.       |
 | DB corruption               | Detect on open, offer re-index from original file.                   |
 
 Error types per domain: `BookError`, `LLMError`, `StorageError`. Swift uses `Result` type, Python uses typed exceptions. Surface errors in UI with actionable messages.
 
 ## Data Flow
 
-1. **Ingest**: Book file → parsed on-device → page boundaries mapped → chunked (500-1000 tokens, preserving page numbers) → embedded via LLM API → vectors + page metadata stored locally
+1. **Ingest**: Book file (or URL) → format-specific parser extracts text and maps page/chapter boundaries → chunked (500-1000 tokens, preserving page numbers) → embedded via LLM API → vectors + page metadata stored locally
 2. **Conversation turn**: User message → appended to conversation history → sent to LLM with system prompt and conversation context → LLM decides next action:
    - **Direct reply**: LLM responds from conversation context alone (no retrieval needed) → response appended to conversation history
    - **Retrieve then reply**: LLM invokes the `search_book` tool with a self-contained query (reformulated from conversation context) → query embedded via API → local vector similarity search (filtered to pages ≤ current position) → top-k chunks with page numbers → chunks returned to LLM as tool result → LLM generates response with page citations → response appended to conversation history
@@ -256,7 +286,15 @@ Each chunk stores its source page number(s). This enables:
 - **Page-based queries**: user can ask about specific pages or page ranges
 - **Tappable citations**: page references in answers link back to the chunk's source content
 
-For PDFs, page numbers come directly from the document structure. For TXT files, pages are estimated by character/line count or user-defined page breaks.
+Page mapping varies by format:
+
+- **PDF**: page numbers from document structure (physical page index as fallback)
+- **TXT**: estimated by character/line count; labeled as "estimated page"
+- **EPUB**: chapter-based — each chapter maps to one logical page (pluggable `PageMappingStrategy`; may subdivide long chapters in future)
+- **DOCX**: heading-based — H1 and H2 headings define page boundaries (pluggable `PageMappingStrategy`; heading levels configurable in future)
+- **HTML**: single logical page (entire document is one page)
+- **Markdown**: heading-based — H1 and H2 headings define page boundaries (same strategy as DOCX)
+- **URL**: single logical page (fetched content is one page)
 
 ## LLM Provider Architecture
 
@@ -310,30 +348,38 @@ Providers that don't support tool-use (Ollama, for now) fall back to always-retr
 
 CLI first, bottom-up, one feature at a time.
 
-| Phase | What                   | Details                                                                                                                                                             |
-| ----- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | **Project scaffold**   | Monorepo structure (DDD), `pyproject.toml`, `.envrc`, CI skeleton                                                                                                   |
-| 2     | **DB schema**          | SQLite schema + migrations, shared between CLI and app                                                                                                              |
-| 3     | **Book ingestion**     | PDF parser → chunker → page mapping                                                                                                                                 |
-| 4     | **Embeddings**         | Embed chunks → store in sqlite-vec                                                                                                                                  |
-| 5     | **Retrieval**          | Vector search with page filtering                                                                                                                                   |
-| 6     | **Q&A (Agentic Chat)** | Conversation sessions + agent loop with tool-use: LLM decides when to retrieve, reformulates queries from conversation context, streams answers with page citations |
-| 7     | **CLI polish**         | All commands working (`ingest`, `search`, `chat`, `books`, `--verbose`)                                                                                             |
-| 8     | **iOS/macOS app**      | Port pipeline to Swift, build SwiftUI interface                                                                                                                     |
+| Phase | What                          | Details                                                                                                                                                             |
+| ----- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | **Project scaffold**          | Monorepo structure (DDD), `pyproject.toml`, `.envrc`, CI skeleton                                                                                                   |
+| 2     | **DB schema**                 | SQLite schema + migrations, shared between CLI and app                                                                                                              |
+| 3     | **Book ingestion**            | PDF parser → chunker → page mapping                                                                                                                                 |
+| 4     | **Embeddings**                | Embed chunks → store in sqlite-vec                                                                                                                                  |
+| 5     | **Retrieval**                 | Vector search with page filtering                                                                                                                                   |
+| 6     | **Q&A (Agentic Chat)**        | Conversation sessions + agent loop with tool-use: LLM decides when to retrieve, reformulates queries from conversation context, streams answers with page citations |
+| 7     | **CLI polish**                | All commands working (`ingest`, `search`, `chat`, `books`, `--verbose`)                                                                                             |
+| 8     | **Structured format parsers** | EPUB (zipfile + selectolax) + DOCX (python-docx) parsers with `PageMappingStrategy`, sample fixtures, integration tests                                             |
+| 9     | **Text format parsers**       | HTML (selectolax) + Markdown (markdown-it-py) + URL (httpx + selectolax) parsers, Content-Type detection for URLs, sample fixtures, integration tests               |
+| 10    | **iOS/macOS app**             | Port pipeline to Swift, build SwiftUI interface                                                                                                                     |
 
 ## First Implementations (Easiest First)
 
 For each pluggable abstraction, start with the simplest implementation:
 
-| Abstraction        | First Implementation        | Why easiest                                   |
-| ------------------ | --------------------------- | --------------------------------------------- |
-| PDF Parser         | PyMuPDF                     | Fast, simple API, good page extraction        |
-| Text Chunker       | Recursive                   | Split by `\n\n` → `\n` → sentence, ~100 lines |
-| Embeddings         | OpenAI                      | Simplest SDK, one-line call                   |
-| Chat               | Anthropic                   | Default provider, good SDK                    |
-| Keychain           | KeychainAccess              | One-liner API                                 |
-| Retrieval Strategy | Tool-use (Anthropic/OpenAI) | Native API support, structured input/output   |
-| Context Strategy   | Full history (capped)       | Simplest; sufficient for MVP                  |
+| Abstraction        | First Implementation        | Why easiest                                                               |
+| ------------------ | --------------------------- | ------------------------------------------------------------------------- |
+| Book Parser (PDF)  | PyMuPDF                     | Fast, simple API, good page extraction                                    |
+| Book Parser (EPUB) | stdlib zipfile + selectolax | Parse OPF for spine order, strip XHTML tags; zero new EPUB dep            |
+| Book Parser (DOCX) | python-docx                 | Simple paragraph/table text extraction                                    |
+| Book Parser (HTML) | selectolax                  | Fast Lexbor-based parser, clean text extraction API                       |
+| Book Parser (MD)   | markdown-it-py              | CommonMark-compliant, strip to plain text                                 |
+| Book Parser (URL)  | httpx + selectolax          | Fetch + extract; reuses HTML parser                                       |
+| Page Mapping       | Per-format defaults         | Chapter (EPUB), H1+H2 (DOCX/MD), char-count (TXT), single-page (HTML/URL) |
+| Text Chunker       | Recursive                   | Split by `\n\n` → `\n` → sentence, ~100 lines                             |
+| Embeddings         | OpenAI                      | Simplest SDK, one-line call                                               |
+| Chat               | Anthropic                   | Default provider, good SDK                                                |
+| Keychain           | KeychainAccess              | One-liner API                                                             |
+| Retrieval Strategy | Tool-use (Anthropic/OpenAI) | Native API support, structured input/output                               |
+| Context Strategy   | Full history (capped)       | Simplest; sufficient for MVP                                              |
 
 Additional implementations are added after the first end-to-end pipeline works.
 
@@ -409,11 +455,11 @@ Rules that both implementations must enforce identically:
 
 Both codebases use the same error categories with equivalent cases:
 
-| Domain  | Python         | Swift          | Cases                                                                                  |
-| ------- | -------------- | -------------- | -------------------------------------------------------------------------------------- |
-| Book    | `BookError`    | `BookError`    | `not_found`, `parse_failed`, `unsupported_format`, `already_exists`                    |
-| LLM     | `LLMError`     | `LLMError`     | `api_key_missing`, `api_call_failed`, `rate_limited`, `timeout`, `unsupported_feature` |
-| Storage | `StorageError` | `StorageError` | `db_corrupted`, `migration_failed`, `write_failed`, `not_found`                        |
+| Domain  | Python         | Swift          | Cases                                                                                                |
+| ------- | -------------- | -------------- | ---------------------------------------------------------------------------------------------------- |
+| Book    | `BookError`    | `BookError`    | `not_found`, `parse_failed`, `unsupported_format`, `already_exists`, `drm_protected`, `fetch_failed` |
+| LLM     | `LLMError`     | `LLMError`     | `api_key_missing`, `api_call_failed`, `rate_limited`, `timeout`, `unsupported_feature`               |
+| Storage | `StorageError` | `StorageError` | `db_corrupted`, `migration_failed`, `write_failed`, `not_found`                                      |
 
 Python uses `snake_case` enum values; Swift uses `camelCase`. The semantic meaning is identical.
 
@@ -443,6 +489,10 @@ A set of known-good test data that both codebases test against to verify compati
 shared/fixtures/
   sample_book.pdf         — a small PDF for ingestion testing
   sample_book.txt         — a plain text book
+  sample_book.epub        — a small EPUB for ingestion testing
+  sample_book.docx        — a small DOCX for ingestion testing
+  sample_book.html        — a single-page HTML for ingestion testing
+  sample_book.md          — a Markdown file for ingestion testing
   expected_chunks.json    — expected chunking output for sample_book.pdf
   expected_schema.sql     — current schema snapshot for validation
 ```
