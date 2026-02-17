@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-cli = "interactive_books.main:app"
+interactive-books = "interactive_books.main:app"
 
 [dependency-groups]
 dev = [

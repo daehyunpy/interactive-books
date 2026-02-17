@@ -23,23 +23,24 @@ uv sync
 
 ### API Keys
 
-| Variable            | Required | Used by                    |
-|---------------------|----------|----------------------------|
-| `ANTHROPIC_API_KEY` | Yes      | `ask` (chat)               |
-| `OPENAI_API_KEY`    | Yes      | `embed`, `search`, `ask`   |
+| Variable            | Required | Used by                  |
+| ------------------- | -------- | ------------------------ |
+| `ANTHROPIC_API_KEY` | Yes      | `ask` (chat)             |
+| `OPENAI_API_KEY`    | Yes      | `embed`, `search`, `ask` |
 
 ## Usage
 
-All commands run from the `python/` directory using `uv run cli`.
+All commands run from the `python/` directory using `uv run interactive-books`.
 
 ### Ingest a book
 
 ```bash
-uv run cli ingest path/to/book.pdf
-uv run cli ingest path/to/book.txt --title "Custom Title"
+uv run interactive-books ingest path/to/book.pdf
+uv run interactive-books ingest path/to/book.txt --title "Custom Title"
 ```
 
 Output:
+
 ```
 Book ID:     a1b2c3d4-...
 Title:       book
@@ -50,7 +51,7 @@ Chunks:      42
 ### Generate embeddings
 
 ```bash
-uv run cli embed <book-id>
+uv run interactive-books embed <book-id>
 ```
 
 This calls the OpenAI embeddings API to vectorize all chunks. Required before `search` or `ask`.
@@ -58,8 +59,8 @@ This calls the OpenAI embeddings API to vectorize all chunks. Required before `s
 ### Search a book
 
 ```bash
-uv run cli search <book-id> "What is the main argument?"
-uv run cli search <book-id> "chapter on ethics" --top-k 10
+uv run interactive-books search <book-id> "What is the main argument?"
+uv run interactive-books search <book-id> "chapter on ethics" --top-k 10
 ```
 
 Returns ranked passages with page ranges and distance scores.
@@ -67,7 +68,7 @@ Returns ranked passages with page ranges and distance scores.
 ### Ask a question
 
 ```bash
-uv run cli ask <book-id> "What does the author say about free will?"
+uv run interactive-books ask <book-id> "What does the author say about free will?"
 ```
 
 Uses RAG: searches for relevant passages, then sends them as context to Claude for a grounded answer with page citations.
@@ -75,10 +76,11 @@ Uses RAG: searches for relevant passages, then sends them as context to Claude f
 ### List all books
 
 ```bash
-uv run cli books
+uv run interactive-books books
 ```
 
 Output:
+
 ```
 ID                                     Title                          Status     Chunks Provider       Page
 ------------------------------------------------------------------------------------------------------
@@ -88,14 +90,14 @@ a1b2c3d4-...                           My Book                        ready     
 ### Show book details
 
 ```bash
-uv run cli show <book-id>
+uv run interactive-books show <book-id>
 ```
 
 ### Set reading position
 
 ```bash
-uv run cli set-page <book-id> 50    # search/ask scoped to pages 1-50
-uv run cli set-page <book-id> 0     # reset — all pages eligible
+uv run interactive-books set-page <book-id> 50    # search/ask scoped to pages 1-50
+uv run interactive-books set-page <book-id> 0     # reset — all pages eligible
 ```
 
 When a reading position is set, `search` and `ask` only return results from pages up to that position. This prevents spoilers.
@@ -103,8 +105,8 @@ When a reading position is set, `search` and `ask` only return results from page
 ### Delete a book
 
 ```bash
-uv run cli delete <book-id>          # prompts for confirmation
-uv run cli delete <book-id> --yes    # skip confirmation
+uv run interactive-books delete <book-id>          # prompts for confirmation
+uv run interactive-books delete <book-id> --yes    # skip confirmation
 ```
 
 Removes the book, its chunks, and embeddings.
@@ -114,23 +116,23 @@ Removes the book, its chunks, and embeddings.
 Add `--verbose` before any command for extra output (model names, timing, result counts):
 
 ```bash
-uv run cli --verbose ask <book-id> "What happens in chapter 3?"
+uv run interactive-books --verbose ask <book-id> "What happens in chapter 3?"
 ```
 
 ## Typical Workflow
 
 ```bash
 # 1. Ingest
-uv run cli ingest ~/Books/thinking-fast-and-slow.pdf
+uv run interactive-books ingest ~/Books/thinking-fast-and-slow.pdf
 
 # 2. Embed (one-time, takes ~30s depending on book size)
-uv run cli embed <book-id>
+uv run interactive-books embed <book-id>
 
 # 3. Set your reading position
-uv run cli set-page <book-id> 120
+uv run interactive-books set-page <book-id> 120
 
 # 4. Ask away — answers scoped to pages 1-120
-uv run cli ask <book-id> "What are the two systems?"
+uv run interactive-books ask <book-id> "What are the two systems?"
 ```
 
 ## Development
