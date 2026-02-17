@@ -1,55 +1,69 @@
 # domain-models
 
-Domain entities and value objects enforcing cross-platform invariants. Located in `python/source/interactive_books/domain/`.
+Delta spec for domain model changes to support agentic conversation. Adds `Conversation` entity, modifies `ChatMessage` to use `conversation_id` instead of `book_id`, and extends `MessageRole` with `TOOL_RESULT`.
 
-## Requirements
+## ADDED Requirements
 
-### DM-1: BookStatus enum
+### DM-12: Conversation entity
 
-`BookStatus` enum with values: `PENDING`, `INGESTING`, `READY`, `FAILED`. String values are lowercase (`"pending"`, `"ingesting"`, `"ready"`, `"failed"`) for DB storage. Defined in `domain/book.py`.
+The domain layer SHALL define a `Conversation` dataclass in `domain/conversation.py` with fields: `id` (str), `book_id` (str), `title` (str), `created_at` (datetime). `Conversation` is an aggregate root. See `conversation-management` spec for full behavioral requirements.
 
-### DM-2: Book aggregate root
+#### Scenario: Conversation creation
 
-`Book` dataclass with fields: `id` (str), `title` (str), `status` (BookStatus), `current_page` (int, default 0), `embedding_provider` (str | None, default None), `embedding_dimension` (int | None, default None), `created_at` (datetime), `updated_at` (datetime). Defined in `domain/book.py`.
+- **WHEN** a `Conversation` is created with valid fields
+- **THEN** all fields are accessible
 
-### DM-3: Book title invariant
+#### Scenario: Conversation in domain model graph
 
-Book creation raises `BookError` if `title` is empty or whitespace-only. Enforced in `__post_init__`.
+- **WHEN** the domain model is examined
+- **THEN** `Conversation` sits between `Book` and `ChatMessage`: a `Book` has many `Conversation`s, each `Conversation` has many `ChatMessage`s
 
-### DM-4: Book status transitions
+## MODIFIED Requirements
 
-Book provides named methods for status transitions:
-- `start_ingestion()`: pending → ingesting
-- `complete_ingestion()`: ingesting → ready
-- `fail_ingestion()`: ingesting → failed
-- `reset_to_pending()`: any → pending
+### DM-9: MessageRole enum (MODIFIED)
 
-Invalid transitions (e.g., pending → ready directly) raise `BookError`.
+`MessageRole` enum with values: `USER`, `ASSISTANT`, `TOOL_RESULT`. String values are lowercase (`"user"`, `"assistant"`, `"tool_result"`). Defined in `domain/chat.py`.
 
-### DM-5: Book current page validation
+The `TOOL_RESULT` value is added to support persisting tool invocation results in conversation history. Tool result messages contain the search results returned by the `search_book` tool and are included in conversation context sent to the LLM.
 
-`set_current_page(page: int)` accepts page >= 0. Page 0 means "no position set." Negative values raise `BookError`.
+#### Scenario: MessageRole includes TOOL_RESULT
 
-### DM-6: Book embedding provider switch
+- **WHEN** `MessageRole` values are enumerated
+- **THEN** `USER`, `ASSISTANT`, and `TOOL_RESULT` are all present
 
-`switch_embedding_provider(provider: str, dimension: int)` updates `embedding_provider` and `embedding_dimension`, then calls `reset_to_pending()` — switching provider requires re-indexing.
+#### Scenario: TOOL_RESULT string value
 
-### DM-7: Chunk value object
+- **WHEN** `MessageRole.TOOL_RESULT.value` is accessed
+- **THEN** the value is `"tool_result"`
 
-`Chunk` frozen dataclass with fields: `id` (str), `book_id` (str), `content` (str), `start_page` (int), `end_page` (int), `chunk_index` (int), `created_at` (datetime). Immutable after creation. Defined in `domain/chunk.py`.
+### DM-10: ChatMessage entity (MODIFIED)
 
-### DM-8: Chunk page range invariant
+`ChatMessage` frozen dataclass with fields: `id` (str), `conversation_id` (str), `role` (MessageRole), `content` (str), `created_at` (datetime). Defined in `domain/chat.py`.
 
-Chunk creation raises `BookError` if `start_page < 1` or `end_page < start_page`. Enforced in `__post_init__`.
+**Changes from original:**
+- `book_id` field is REMOVED
+- `conversation_id` field is ADDED -- the message belongs to a `Conversation`, not directly to a `Book`
+- The book is reachable via `message -> conversation -> book`
 
-### DM-9: MessageRole enum
+#### Scenario: ChatMessage with conversation_id
 
-`MessageRole` enum with values: `USER`, `ASSISTANT`. String values are lowercase (`"user"`, `"assistant"`). Defined in `domain/chat.py`.
+- **WHEN** a `ChatMessage` is created with a valid `conversation_id`
+- **THEN** the `conversation_id` field is accessible and there is no `book_id` field
 
-### DM-10: ChatMessage entity
+#### Scenario: ChatMessage with TOOL_RESULT role
 
-`ChatMessage` frozen dataclass with fields: `id` (str), `book_id` (str), `role` (MessageRole), `content` (str), `created_at` (datetime). Defined in `domain/chat.py`.
+- **WHEN** a `ChatMessage` is created with `role=MessageRole.TOOL_RESULT`
+- **THEN** the message is valid and the content contains tool result data
 
-### DM-11: No external dependencies
+#### Scenario: ChatMessage immutability
 
-All domain model files import only from the standard library and other domain modules. No imports from `infra/`, `app/`, or third-party packages.
+- **WHEN** an attempt is made to modify a `ChatMessage` field after creation
+- **THEN** a `FrozenInstanceError` is raised
+
+## REMOVED Requirements
+
+### DM-10 (original): ChatMessage with book_id
+
+**Reason:** `ChatMessage` no longer references `Book` directly. The `book_id` field is replaced by `conversation_id`. Messages are accessed through their parent `Conversation`, which holds the `book_id`.
+
+**Migration:** Replace all `ChatMessage.book_id` references with `ChatMessage.conversation_id`. Access the book via `conversation.book_id` when needed.

@@ -1,43 +1,122 @@
 # sql-schema
 
-Shared SQL migration defining the initial database tables for books, chunks, and chat messages.
+Delta spec for SQL schema changes to support agentic conversation. Adds `conversations` table, rewrites `chat_messages` foreign key from `book_id` to `conversation_id`, and adds `tool_result` to the role CHECK constraint.
 
-## Requirements
+## ADDED Requirements
 
-### SS-1: Migration file location and naming
+### SS-8: Conversations table
 
-`shared/schema/001_initial.sql` exists and follows the numbered migration naming convention (`NNN_name.sql`). The file contains plain SQL — no ORM-specific syntax, no Python or Swift code.
+The `conversations` table SHALL be added with columns:
 
-### SS-2: Books table
+- `id` (TEXT PRIMARY KEY)
+- `book_id` (TEXT NOT NULL, FK to `books` ON DELETE CASCADE)
+- `title` (TEXT NOT NULL)
+- `created_at` (TEXT NOT NULL, default `datetime('now')`)
 
-The `books` table has columns: `id` (TEXT PRIMARY KEY), `title` (TEXT NOT NULL, non-empty), `status` (TEXT NOT NULL, constrained to 'pending'|'ingesting'|'ready'|'failed', default 'pending'), `current_page` (INTEGER NOT NULL, default 0), `embedding_provider` (TEXT, nullable), `embedding_dimension` (INTEGER, nullable), `created_at` (TEXT NOT NULL, default datetime('now')), `updated_at` (TEXT NOT NULL, default datetime('now')).
+An index SHALL be created on `book_id` for efficient lookup of conversations by book.
 
-### SS-3: Chunks table
+#### Scenario: Conversations table exists
 
-The `chunks` table has columns: `id` (TEXT PRIMARY KEY), `book_id` (TEXT NOT NULL, FK to books ON DELETE CASCADE), `content` (TEXT NOT NULL), `start_page` (INTEGER NOT NULL, CHECK >= 1), `end_page` (INTEGER NOT NULL, CHECK >= start_page), `chunk_index` (INTEGER NOT NULL), `created_at` (TEXT NOT NULL, default datetime('now')). Indexes on `book_id` and `(book_id, start_page, end_page)`.
+- **WHEN** the schema is applied
+- **THEN** a `conversations` table exists with all specified columns and constraints
 
-### SS-4: Chat messages table
+#### Scenario: Book foreign key enforced
 
-The `chat_messages` table has columns: `id` (TEXT PRIMARY KEY), `book_id` (TEXT NOT NULL, FK to books ON DELETE CASCADE), `role` (TEXT NOT NULL, constrained to 'user'|'assistant'), `content` (TEXT NOT NULL), `created_at` (TEXT NOT NULL, default datetime('now')). Index on `book_id`.
+- **WHEN** a conversation is inserted with a `book_id` that does not exist in `books`
+- **THEN** the insert fails with a foreign key constraint violation
 
-### SS-5: Column names match domain glossary
+#### Scenario: Book deletion cascades to conversations
 
-All column names match the "Domain Glossary" table in `docs/technical_design.md` → "Cross-Platform Contracts". Column naming uses `snake_case`.
+- **WHEN** a book is deleted from the `books` table
+- **THEN** all conversations referencing that `book_id` are automatically deleted
 
-### SS-6: Cascade delete integrity
+#### Scenario: Index on book_id
 
-Deleting a row from `books` cascades to all related rows in `chunks` and `chat_messages` via `ON DELETE CASCADE` foreign key constraints.
+- **WHEN** conversations are queried by `book_id`
+- **THEN** an index on `conversations(book_id)` is used for efficient lookup
 
-### SS-7: Embeddings migration file
+## MODIFIED Requirements
 
-`shared/schema/002_add_embeddings.sql` SHALL exist and load the sqlite-vec extension. The migration follows the numbered naming convention (`NNN_name.sql`). Per-provider vector tables are created dynamically by the `EmbeddingRepository`, not by this migration.
+### SS-4: Chat messages table (MODIFIED)
 
-#### Scenario: Migration file exists
+The `chat_messages` table SHALL have columns:
 
-- **WHEN** the migrations directory is listed
-- **THEN** `shared/schema/002_add_embeddings.sql` is present
+- `id` (TEXT PRIMARY KEY)
+- `conversation_id` (TEXT NOT NULL, FK to `conversations` ON DELETE CASCADE)
+- `role` (TEXT NOT NULL, constrained to `'user'`|`'assistant'`|`'tool_result'`)
+- `content` (TEXT NOT NULL)
+- `created_at` (TEXT NOT NULL, default `datetime('now')`)
 
-#### Scenario: Migration loads sqlite-vec extension
+Index on `conversation_id`.
 
-- **WHEN** the migration is executed
-- **THEN** the sqlite-vec extension is loaded and available for subsequent virtual table operations
+**Changes from original:**
+- `book_id` column is REMOVED
+- `conversation_id` column is ADDED with FK to `conversations` (not `books`)
+- `role` CHECK constraint now includes `'tool_result'` in addition to `'user'` and `'assistant'`
+- Index changed from `book_id` to `conversation_id`
+
+#### Scenario: Chat messages table has conversation_id
+
+- **WHEN** the schema is inspected
+- **THEN** `chat_messages` has a `conversation_id` column and no `book_id` column
+
+#### Scenario: Conversation foreign key enforced
+
+- **WHEN** a chat message is inserted with a `conversation_id` that does not exist in `conversations`
+- **THEN** the insert fails with a foreign key constraint violation
+
+#### Scenario: Conversation deletion cascades to messages
+
+- **WHEN** a conversation is deleted from the `conversations` table
+- **THEN** all chat messages referencing that `conversation_id` are automatically deleted
+
+#### Scenario: Book deletion cascades through conversations to messages
+
+- **WHEN** a book is deleted from the `books` table
+- **THEN** its conversations are deleted (via SS-8 cascade), and those conversations' messages are also deleted (via this cascade)
+
+#### Scenario: tool_result role accepted
+
+- **WHEN** a chat message is inserted with `role='tool_result'`
+- **THEN** the insert succeeds
+
+#### Scenario: Invalid role rejected
+
+- **WHEN** a chat message is inserted with `role='system'`
+- **THEN** the insert fails with a CHECK constraint violation
+
+### SS-5: Column names match domain glossary (MODIFIED)
+
+All column names SHALL match the "Domain Glossary" table in `docs/technical_design.md` -- "Cross-Platform Contracts". Column naming uses `snake_case`. This now includes the `conversations` table columns (`id`, `book_id`, `title`, `created_at`) and the updated `chat_messages` column (`conversation_id` replacing `book_id`).
+
+#### Scenario: Glossary alignment for conversations
+
+- **WHEN** the `conversations` table columns are compared to the domain glossary
+- **THEN** all column names match: `id`, `book_id`, `title`, `created_at`
+
+#### Scenario: Glossary alignment for chat_messages
+
+- **WHEN** the `chat_messages` table columns are compared to the domain glossary
+- **THEN** `conversation_id` matches the glossary entry for "Message conversation ref"
+
+### SS-6: Cascade delete integrity (MODIFIED)
+
+Deleting a row from `books` SHALL cascade to all related rows in `chunks`, `conversations`, and `chat_messages` (via conversations) through `ON DELETE CASCADE` foreign key constraints. Deleting a row from `conversations` SHALL cascade to all related rows in `chat_messages`.
+
+#### Scenario: Full cascade chain
+
+- **WHEN** a book is deleted that has chunks, conversations, and messages
+- **THEN** all chunks are deleted (direct cascade), all conversations are deleted (direct cascade), and all messages are deleted (transitive cascade via conversations)
+
+#### Scenario: Conversation-only cascade
+
+- **WHEN** a conversation is deleted (but its book remains)
+- **THEN** all messages for that conversation are deleted, but the book and other conversations are unaffected
+
+## REMOVED Requirements
+
+### SS-4 (original): Chat messages with book_id
+
+**Reason:** `chat_messages.book_id` is replaced by `chat_messages.conversation_id`. Messages no longer reference books directly; they reference conversations, which reference books.
+
+**Migration:** Since the `chat_messages` table and `ChatMessage` model are not yet in production use, the schema change can be folded into `001_initial.sql` or added as a new migration `003_add_conversations.sql` -- implementation decision.

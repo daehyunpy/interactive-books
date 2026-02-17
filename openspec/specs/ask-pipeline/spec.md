@@ -1,27 +1,23 @@
 # ask-pipeline
 
-Book Q&A use case and CLI command. Located in `python/source/interactive_books/app/ask.py` and `python/source/interactive_books/main.py`.
+Delta spec for the ask pipeline. The entire `AskBookUseCase` is replaced by `ChatWithBookUseCase` in the `chat-agent` capability. The CLI `ask` command is removed in favor of `chat` (see `cli-commands` spec).
 
-## Requirements
+## REMOVED Requirements
 
 ### AP-1: AskBookUseCase orchestrates question answering
 
-`AskBookUseCase` in `app/ask.py` accepts `ChatProvider`, `SearchBooksUseCase`, and `prompts_dir: Path` via constructor injection. Exposes `execute(book_id: str, question: str, top_k: int = 5) → str` that:
+**Reason:** `AskBookUseCase` is replaced by `ChatWithBookUseCase` (see `chat-agent` spec, requirement CA-1). The new use case provides agentic conversation with tool-use, conversation context, and message persistence -- a superset of what `AskBookUseCase` provided.
 
-1. Calls `SearchBooksUseCase.execute()` to get relevant chunks
-2. Loads prompt templates from `prompts_dir`
-3. Builds message list: system prompt (with citation instructions) + user query (with context)
-4. Calls `ChatProvider.chat()` and returns the answer string
-
-Edge cases: book not found and no embeddings propagate as `BookError`; no search results still calls the LLM with a "no relevant passages" message; LLM failures propagate as `LLMError`.
+**Migration:** All code that calls `AskBookUseCase.execute(book_id, question)` SHALL be replaced with `ChatWithBookUseCase.execute(conversation_id, user_message)`. Callers must first create or select a `Conversation` and pass its `conversation_id` instead of `book_id`. The `ChatWithBookUseCase` handles retrieval internally via the agent loop rather than always calling search.
 
 ### AP-2: Prompt assembly uses shared templates
 
-The use case loads templates from `prompts_dir` and assembles:
+**Reason:** Prompt assembly is replaced by the conversation system prompt and context strategy in `ChatWithBookUseCase`. The new prompt assembly uses `conversation_system_prompt.md` (see `prompt-templates` spec, PT-4) instead of `system_prompt.md` + `query_template.md` + `citation_instructions.md`. Context is built by `ConversationContextStrategy` (see `chat-agent` spec, CA-5/CA-6).
 
-1. System message: `system_prompt.md` + `citation_instructions.md`
-2. User message: `query_template.md` with `{context}` (passages labeled with `[Pages X-Y]`, joined by double newlines) and `{question}`
+**Migration:** The existing `system_prompt.md`, `query_template.md`, and `citation_instructions.md` templates remain available for potential future single-turn use cases but are no longer used by the primary chat pipeline. The new `conversation_system_prompt.md` subsumes their functionality for agentic conversation.
 
 ### AP-3: CLI ask command wires the Q&A pipeline
 
-The CLI provides an `ask` command accepting a book ID and question string. Supports `--top-k` option (default 5). Validates both `OPENAI_API_KEY` (for embeddings/search) and `ANTHROPIC_API_KEY` (for chat) using the shared `_require_env` helper. Prints the answer to stdout. Catches `BookError` and `LLMError` with error messages to stderr. Uses `_open_db` helper for database setup. When `--verbose` is enabled, prints the chat model name, top_k value, and answer generation timing.
+**Reason:** The `ask` CLI command is replaced by the `chat` command (see `cli-commands` spec). The `chat` command provides an interactive REPL with conversation persistence, tool-use, and verbose mode.
+
+**Migration:** Remove the `ask` command from `main.py`. Users use `cli chat <book-id>` instead. See `chat-cli` spec for the replacement command's full specification.
