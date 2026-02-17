@@ -16,22 +16,38 @@ Read all three before making changes.
 
 ## Current State
 
-**Pre-implementation.** No code written yet. Currently entering Phase 1 (Project Scaffold).
+**Phases 1–5 complete.** Entering Phase 6 (Q&A / Agentic Chat).
+
+The Python CLI can ingest books (PDF/TXT), generate embeddings, and run vector search with page filtering. The `AskBookUseCase` exists as a single-turn RAG pipeline but will be replaced by agentic conversation in Phase 6.
 
 Build order: CLI first, bottom-up, one feature at a time.
 
-| Phase | What             |
-| ----- | ---------------- |
-| 1     | Project scaffold |
-| 2     | DB schema        |
-| 3     | Book ingestion   |
-| 4     | Embeddings       |
-| 5     | Retrieval        |
-| 6     | Q&A              |
-| 7     | CLI polish       |
-| 8     | iOS/macOS app    |
+| Phase | What               | Status   |
+| ----- | ------------------ | -------- |
+| 1     | Project scaffold   | Done     |
+| 2     | DB schema          | Done     |
+| 3     | Book ingestion     | Done     |
+| 4     | Embeddings         | Done     |
+| 5     | Retrieval          | Done     |
+| 6     | Q&A (Agentic Chat) | **Next** |
+| 7     | CLI polish         | —        |
+| 8     | iOS/macOS app      | —        |
 
 See `docs/technical_design.md` → "Build Order" for details on each phase. See "Directory Layout" for the full project tree.
+
+### Phase 6 Scope
+
+Phase 6 replaces single-turn RAG with an agentic conversation system:
+
+- **`Conversation`** aggregate — multiple named conversations per book, auto-titled
+- **`ChatMessage`** updated — `conversation_id` FK replaces `book_id`; adds `tool_result` role
+- **Tool-use** — LLM decides when to retrieve via `search_book` tool; `RetrievalStrategy` protocol
+- **Context management** — full conversation history sent to LLM (capped at N); `ConversationContextStrategy` protocol
+- **`ChatWithBookUseCase`** — replaces `AskBookUseCase`; agent loop with tool invocations
+- **`cli chat <book>`** — interactive conversation mode replacing `cli ask`
+- **Schema migration** — `conversations` table + `chat_messages` FK update
+
+See `docs/technical_design.md` → "Tool-Use Support" and "Data Flow" for architecture details.
 
 ## First-Time Setup
 
@@ -88,7 +104,7 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 
 - **Ubiquitous language** — use domain terms consistently. A `Book` is a `Book`, not a `Document` or `Item`. A `Chunk` is a `Chunk`, not a `Segment` or `Fragment`. If the domain term changes, rename everywhere.
 - **Entities vs Value Objects** — entities have identity (`Book` has an ID, persists, tracks state). Value objects are immutable data with no identity (`PageRange`, `ChunkMetadata`, `EmbeddingVector`). Don't give value objects IDs.
-- **Aggregates** — `Book` is an aggregate root. Access its `Chunk`s through `Book`, not independently. Don't let outside code reach into aggregate internals.
+- **Aggregates** — `Book` and `Conversation` are aggregate roots. Access `Chunk`s through `Book`, `ChatMessage`s through `Conversation`. Don't let outside code reach into aggregate internals.
 - **Domain logic in domain objects** — not in controllers, CLI handlers, or UI code. If you're writing an `if` about book state in a command handler, it belongs in the domain layer.
 - **Domain layer has no outward dependencies** — domain code never imports infrastructure (DB, API clients, file I/O). It depends only on protocols/interfaces.
 - **Domain errors** — use `BookError`, `LLMError`, `StorageError`. Let them propagate to the application layer.
@@ -129,6 +145,9 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 - Don't use magic numbers or strings — name them
 - Don't add DB columns, domain concepts, or error cases without updating the shared contracts first (see `docs/technical_design.md` → "Cross-Platform Contracts")
 - Don't change prompt templates in one codebase without updating `shared/prompts/`
+- Don't put `book_id` on `ChatMessage` — it belongs on `Conversation`; access book via `message → conversation → book`
+- Don't use "session" as a domain entity name — use `Conversation`
+- Don't use "ask" for the CLI conversation command — it's `chat`
 
 ## Git Workflow (Gitflow)
 
