@@ -34,6 +34,7 @@ def _require_env(name: str) -> str:
 
 @app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     version: bool = typer.Option(False, "--version", "-v", help="Show version"),
     verbose: bool = typer.Option(False, "--verbose", help="Enable verbose output"),
 ) -> None:
@@ -41,6 +42,9 @@ def main(
     _verbose = verbose
     if version:
         typer.echo(f"interactive-books {VERSION}")
+        raise typer.Exit()
+    if ctx.invoked_subcommand is None:
+        typer.echo(ctx.get_help())
         raise typer.Exit()
 
 
