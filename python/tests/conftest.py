@@ -6,7 +6,7 @@ import pytest
 
 from interactive_books.infra.storage.database import Database
 
-SCHEMA_DIR = Path(__file__).resolve().parent.parent.parent / "shared" / "schema"
+SCHEMA_DIR = Path(__file__).resolve().parents[2] / "shared" / "schema"
 
 
 @pytest.fixture
