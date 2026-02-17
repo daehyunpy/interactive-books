@@ -2,6 +2,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from interactive_books.domain.chat import ChatMessage
+from interactive_books.domain.chat_event import ChatEvent, ToolResultEvent
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.protocols import ChatProvider
 from interactive_books.domain.search_result import SearchResult
@@ -20,9 +21,20 @@ class RetrievalStrategy:
         messages: list[PromptMessage],
         tools: list[ToolDefinition],
         search_fn: Callable[[str], list[SearchResult]],
+        on_event: Callable[[ChatEvent], None] | None = None,
     ) -> tuple[str, list[ChatMessage]]:
         query = self._reformulate_query(chat_provider, messages)
         results = search_fn(query)
+
+        if on_event:
+            on_event(
+                ToolResultEvent(
+                    query=query,
+                    result_count=len(results),
+                    results=results,
+                )
+            )
+
         context = self._format_context(results)
 
         augmented_messages = list(messages)

@@ -16,6 +16,13 @@ class ToolInvocation:
 
 
 @dataclass(frozen=True)
+class TokenUsage:
+    input_tokens: int
+    output_tokens: int
+
+
+@dataclass(frozen=True)
 class ChatResponse:
     text: str | None = None
     tool_invocations: list[ToolInvocation] = field(default_factory=list)
+    usage: TokenUsage | None = None

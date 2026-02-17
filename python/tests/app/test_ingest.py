@@ -10,6 +10,18 @@ from interactive_books.domain.page_content import PageContent
 from interactive_books.domain.protocols import BookParser, TextChunker
 
 
+class FakeEmbedBookUseCase:
+    def __init__(self, *, error: Exception | None = None) -> None:
+        self._error = error
+        self.last_book_id: str | None = None
+
+    def execute(self, book_id: str) -> Book:
+        self.last_book_id = book_id
+        if self._error is not None:
+            raise self._error
+        return Book(id=book_id, title="embedded")
+
+
 class FakeBookRepository:
     def __init__(self) -> None:
         self.books: dict[str, Book] = {}
@@ -90,6 +102,7 @@ def make_use_case(
     chunker: TextChunker | None = None,
     book_repo: FakeBookRepository | None = None,
     chunk_repo: FakeChunkRepository | None = None,
+    embed_use_case: FakeEmbedBookUseCase | None = None,
 ) -> tuple[IngestBookUseCase, FakeBookRepository, FakeChunkRepository]:
     br = book_repo or FakeBookRepository()
     cr = chunk_repo or FakeChunkRepository()
@@ -100,6 +113,7 @@ def make_use_case(
             chunker=chunker or FakeChunker(),
             book_repo=br,
             chunk_repo=cr,
+            embed_use_case=embed_use_case,  # type: ignore[arg-type]
         ),
         br,
         cr,
@@ -111,22 +125,23 @@ class TestIngestSuccess:
         use_case, _, _ = make_use_case()
         pdf_path = tmp_path / "test.pdf"
         pdf_path.touch()
-        book = use_case.execute(pdf_path, "Test Book")
+        book, embed_error = use_case.execute(pdf_path, "Test Book")
         assert book.status == BookStatus.READY
         assert book.title == "Test Book"
+        assert embed_error is None
 
     def test_successful_txt_ingest_returns_ready_book(self, tmp_path: Path) -> None:
         use_case, _, _ = make_use_case()
         txt_path = tmp_path / "test.txt"
         txt_path.touch()
-        book = use_case.execute(txt_path, "Text Book")
+        book, _ = use_case.execute(txt_path, "Text Book")
         assert book.status == BookStatus.READY
 
     def test_book_is_persisted(self, tmp_path: Path) -> None:
         use_case, book_repo, _ = make_use_case()
         pdf_path = tmp_path / "test.pdf"
         pdf_path.touch()
-        book = use_case.execute(pdf_path, "Test Book")
+        book, _ = use_case.execute(pdf_path, "Test Book")
         assert book_repo.get(book.id) is not None
         assert book_repo.get(book.id).status == BookStatus.READY  # type: ignore[union-attr]
 
@@ -178,7 +193,7 @@ class TestIngestChunkAssociation:
         use_case, _, chunk_repo = make_use_case(chunker=FakeChunker(chunks))
         pdf_path = tmp_path / "test.pdf"
         pdf_path.touch()
-        book = use_case.execute(pdf_path, "Test Book")
+        book, _ = use_case.execute(pdf_path, "Test Book")
         saved_chunks = chunk_repo.get_by_book(book.id)
         assert len(saved_chunks) == 5
         for chunk in saved_chunks:
@@ -192,7 +207,48 @@ class TestIngestChunkAssociation:
         use_case, _, chunk_repo = make_use_case(chunker=FakeChunker(chunks))
         pdf_path = tmp_path / "test.pdf"
         pdf_path.touch()
-        book = use_case.execute(pdf_path, "Test Book")
+        book, _ = use_case.execute(pdf_path, "Test Book")
         saved_chunks = chunk_repo.get_by_book(book.id)
         ids = [c.id for c in saved_chunks]
         assert len(ids) == len(set(ids))
+
+
+# ── Tests: Auto-Embed ───────────────────────────────────────────
+
+
+class TestAutoEmbed:
+    def test_auto_embed_success_returns_no_error(self, tmp_path: Path) -> None:
+        embed = FakeEmbedBookUseCase()
+        use_case, _, _ = make_use_case(embed_use_case=embed)
+        pdf_path = tmp_path / "test.pdf"
+        pdf_path.touch()
+
+        book, embed_error = use_case.execute(pdf_path, "Test Book")
+
+        assert book.status == BookStatus.READY
+        assert embed_error is None
+        assert embed.last_book_id == book.id
+
+    def test_auto_embed_failure_returns_exception_with_ready_book(
+        self, tmp_path: Path
+    ) -> None:
+        failure = RuntimeError("Embedding API down")
+        embed = FakeEmbedBookUseCase(error=failure)
+        use_case, _, _ = make_use_case(embed_use_case=embed)
+        pdf_path = tmp_path / "test.pdf"
+        pdf_path.touch()
+
+        book, embed_error = use_case.execute(pdf_path, "Test Book")
+
+        assert book.status == BookStatus.READY
+        assert embed_error is failure
+
+    def test_no_embed_use_case_returns_no_error(self, tmp_path: Path) -> None:
+        use_case, _, _ = make_use_case()
+        pdf_path = tmp_path / "test.pdf"
+        pdf_path.touch()
+
+        book, embed_error = use_case.execute(pdf_path, "Test Book")
+
+        assert book.status == BookStatus.READY
+        assert embed_error is None

@@ -1,9 +1,20 @@
 from collections.abc import Callable
 
 from interactive_books.domain.chat import MessageRole
+from interactive_books.domain.chat_event import (
+    ChatEvent,
+    TokenUsageEvent,
+    ToolInvocationEvent,
+    ToolResultEvent,
+)
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.search_result import SearchResult
-from interactive_books.domain.tool import ChatResponse, ToolDefinition, ToolInvocation
+from interactive_books.domain.tool import (
+    ChatResponse,
+    TokenUsage,
+    ToolDefinition,
+    ToolInvocation,
+)
 from interactive_books.infra.retrieval.tool_use import RetrievalStrategy
 
 
@@ -163,3 +174,108 @@ class TestToolUseStrategyNoResults:
 
         assert text == "I couldn't find anything."
         assert "No relevant passages" in new_messages[0].content
+
+
+def _collect_events() -> tuple[list[ChatEvent], Callable[[ChatEvent], None]]:
+    events: list[ChatEvent] = []
+    return events, events.append
+
+
+class TestToolUseStrategyEventEmission:
+    def test_direct_reply_emits_token_usage_only(self) -> None:
+        usage = TokenUsage(input_tokens=100, output_tokens=50)
+        provider = FakeChatProvider([ChatResponse(text="Answer.", usage=usage)])
+        strategy = RetrievalStrategy()
+        events, on_event = _collect_events()
+
+        strategy.execute(
+            provider,
+            [PromptMessage(role="user", content="Hello")],
+            [_search_tool()],
+            _make_search_fn(),
+            on_event=on_event,
+        )
+
+        assert len(events) == 1
+        assert isinstance(events[0], TokenUsageEvent)
+        assert events[0].input_tokens == 100
+        assert events[0].output_tokens == 50
+
+    def test_tool_use_emits_all_event_types(self) -> None:
+        usage1 = TokenUsage(input_tokens=200, output_tokens=10)
+        usage2 = TokenUsage(input_tokens=300, output_tokens=100)
+        provider = FakeChatProvider(
+            [
+                ChatResponse(
+                    tool_invocations=[
+                        ToolInvocation(
+                            tool_name="search_book",
+                            tool_use_id="tu_1",
+                            arguments={"query": "themes"},
+                        )
+                    ],
+                    usage=usage1,
+                ),
+                ChatResponse(text="The themes are...", usage=usage2),
+            ]
+        )
+        results = [
+            SearchResult(
+                chunk_id="c1",
+                content="Theme text.",
+                start_page=10,
+                end_page=12,
+                distance=0.1,
+            )
+        ]
+        strategy = RetrievalStrategy()
+        events, on_event = _collect_events()
+
+        strategy.execute(
+            provider,
+            [PromptMessage(role="user", content="What are the themes?")],
+            [_search_tool()],
+            _make_search_fn(results),
+            on_event=on_event,
+        )
+
+        # Expect: TokenUsage(1st call), ToolInvocation, ToolResult, TokenUsage(2nd call)
+        assert len(events) == 4
+        assert isinstance(events[0], TokenUsageEvent)
+        assert isinstance(events[1], ToolInvocationEvent)
+        assert events[1].tool_name == "search_book"
+        assert events[1].arguments == {"query": "themes"}
+        assert isinstance(events[2], ToolResultEvent)
+        assert events[2].query == "themes"
+        assert events[2].result_count == 1
+        assert isinstance(events[3], TokenUsageEvent)
+
+    def test_no_events_when_callback_is_none(self) -> None:
+        usage = TokenUsage(input_tokens=100, output_tokens=50)
+        provider = FakeChatProvider([ChatResponse(text="Answer.", usage=usage)])
+        strategy = RetrievalStrategy()
+
+        # Should not raise — on_event defaults to None
+        text, _ = strategy.execute(
+            provider,
+            [PromptMessage(role="user", content="Hello")],
+            [_search_tool()],
+            _make_search_fn(),
+        )
+
+        assert text == "Answer."
+
+    def test_no_token_event_when_usage_is_none(self) -> None:
+        provider = FakeChatProvider([ChatResponse(text="Answer.")])
+        strategy = RetrievalStrategy()
+        events, on_event = _collect_events()
+
+        strategy.execute(
+            provider,
+            [PromptMessage(role="user", content="Hello")],
+            [_search_tool()],
+            _make_search_fn(),
+            on_event=on_event,
+        )
+
+        assert len(events) == 0

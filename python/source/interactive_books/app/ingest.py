@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from interactive_books.domain.book import Book
 from interactive_books.domain.chunk import Chunk
@@ -10,6 +13,9 @@ from interactive_books.domain.protocols import (
     ChunkRepository,
     TextChunker,
 )
+
+if TYPE_CHECKING:
+    from interactive_books.app.embed import EmbedBookUseCase
 
 SUPPORTED_EXTENSIONS = {".pdf", ".txt"}
 
@@ -23,14 +29,16 @@ class IngestBookUseCase:
         chunker: TextChunker,
         book_repo: BookRepository,
         chunk_repo: ChunkRepository,
+        embed_use_case: EmbedBookUseCase | None = None,
     ) -> None:
         self._pdf_parser = pdf_parser
         self._txt_parser = txt_parser
         self._chunker = chunker
         self._book_repo = book_repo
         self._chunk_repo = chunk_repo
+        self._embed_use_case = embed_use_case
 
-    def execute(self, file_path: Path, title: str) -> Book:
+    def execute(self, file_path: Path, title: str) -> tuple[Book, Exception | None]:
         extension = file_path.suffix.lower()
         if extension not in SUPPORTED_EXTENSIONS:
             raise BookError(
@@ -67,4 +75,15 @@ class IngestBookUseCase:
             raise
 
         self._book_repo.save(book)
-        return book
+
+        embed_error = self._auto_embed(book)
+        return book, embed_error
+
+    def _auto_embed(self, book: Book) -> Exception | None:
+        if self._embed_use_case is None:
+            return None
+        try:
+            self._embed_use_case.execute(book.id)
+        except Exception as exc:
+            return exc
+        return None

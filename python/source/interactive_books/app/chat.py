@@ -1,9 +1,11 @@
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 from interactive_books.app.conversations import ManageConversationsUseCase
 from interactive_books.app.search import SearchBooksUseCase
 from interactive_books.domain.chat import ChatMessage, MessageRole
+from interactive_books.domain.chat_event import ChatEvent
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.protocols import (
@@ -43,6 +45,7 @@ class ChatWithBookUseCase:
         conversation_repo: ConversationRepository,
         message_repo: ChatMessageRepository,
         prompts_dir: Path,
+        on_event: Callable[[ChatEvent], None] | None = None,
     ) -> None:
         self._chat = chat_provider
         self._retrieval = retrieval_strategy
@@ -51,6 +54,7 @@ class ChatWithBookUseCase:
         self._conversation_repo = conversation_repo
         self._message_repo = message_repo
         self._prompts_dir = prompts_dir
+        self._on_event = on_event
 
     def execute(self, conversation_id: str, user_message: str) -> str:
         conversation = self._conversation_repo.get(conversation_id)
@@ -80,7 +84,11 @@ class ChatWithBookUseCase:
             return self._search.execute(book_id, query)
 
         response_text, new_messages = self._retrieval.execute(
-            self._chat, prompt_messages, [SEARCH_BOOK_TOOL], search_fn
+            self._chat,
+            prompt_messages,
+            [SEARCH_BOOK_TOOL],
+            search_fn,
+            on_event=self._on_event,
         )
 
         user_chat_message = ChatMessage(

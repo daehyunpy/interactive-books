@@ -1,8 +1,10 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from interactive_books.app.chat import ChatWithBookUseCase
 from interactive_books.domain.chat import ChatMessage, MessageRole
+from interactive_books.domain.chat_event import ChatEvent
 from interactive_books.domain.conversation import Conversation
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.domain.prompt_message import PromptMessage
@@ -65,6 +67,7 @@ class FakeRetrievalStrategy:
         self._intermediate = intermediate_messages or []
         self.last_messages: list[PromptMessage] | None = None
         self.last_tools: list[ToolDefinition] | None = None
+        self.last_on_event: Callable[[ChatEvent], None] | None = None
 
     def execute(
         self,
@@ -72,9 +75,11 @@ class FakeRetrievalStrategy:
         messages: list[PromptMessage],
         tools: list[ToolDefinition],
         search_fn: object,
+        on_event: Callable[[ChatEvent], None] | None = None,
     ) -> tuple[str, list[ChatMessage]]:
         self.last_messages = messages
         self.last_tools = tools
+        self.last_on_event = on_event
         return self._response_text, self._intermediate
 
 
@@ -138,6 +143,7 @@ def _make_use_case(
     context: FakeContextStrategy | None = None,
     search: FakeSearchBooksUseCase | None = None,
     chat: FakeChatProvider | None = None,
+    on_event: Callable[[ChatEvent], None] | None = None,
 ) -> ChatWithBookUseCase:
     return ChatWithBookUseCase(
         chat_provider=chat or FakeChatProvider(),
@@ -147,6 +153,7 @@ def _make_use_case(
         conversation_repo=conversation_repo,  # type: ignore[arg-type]
         message_repo=message_repo,  # type: ignore[arg-type]
         prompts_dir=prompts_dir,
+        on_event=on_event,
     )
 
 
@@ -445,3 +452,49 @@ class TestContextIntegration:
         assert len(retrieval.last_messages) == 3
         assert retrieval.last_messages[1].content == "Earlier question"
         assert retrieval.last_messages[2].content == "Follow-up"
+
+
+# ── Tests: Event Callback Passthrough ────────────────────────────
+
+
+class TestEventCallbackPassthrough:
+    def test_on_event_passed_to_retrieval_strategy(
+        self,
+        prompts_dir: Path,
+        conversation_repo: FakeConversationRepository,
+        message_repo: FakeChatMessageRepository,
+    ) -> None:
+        _seed_conversation(conversation_repo)
+        retrieval = FakeRetrievalStrategy()
+        events: list[ChatEvent] = []
+        callback = events.append
+        uc = _make_use_case(
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=prompts_dir,
+            retrieval=retrieval,
+            on_event=callback,
+        )
+
+        uc.execute("conv-1", "Hello")
+
+        assert retrieval.last_on_event is callback
+
+    def test_none_on_event_passed_when_not_provided(
+        self,
+        prompts_dir: Path,
+        conversation_repo: FakeConversationRepository,
+        message_repo: FakeChatMessageRepository,
+    ) -> None:
+        _seed_conversation(conversation_repo)
+        retrieval = FakeRetrievalStrategy()
+        uc = _make_use_case(
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=prompts_dir,
+            retrieval=retrieval,
+        )
+
+        uc.execute("conv-1", "Hello")
+
+        assert retrieval.last_on_event is None

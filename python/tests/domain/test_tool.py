@@ -1,5 +1,10 @@
 import pytest
-from interactive_books.domain.tool import ChatResponse, ToolDefinition, ToolInvocation
+from interactive_books.domain.tool import (
+    ChatResponse,
+    TokenUsage,
+    ToolDefinition,
+    ToolInvocation,
+)
 
 
 class TestToolDefinition:
@@ -61,3 +66,23 @@ class TestChatResponse:
         cr = ChatResponse()
         assert cr.text is None
         assert cr.tool_invocations == []
+        assert cr.usage is None
+
+    def test_response_with_usage(self) -> None:
+        usage = TokenUsage(input_tokens=1234, output_tokens=567)
+        cr = ChatResponse(text="answer", usage=usage)
+        assert cr.usage is not None
+        assert cr.usage.input_tokens == 1234
+        assert cr.usage.output_tokens == 567
+
+
+class TestTokenUsage:
+    def test_create_token_usage(self) -> None:
+        usage = TokenUsage(input_tokens=100, output_tokens=50)
+        assert usage.input_tokens == 100
+        assert usage.output_tokens == 50
+
+    def test_token_usage_is_immutable(self) -> None:
+        usage = TokenUsage(input_tokens=100, output_tokens=50)
+        with pytest.raises(AttributeError):
+            usage.input_tokens = 200  # type: ignore[misc]

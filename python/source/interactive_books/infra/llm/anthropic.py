@@ -5,7 +5,12 @@ from anthropic.types import Message
 from interactive_books.domain.errors import LLMError, LLMErrorCode
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.protocols import ChatProvider as ChatProviderPort
-from interactive_books.domain.tool import ChatResponse, ToolDefinition, ToolInvocation
+from interactive_books.domain.tool import (
+    ChatResponse,
+    TokenUsage,
+    ToolDefinition,
+    ToolInvocation,
+)
 
 MODEL = "claude-sonnet-4-5-20250929"
 MAX_TOKENS = 4096
@@ -57,7 +62,11 @@ class ChatProvider(ChatProviderPort):
                     )
                 )
 
-        return ChatResponse(text=text, tool_invocations=invocations)
+        usage = TokenUsage(
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+        )
+        return ChatResponse(text=text, tool_invocations=invocations, usage=usage)
 
     def _call_api(
         self,
