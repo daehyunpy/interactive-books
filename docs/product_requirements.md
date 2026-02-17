@@ -2,7 +2,7 @@
 
 ## Overview
 
-A local-only iOS and macOS app that lets users upload books and have conversations about them. All processing happens on-device or via direct API calls to an LLM provider — no backend server required. Users can ask questions, get summaries, find specific passages, and explore themes using RAG (retrieval-augmented generation).
+A local-only iOS and macOS app that lets users upload books and have ongoing conversations about them. All processing happens on-device or via direct API calls to an LLM provider — no backend server required. An agentic chat system maintains conversation context, decides when to retrieve relevant passages, and reformulates queries as the conversation evolves — grounding every answer in the actual text.
 
 A Python CLI tool is provided for debugging and rapid prototyping.
 
@@ -44,18 +44,21 @@ No backend server. No web interface.
 - As a student reading a textbook, I want to ask questions about concepts from chapters I've already read so that I can deepen my understanding without spoiling later material.
 - As a student preparing for an exam, I want to get summaries of specific chapters so that I can review efficiently.
 - As a student, I want to ask questions across multiple textbooks so that I can connect ideas from different courses.
+- As a student, I want to ask follow-up questions without repeating context so that my study session flows naturally like a conversation with a tutor.
 
 ### Researcher / Professional
 
 - As a researcher, I want to upload a paper or book and ask about specific arguments so that I can quickly locate evidence without re-reading.
 - As a professional, I want to search across multiple reference books at once so that I can compare approaches to a problem.
 - As a researcher, I want page citations in every answer so that I can verify claims against the source material.
+- As a researcher, I want the system to understand "compare that with chapter 5's argument" without me restating what "that" refers to, so I can work efficiently.
 
 ### General Reader
 
 - As a reader midway through a novel, I want to ask "Who is this character?" without getting spoilers from later chapters.
 - As a reader who finished a book weeks ago, I want to recall specific details so that I can discuss the book with others.
 - As a privacy-conscious reader, I want to use a local LLM so that my reading data never leaves my device.
+- As a reader, I want to continue a conversation about a book where I left off yesterday so that I don't lose my train of thought.
 
 ## Core Features
 
@@ -74,9 +77,11 @@ No backend server. No web interface.
    - Answers cite specific page numbers (e.g. "As mentioned on p.42...")
    - Position is saved per book and persists across sessions
 
-3. **Ask Questions**
-   - Chat-style interface for asking questions about a book
-   - App retrieves relevant passages locally, sends them with the question to an LLM API
+3. **Book Conversations**
+   - Chat-style interface for multi-turn conversations about a book
+   - The agent maintains conversation history within a session and uses it to interpret follow-up questions (e.g., "Tell me more about that character" resolves to the character discussed in the previous turn)
+   - The agent decides when to retrieve passages from the book — not every message requires retrieval (e.g., clarifying questions, follow-ups on already-retrieved context, or meta-questions about the conversation)
+   - When retrieval is needed, the agent reformulates the user's message into a self-contained search query using conversation context before searching
    - Answers include page number references to source passages
    - Users can reference pages in questions (e.g. "What did the author mean on p.73?", "Summarize pages 100-120")
    - Page references in answers are tappable — jump to that page's context
@@ -98,26 +103,31 @@ No backend server. No web interface.
      - **Anthropic (Claude)** — default provider
      - **OpenAI (GPT)**
      - **Local LLM** — connect to a locally running model (e.g. Ollama)
-   - Provider can be switched at any time; existing books and chat history are preserved
+   - Provider can be switched at any time; existing books and conversations are preserved
+
+6. **Conversation Sessions**
+   - Each book can have multiple conversations (e.g., one for study notes, one for casual reading)
+   - A conversation preserves the full message history (user and assistant turns)
+   - The agent uses conversation history as context when interpreting new messages
+   - Conversations are titled automatically from the first message; users can rename them
+   - Conversations are persisted locally and survive app restarts
+   - Users can start a new conversation or continue an existing one
+   - Deleting a book deletes all its conversations (cascade)
 
 ### P1 — Should Have
 
-6. **Large Book Support (1000+ pages)**
+7. **Large Book Support (1000+ pages)**
    - Efficient chunking and indexing for very large books
    - Background ingestion with progress indicator
    - Incremental embedding (resume if interrupted)
 
-7. **Chapter Summaries**
+8. **Chapter Summaries**
    - Users can request a summary of a specific chapter or section
    - App identifies chapter boundaries and summarizes content
 
-8. **Multi-Book Queries**
+9. **Multi-Book Queries**
    - Users can ask questions across multiple books at once
    - Useful for comparing themes, characters, or ideas across works
-
-9. **Chat History**
-   - Conversation history is persisted locally per book
-   - Users can revisit prior Q&A sessions
 
 ### P2 — Nice to Have
 
@@ -140,13 +150,14 @@ A CLI for debugging and rapid prototyping. Used to iterate on the RAG pipeline q
 
 - `cli ingest <file>` — parse, chunk, embed a book and inspect the results
 - `cli search <book> <query>` — run vector search and see retrieved chunks with similarity scores
-- `cli ask <book> <question>` — full end-to-end question answering
+- `cli chat <book>` — interactive conversation mode with session persistence
 - `cli books` — list ingested books, chunk counts, metadata
 - `--verbose` flag — log chunk boundaries, similarity scores, prompt construction, token counts
 
 ### Role
 
 The CLI serves two purposes:
+
 1. **Prototyping** — quickly test different chunking strategies, embedding models, prompt templates, and retrieval parameters without rebuilding an Xcode project
 2. **Debugging** — inspect intermediate pipeline state (chunks, embeddings, retrieved context, final prompt) when something isn't working
 
@@ -156,16 +167,17 @@ The CLI is not a user-facing product.
 
 Local-first is a core value proposition, not just an architecture choice. Users must understand exactly what stays on their device and what doesn't.
 
-| Data | Where it lives | Leaves the device? |
-|------|----------------|-------------------|
-| Book files (PDF, TXT) | Local storage only | Never |
-| Parsed text and chunks | Local SQLite DB | Only when sent to LLM API as context for a question |
-| Embeddings | Local SQLite DB (sqlite-vec) | Never (computed via API, stored locally) |
-| Chat history | Local SQLite DB | Never |
-| API keys | Keychain (app) / `.env` (CLI) | Sent to LLM provider for authentication |
-| Reading position | Local SQLite DB | Never |
+| Data                   | Where it lives                | Leaves the device?                                         |
+| ---------------------- | ----------------------------- | ---------------------------------------------------------- |
+| Book files (PDF, TXT)  | Local storage only            | Never                                                      |
+| Parsed text and chunks | Local SQLite DB               | Only when sent to LLM API as context for a question        |
+| Embeddings             | Local SQLite DB (sqlite-vec)  | Never (computed via API, stored locally)                   |
+| Conversation history   | Local SQLite DB               | Message content is sent to LLM API as conversation context |
+| API keys               | Keychain (app) / `.env` (CLI) | Sent to LLM provider for authentication                    |
+| Reading position       | Local SQLite DB               | Never                                                      |
 
 **What gets sent to external APIs:**
+
 - When using a cloud LLM (Anthropic, OpenAI): the user's question and retrieved text chunks are sent to the provider's API. This is the minimum needed to generate an answer.
 - When using a cloud embedding provider: chunk text is sent to generate embeddings. This happens once at ingestion time.
 - When using Ollama (local LLM + local embeddings): nothing leaves the device. Fully offline.
@@ -187,21 +199,22 @@ Local-first is a core value proposition, not just an architecture choice. Users 
 
 ### Leading Indicators (validate during development)
 
-| Metric | Target | How to measure |
-|--------|--------|----------------|
-| Ingestion time | < 2 min for a 300-page PDF | Time from upload to "ready" status |
-| Retrieval accuracy | Top-5 chunks contain the relevant passage ≥ 80% of the time | Manual evaluation on a test set of 20 questions per sample book |
-| Citation rate | ≥ 90% of answers include at least one page citation | Automated check on LLM output |
-| Answer groundedness | < 10% of answers contain claims not traceable to retrieved chunks | Manual spot-check against source passages |
-| Ingestion throughput | ≥ 50 pages/sec for chunking + embedding | Benchmark on sample books |
+| Metric               | Target                                                            | How to measure                                                   |
+| -------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Ingestion time       | < 2 min for a 300-page PDF                                        | Time from upload to "ready" status                               |
+| Retrieval accuracy   | Top-5 chunks contain the relevant passage ≥ 80% of the time       | Manual evaluation on a test set of 20 questions per sample book  |
+| Citation rate        | ≥ 90% of answers include at least one page citation               | Automated check on LLM output                                    |
+| Answer groundedness  | < 10% of answers contain claims not traceable to retrieved chunks | Manual spot-check against source passages                        |
+| Ingestion throughput | ≥ 50 pages/sec for chunking + embedding                           | Benchmark on sample books                                        |
+| Anaphora resolution  | Agent correctly resolves references ≥ 80% of the time             | Manual evaluation on 10 multi-turn conversations per sample book |
 
 ### Lagging Indicators (validate post-launch)
 
-| Metric | Target | How to measure |
-|--------|--------|----------------|
+| Metric                 | Target                                              | How to measure                                   |
+| ---------------------- | --------------------------------------------------- | ------------------------------------------------ |
 | Time to first question | < 5 min from app install to first answered question | Analytics event (if added later) or user testing |
-| Return usage | User asks ≥ 3 questions per book on average | Local usage stats (opt-in) |
-| Multi-book adoption | ≥ 30% of users upload 2+ books within first month | Local usage stats (opt-in) |
+| Return usage           | User asks ≥ 3 questions per book on average         | Local usage stats (opt-in)                       |
+| Multi-book adoption    | ≥ 30% of users upload 2+ books within first month   | Local usage stats (opt-in)                       |
 
 ### Functional Requirements
 
