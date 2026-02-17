@@ -1,139 +1,64 @@
 # cli-commands
 
-Book management CLI commands and supporting domain/application types. Located in `python/source/interactive_books/main.py`, `python/source/interactive_books/app/list_books.py`, `python/source/interactive_books/app/delete_book.py`, and `python/source/interactive_books/domain/book_summary.py`.
+Delta spec for CLI command changes. Removes the `ask` command and adds the `chat` command with conversation selection. Other commands (`books`, `show`, `delete`, `set-page`) are unchanged.
 
-## Requirements
+## ADDED Requirements
 
-### CC-1: BookSummary value object for book listings
+### CC-9: CLI chat command replaces ask command
 
-The domain layer SHALL define a `BookSummary` frozen dataclass in `domain/book_summary.py` with fields: `id: str`, `title: str`, `status: BookStatus`, `chunk_count: int`, `embedding_provider: str | None`, `current_page: int`.
+The CLI SHALL provide a `chat <book-id>` command that starts an interactive conversation about a book. This command replaces the removed `ask` command. The full specification for the chat command is defined in the `chat-cli` spec (CCLI-1 through CCLI-6).
 
-#### Scenario: BookSummary creation
+The `chat` command SHALL:
+- Accept a required `book-id` argument
+- Support `--verbose` / `-v` flag for tool result visibility
+- Use `_require_env` to validate `OPENAI_API_KEY` and `ANTHROPIC_API_KEY`
+- Use `_open_db` helper for database setup
+- Wire together `ChatWithBookUseCase`, `ConversationRepository`, `ChatMessageRepository`, and all required dependencies
 
-- **WHEN** a `BookSummary` is created with valid fields
-- **THEN** all fields are accessible and the object is immutable
+#### Scenario: Chat command registered
 
-### CC-2: ChunkRepository.count_by_book protocol and implementation
+- **WHEN** `cli --help` is executed
+- **THEN** the `chat` command appears in the help output with a description
 
-The `ChunkRepository` protocol SHALL include a `count_by_book(book_id: str) -> int` method. The `infra/storage/chunk_repo.py` implementation SHALL use `SELECT COUNT(*) FROM chunks WHERE book_id = ?`.
+#### Scenario: Chat command wiring
 
-#### Scenario: Count chunks for a book with data
+- **WHEN** `cli chat <book-id>` is executed
+- **THEN** all dependencies are constructed and injected: `ChatProvider`, `SearchBooksUseCase`, `ChatMessageRepository`, `ConversationRepository`, `BookRepository`, `RetrievalStrategy`, `ConversationContextStrategy`
 
-- **WHEN** `count_by_book` is called for a book with 5 chunks
-- **THEN** 5 is returned
+#### Scenario: Chat replaces ask in CLI
 
-#### Scenario: Count chunks for a book with no chunks
+- **WHEN** `cli --help` is executed
+- **THEN** there is a `chat` command but no `ask` command
 
-- **WHEN** `count_by_book` is called for a book with no chunks
-- **THEN** 0 is returned
+## MODIFIED Requirements
 
-### CC-3: ListBooksUseCase returns book summaries
+### CC-4: DeleteBookUseCase removes a book and all associated data (MODIFIED)
 
-The application layer SHALL provide a `ListBooksUseCase` class in `app/list_books.py` that accepts `BookRepository` and `ChunkRepository` via constructor injection. It SHALL use `chunk_repo.count_by_book(book_id)` to get chunk counts efficiently. It SHALL expose an `execute() → list[BookSummary]` method that returns all books with their chunk counts.
+The application layer SHALL provide a `DeleteBookUseCase` class in `app/delete_book.py` that accepts `BookRepository` and `EmbeddingRepository` via constructor injection. It SHALL expose an `execute(book_id: str) -> Book` method that:
 
-#### Scenario: List books with data
-
-- **WHEN** `execute()` is called and books exist in the database
-- **THEN** a list of `BookSummary` objects is returned, one per book, each with the correct chunk count
-
-#### Scenario: List books when empty
-
-- **WHEN** `execute()` is called and no books exist
-- **THEN** an empty list is returned
-
-### CC-4: DeleteBookUseCase removes a book and all associated data
-
-The application layer SHALL provide a `DeleteBookUseCase` class in `app/delete_book.py` that accepts `BookRepository` and `EmbeddingRepository` via constructor injection. It SHALL expose an `execute(book_id: str) → Book` method that:
-
-1. Fetches the book via `book_repo.get(book_id)` — raises `BookError(NOT_FOUND)` if missing
+1. Fetches the book via `book_repo.get(book_id)` -- raises `BookError(NOT_FOUND)` if missing
 2. If `book.embedding_provider` and `book.embedding_dimension` are both non-None, calls `embedding_repo.delete_by_book(provider, dimension, book_id)` to clean up vec0 virtual table rows
-3. Calls `book_repo.delete(book_id)` — chunks cascade automatically via SQL foreign key
+3. Calls `book_repo.delete(book_id)` -- chunks, conversations, and messages cascade automatically via SQL foreign keys
 4. Returns the deleted book
 
-`ChunkRepository` is NOT needed — SQLite ON DELETE CASCADE handles chunk cleanup. Only vec0 virtual tables require explicit deletion because they don't participate in foreign key cascades.
+**Changes from original:**
+- Cascade delete now also covers `conversations` and `chat_messages` (via `conversations`) in addition to `chunks`
+- No code change required in `DeleteBookUseCase` itself -- the cascade is handled by SQL foreign key constraints added in the `sql-schema` delta
 
-#### Scenario: Successful deletion of book with embeddings
+#### Scenario: Book deletion cascades to conversations and messages
 
-- **WHEN** `execute` is called with a valid book ID that has embeddings
-- **THEN** embeddings are deleted from the vec0 table, the book and its chunks are deleted, and the deleted book is returned
+- **WHEN** `execute` is called for a book that has conversations with messages
+- **THEN** the book, its chunks, its conversations, and all messages in those conversations are deleted
 
-#### Scenario: Successful deletion of book without embeddings
+#### Scenario: Unchanged behavior for books without conversations
 
-- **WHEN** `execute` is called with a valid book ID that was never embedded (embedding_provider is None)
-- **THEN** the book and its chunks are deleted (no embedding cleanup needed), and the deleted book is returned
+- **WHEN** `execute` is called for a book that has no conversations
+- **THEN** the behavior is identical to the original (chunks and embeddings cleaned up)
 
-#### Scenario: Book not found
+## REMOVED Requirements
 
-- **WHEN** `execute` is called with a non-existent book ID
-- **THEN** a `BookError` with code `NOT_FOUND` is raised
+### AP-3 / CC (ask command): CLI ask command
 
-### CC-5: CLI books command lists all books
+**Reason:** The `ask` command is removed from the CLI. It is replaced by the `chat` command which provides a superset of functionality (interactive REPL, conversation persistence, tool-use, verbose mode).
 
-The CLI SHALL provide a `books` command that prints a table of all books with columns: ID, title, status, chunks, embedding provider, and current page.
-
-#### Scenario: Books listed
-
-- **WHEN** `cli books` is executed and books exist
-- **THEN** a formatted table of books is printed to stdout
-
-#### Scenario: No books
-
-- **WHEN** `cli books` is executed and no books exist
-- **THEN** a message "No books found." is printed
-
-### CC-6: CLI show command displays book details
-
-The CLI SHALL provide a `show <book-id>` command that prints detailed information about a single book: ID, title, status, chunk count, embedding provider, embedding dimension, current page, created/updated timestamps.
-
-#### Scenario: Show existing book
-
-- **WHEN** `cli show <book-id>` is executed with a valid ID
-- **THEN** detailed book information is printed
-
-#### Scenario: Show non-existent book
-
-- **WHEN** `cli show <book-id>` is executed with an invalid ID
-- **THEN** an error message is displayed
-
-### CC-7: CLI delete command removes a book
-
-The CLI SHALL provide a `delete <book-id>` command that removes a book and all associated data. It SHALL prompt for confirmation by default and support a `--yes` / `-y` flag to skip confirmation.
-
-#### Scenario: Delete with confirmation
-
-- **WHEN** `cli delete <book-id>` is executed and user confirms
-- **THEN** the book is deleted and a success message is printed
-
-#### Scenario: Delete cancelled
-
-- **WHEN** `cli delete <book-id>` is executed and user declines confirmation
-- **THEN** the deletion is cancelled and a message is printed
-
-#### Scenario: Delete with --yes flag
-
-- **WHEN** `cli delete <book-id> --yes` is executed
-- **THEN** the book is deleted without prompting for confirmation
-
-#### Scenario: Delete non-existent book
-
-- **WHEN** `cli delete <invalid-id>` is executed
-- **THEN** an error message is displayed
-
-### CC-8: CLI set-page command sets reading position
-
-The CLI SHALL provide a `set-page <book-id> <page>` command that updates the book's current reading position. Page 0 means "no position set" (all pages eligible for search).
-
-#### Scenario: Set page to valid value
-
-- **WHEN** `cli set-page <book-id> 42` is executed
-- **THEN** the book's current_page is updated to 42 and a confirmation message is printed
-
-#### Scenario: Reset page to 0
-
-- **WHEN** `cli set-page <book-id> 0` is executed
-- **THEN** the book's current_page is reset to 0 and a confirmation message is printed
-
-#### Scenario: Set page on non-existent book
-
-- **WHEN** `cli set-page <invalid-id> 10` is executed
-- **THEN** an error message is displayed
+**Migration:** Remove the `ask` command definition and its callback from `main.py`. Remove the `AskBookUseCase` import and wiring. Users migrate to `cli chat <book-id>` for book Q&A. The `app/ask.py` module is deleted.
