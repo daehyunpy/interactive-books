@@ -178,6 +178,7 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 - **Functions** — do one thing. If it has "and" in its description, split it. Aim for < 20 lines.
 - **No empty `__init__.py`** — don't create empty `__init__.py` files. The project uses implicit namespace packages; they're unnecessary.
 - **No dead code** — no commented-out code, no unused imports. Delete it; git remembers.
+- **Lazy imports in CLI** — `main.py` uses function-local imports to keep startup fast. Don't use `from __future__ import annotations` in files with lazy imports — it breaks ruff's F821 name resolution. Use `TYPE_CHECKING` imports for module-level type annotations only.
 - **No magic values** — `MAX_CHUNK_TOKENS = 500`, not bare `500`.
 - **Dependency direction** — UI → App → Domain ← Infra. Never reverse.
 - **Single level of abstraction** — high-level functions call named functions; don't mix orchestration with details.
@@ -200,6 +201,7 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 - Don't put `book_id` on `ChatMessage` — it belongs on `Conversation`; access book via `message → conversation → book`
 - Don't use "session" as a domain entity name — use `Conversation`
 - Don't use "ask" for the CLI conversation command — it's `chat`
+- Don't use `callable` (lowercase) as a type annotation — use `Callable` from `collections.abc`
 
 ## Git Workflow (Gitflow)
 
