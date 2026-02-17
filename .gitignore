@@ -13,6 +13,10 @@ dist/
 .env
 .envrc
 
+# Data
+data/
+temp/
+
 # macOS
 .DS_Store
 
