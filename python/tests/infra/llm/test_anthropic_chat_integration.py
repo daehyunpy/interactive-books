@@ -4,10 +4,13 @@ import pytest
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.infra.llm.anthropic import ChatProvider
 
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("ANTHROPIC_API_KEY"),
-    reason="ANTHROPIC_API_KEY not set",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not os.environ.get("ANTHROPIC_API_KEY"),
+        reason="ANTHROPIC_API_KEY not set",
+    ),
+]
 
 
 class TestAnthropicChatIntegration:
