@@ -233,6 +233,63 @@ class TestChatWithTools:
         assert messages[2]["content"][0]["type"] == "tool_result"
         assert messages[2]["content"][0]["tool_use_id"] == "tu_1"
 
+    def test_tool_result_without_tool_use_id_is_dropped(self) -> None:
+        """History-loaded tool_result messages (no tool_use_id) are dropped.
+
+        When conversation history is rebuilt from the DB, TOOL_RESULT
+        ChatMessages become PromptMessage(role="tool_result") without a
+        tool_use_id. These are dropped from the API call because:
+        1. Anthropic only accepts "user"/"assistant" roles
+        2. The assistant's response already incorporates the search results
+        3. Replaying raw chunks confuses the model about who provided them
+        """
+        provider = ChatProvider(api_key="test-key")
+        text_block = MagicMock()
+        text_block.type = "text"
+        text_block.text = "Sure, based on the earlier search..."
+        mock_response = MagicMock()
+        mock_response.content = [text_block]
+        mock_response.usage = _mock_usage()
+
+        with patch.object(
+            provider._client.messages, "create", return_value=mock_response
+        ) as mock_create:
+            provider.chat_with_tools(
+                [
+                    PromptMessage(role="user", content="What is the theme?"),
+                    PromptMessage(
+                        role="assistant",
+                        content="Let me search for that.",
+                    ),
+                    # History-loaded tool_result: no tool_use_id — should be dropped
+                    PromptMessage(
+                        role="tool_result",
+                        content="[Pages 10-12]: The central theme is...",
+                    ),
+                    PromptMessage(
+                        role="assistant",
+                        content="The central theme is redemption.",
+                    ),
+                    PromptMessage(role="user", content="Tell me more about that"),
+                ],
+                [_search_tool()],
+            )
+
+        call_kwargs = mock_create.call_args.kwargs
+        messages = call_kwargs["messages"]
+        # tool_result should be dropped entirely — only valid roles remain
+        assert len(messages) == 4
+        assert messages[0] == {"role": "user", "content": "What is the theme?"}
+        assert messages[1] == {
+            "role": "assistant",
+            "content": "Let me search for that.",
+        }
+        assert messages[2] == {
+            "role": "assistant",
+            "content": "The central theme is redemption.",
+        }
+        assert messages[3] == {"role": "user", "content": "Tell me more about that"}
+
     def test_token_usage_populated_from_response(self) -> None:
         provider = ChatProvider(api_key="test-key")
         text_block = MagicMock()
