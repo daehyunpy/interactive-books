@@ -12,14 +12,14 @@ This isn't a technical limitation. It's a product gap. LLMs are already capable 
 
 Several products occupy adjacent spaces:
 
-| Product | What it does | How we differ |
-|---------|-------------|---------------|
-| **Google NotebookLM** | Upload docs, get AI-generated summaries and Q&A | Cloud-only, no page-awareness, no spoiler control, Google controls your data |
-| **ChatPDF / Humata** | Upload a PDF, chat with it | Web-based, no reading position tracking, no local processing, subscription model |
-| **Readwise Reader** | Read-later app with AI summaries | Reading tool first, AI second; no deep Q&A, no page-scoped retrieval |
-| **ChatGPT / Claude** | General-purpose LLM chat | No access to the actual book text — answers are from training data, not your copy |
+| Product               | What it does                                    | How we differ                                                                                                               |
+| --------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Google NotebookLM** | Upload docs, get AI-generated summaries and Q&A | Cloud-only, no page-awareness, no spoiler control, Google controls your data                                                |
+| **ChatPDF / Humata**  | Upload a PDF, chat with it                      | Web-based, stateless Q&A with no conversation memory, no reading position tracking, no local processing, subscription model |
+| **Readwise Reader**   | Read-later app with AI summaries                | Reading tool first, AI second; no deep Q&A, no page-scoped retrieval                                                        |
+| **ChatGPT / Claude**  | General-purpose LLM chat                        | No access to the actual book text — answers are from training data, not your copy                                           |
 
-The gap: none of these are **local-first**, **page-aware**, or **spoiler-safe**. None let you bring your own LLM. None treat the book as a knowledge base scoped to your reading progress.
+The gap: none of these are **local-first**, **page-aware**, or **spoiler-safe**. None let you bring your own LLM. None treat the book as a knowledge base scoped to your reading progress. And none offer a **conversation** with the book — they answer one question at a time, forgetting everything between turns.
 
 ## The Opportunity
 
@@ -56,7 +56,7 @@ A local-only iOS/macOS app and Python CLI that lets readers:
 
 1. Upload books (PDF, TXT)
 2. Set their reading position (page-aware, spoiler-free)
-3. Ask questions and get answers grounded in the actual text, with page citations
+3. Have conversations about books — ask questions, get follow-ups, and explore ideas, all grounded in the actual text with page citations
 4. Choose their LLM provider (Anthropic, OpenAI, or local via Ollama)
 
 Everything runs on-device or via direct API calls. No backend. No account. No data collection.
