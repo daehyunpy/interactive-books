@@ -117,4 +117,4 @@ class TestIngestVerbose:
             result = runner.invoke(app, ["--verbose", "ingest", str(pdf)])
 
         assert result.exit_code == 0
-        assert "[verbose] 12 chunks created" in result.output
+        assert "[verbose] Ingested 12 chunks" in result.output
