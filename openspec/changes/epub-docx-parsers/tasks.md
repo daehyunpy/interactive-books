@@ -12,16 +12,16 @@
 ## 3. EPUB Parser
 
 - [ ] 3.1 Implement `BookParser` in `infra/parsers/epub.py` — read EPUB ZIP, parse `META-INF/container.xml` for OPF path, parse OPF for spine-ordered content document paths, use `selectolax` to strip XHTML tags from each content document, return one `PageContent` per chapter (1-indexed by spine order)
-- [ ] 3.2 Add DRM detection in EPUB parser — check for `META-INF/encryption.xml` with `EncryptedData` elements targeting content documents; raise `BookError(BookErrorCode.DRM_PROTECTED)` if detected
+- [ ] 3.2 Add DRM detection in EPUB parser — check for presence of `META-INF/encryption.xml`; if it exists (regardless of contents), raise `BookError(BookErrorCode.DRM_PROTECTED)`
 - [ ] 3.3 Handle EPUB error cases — file not found raises `BookError(PARSE_FAILED)`, invalid/corrupted ZIP raises `BookError(PARSE_FAILED)`, EPUB with no content documents raises `BookError(PARSE_FAILED)`
-- [ ] 3.4 Write tests for EPUB parser: multi-chapter EPUB, single-chapter EPUB, chapter with only whitespace (empty text allowed), file not found, invalid ZIP, DRM-protected EPUB rejection, EPUB with no chapters
+- [ ] 3.4 Write tests for EPUB parser using programmatically generated EPUBs in conftest: multi-chapter EPUB, single-chapter EPUB, chapter with only whitespace (included with empty text), file not found, invalid ZIP, DRM-protected EPUB rejection (encryption.xml present), EPUB with no chapters
 
 ## 4. DOCX Parser
 
 - [ ] 4.1 Implement `BookParser` in `infra/parsers/docx.py` — use `python-docx` to iterate paragraphs and tables, split at `Heading 1` and `Heading 2` styles, content before first heading is page 1, each heading starts a new page, extract table cell text row by row, return `list[PageContent]` with 1-indexed page numbers
 - [ ] 4.2 Handle DOCX with no headings — entire document content is one `PageContent` with `page_number=1`
 - [ ] 4.3 Handle DOCX error cases — file not found raises `BookError(PARSE_FAILED)`, invalid/corrupted DOCX raises `BookError(PARSE_FAILED)`, empty DOCX (no text content) raises `BookError(PARSE_FAILED)`
-- [ ] 4.4 Write tests for DOCX parser: multi-section DOCX with H1 and H2 headings, DOCX with no headings (single page), DOCX with tables, DOCX with mixed content (paragraphs + tables + headings), empty DOCX, file not found, invalid DOCX file
+- [ ] 4.4 Write tests for DOCX parser using programmatically generated DOCX in conftest: multi-section DOCX with H1 and H2 headings, DOCX with no headings (single page), DOCX with tables, DOCX with mixed content (paragraphs + tables + headings), empty DOCX, file not found, invalid DOCX file
 
 ## 5. Ingestion Pipeline Integration
 
@@ -38,8 +38,8 @@
 
 ## 7. Shared Test Fixtures
 
-- [ ] 7.1 Create `shared/fixtures/sample_book.epub` — a small multi-chapter EPUB for integration testing (can be generated programmatically in a conftest or checked in)
-- [ ] 7.2 Create `shared/fixtures/sample_book.docx` — a small multi-section DOCX with headings for integration testing
+- [ ] 7.1 Create `shared/fixtures/sample_book.epub` — a small static multi-chapter EPUB checked into the repo for integration testing
+- [ ] 7.2 Create `shared/fixtures/sample_book.docx` — a small static multi-section DOCX with headings checked into the repo for integration testing
 
 ## 8. Spec Updates
 

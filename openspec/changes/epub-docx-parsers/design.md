@@ -34,17 +34,19 @@ Phase 8 adds EPUB and DOCX parsers as Batch 1 of the multi-format expansion. Bot
 - Split long chapters into sub-pages: adds complexity, no clear benefit since the chunker already handles large text
 - One page per XHTML file: some EPUBs have multiple files per chapter or vice versa; spine order is more reliable
 
+**Note:** Navigational/empty chapters (e.g., cover page, ToC) are included as `PageContent` with empty or whitespace-only text. This is consistent with how the PDF parser handles image-only pages. The downstream chunker filters out empty pages.
+
 ### 2. EPUB parsing: stdlib zipfile + selectolax
 
 **Decision:** Use Python's `zipfile` module to read the EPUB (which is a ZIP archive), parse the `META-INF/container.xml` to find the OPF file, parse the OPF to get spine order and content document paths, then use `selectolax` to strip XHTML tags from each content document.
 
 **Rationale:** The technical design specifies this approach. EPUB is just a ZIP of XHTML files — no dedicated EPUB library needed. `selectolax` (Lexbor-based) is fast and already planned for the HTML parser in Phase 9, so adding it now shares a dependency. The alternative `ebooklib` library is heavier and less maintained.
 
-### 3. EPUB DRM detection
+### 3. EPUB DRM detection: strict — any encryption.xml rejects
 
-**Decision:** Check for the presence of `META-INF/encryption.xml` in the EPUB ZIP. If present and non-trivial (contains `EncryptedData` elements), raise `BookError(BookErrorCode.DRM_PROTECTED)`.
+**Decision:** Check for the presence of `META-INF/encryption.xml` in the EPUB ZIP. If present, raise `BookError(BookErrorCode.DRM_PROTECTED)` regardless of what it encrypts (content, fonts, or otherwise).
 
-**Rationale:** Product requirements mandate DRM-free only with clear rejection. `encryption.xml` is the standard indicator of DRM in EPUB files. This is a simple heuristic that catches the common cases (Adobe DRM, Apple FairPlay) without needing to decrypt anything.
+**Rationale:** Product requirements mandate DRM-free only with clear rejection. A strict check is simpler to implement and avoids false negatives. Font obfuscation is rare in user-supplied EPUBs, and a false positive is safer than letting DRM-protected content through. Users can re-export without font obfuscation if needed.
 
 ### 4. DOCX page mapping: H1 + H2 heading boundaries
 
@@ -72,9 +74,9 @@ Phase 8 adds EPUB and DOCX parsers as Batch 1 of the multi-format expansion. Bot
 
 ## Risks / Trade-offs
 
-**[Risk] EPUB DRM detection heuristic may false-positive on font obfuscation** → Mitigation: check for `EncryptedData` elements targeting content documents, not just the presence of `encryption.xml`. Font obfuscation typically only encrypts font files.
+**[Risk] Strict EPUB DRM detection may false-positive on font obfuscation** → Accepted trade-off: false positives are safer than false negatives. Font-obfuscated EPUBs are rare in practice; users can re-export without obfuscation.
 
-**[Risk] DOCX files without standard heading styles won't split into pages** → Mitigation: acceptable — degrades gracefully to a single page. Product requirements don't require custom style mapping.
+**[Risk] DOCX files without standard heading styles won't split into pages** → Accepted: assumes production-grade DOCX files with proper `Heading 1`/`Heading 2` styles. Degrades gracefully to a single page otherwise.
 
 **[Risk] selectolax may strip too aggressively (e.g., lose paragraph breaks)** → Mitigation: extract text node by node, joining with newlines between block elements, rather than using a single `.text()` call.
 
