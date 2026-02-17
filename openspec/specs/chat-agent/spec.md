@@ -1,20 +1,28 @@
 # chat-agent
 
-Agentic chat loop use case: `ChatWithBookUseCase`, tool-use integration, retrieval strategy, conversation context strategy, prompt assembly, and message persistence. Located in `python/source/interactive_books/app/chat.py` and `python/source/interactive_books/domain/protocols.py`.
+Agentic chat loop use case: `ChatWithBookUseCase`, tool-use integration, retrieval strategy, conversation context strategy, prompt assembly, event observability, and message persistence. Located in `python/source/interactive_books/app/chat.py` and `python/source/interactive_books/domain/protocols.py`.
 
-## ADDED Requirements
+## Requirements
 
 ### CA-1: ChatWithBookUseCase orchestrates agentic conversation
 
-The application layer SHALL provide a `ChatWithBookUseCase` class in `app/chat.py` that accepts `ChatProvider`, `SearchBooksUseCase`, `ChatMessageRepository`, `ConversationRepository`, `BookRepository`, `RetrievalStrategy`, `ConversationContextStrategy`, and `prompts_dir: Path` via constructor injection. It SHALL expose `execute(conversation_id: str, user_message: str) -> str` that:
+The application layer SHALL provide a `ChatWithBookUseCase` class in `app/chat.py` that accepts `ChatProvider`, `SearchBooksUseCase`, `ChatMessageRepository`, `ConversationRepository`, `BookRepository`, `RetrievalStrategy`, `ConversationContextStrategy`, `prompts_dir: Path`, and an optional `on_event: Callable[[ChatEvent], None] | None = None` via constructor injection. It SHALL expose `execute(conversation_id: str, user_message: str) -> str` that:
 
 1. Fetches the conversation via `conversation_repo.get(conversation_id)` -- raises `BookError(NOT_FOUND)` if missing
 2. Persists the user message as a `ChatMessage` with role `USER`
 3. Loads conversation history via `chat_message_repo.get_by_conversation(conversation_id)`
 4. Builds prompt messages via `ConversationContextStrategy.build_context()`
-5. Enters the agent loop (see CA-2)
+5. Enters the agent loop (see CA-2), passing `on_event` to the retrieval strategy
 6. Persists the assistant response as a `ChatMessage` with role `ASSISTANT`
 7. Returns the assistant response text
+
+If `on_event` is provided, events are emitted at key moments:
+
+- After each tool invocation by the retrieval strategy: emits `ToolInvocationEvent`
+- After each tool result is received: emits `ToolResultEvent`
+- After each LLM call that returns token usage: emits `TokenUsageEvent`
+
+If `on_event` is `None`, no events are emitted (no-op).
 
 #### Scenario: Single-turn response without retrieval
 
@@ -35,6 +43,21 @@ The application layer SHALL provide a `ChatWithBookUseCase` class in `app/chat.p
 
 - **WHEN** the LLM API call fails during the agent loop
 - **THEN** an `LLMError` is raised (user message is already persisted; no assistant message is persisted)
+
+#### Scenario: Events emitted during tool-use turn
+
+- **WHEN** `execute()` is called with `on_event` set and the LLM invokes a tool
+- **THEN** `ToolInvocationEvent`, `ToolResultEvent`, and `TokenUsageEvent` are emitted via the callback
+
+#### Scenario: No events when callback is None
+
+- **WHEN** `execute()` is called with `on_event=None`
+- **THEN** no events are emitted; behavior is otherwise identical
+
+#### Scenario: Token usage emitted on direct response
+
+- **WHEN** the LLM responds directly without tool use
+- **THEN** only `TokenUsageEvent` is emitted (no tool events)
 
 ### CA-2: Agent loop executes tool invocations iteratively
 
@@ -73,10 +96,11 @@ The agent loop SHALL:
 
 ### CA-3: RetrievalStrategy protocol controls retrieval behavior
 
-The domain layer SHALL define a `RetrievalStrategy` protocol in `domain/protocols.py` with methods:
+The domain layer SHALL define a `RetrievalStrategy` protocol in `domain/protocols.py` with method:
 
-- `build_tool_definitions() -> list[ToolDefinition]` -- returns the tool definitions to offer the LLM
-- `execute_tool(tool_invocation: ToolInvocation, book_id: str) -> str` -- executes a tool invocation and returns the result as a formatted string
+- `execute(chat_provider, messages, tools, search_fn, on_event=None) -> tuple[str, list[ChatMessage]]` -- runs the retrieval loop with optional event emission
+
+The `on_event` parameter is passed through from `ChatWithBookUseCase` so the strategy can emit `ToolInvocationEvent` and `ToolResultEvent` during its internal loop.
 
 #### Scenario: Tool-use strategy provides search_book tool
 
@@ -95,6 +119,8 @@ The application layer SHALL provide a `ToolUseRetrievalStrategy` class that impl
 - Return a `ToolDefinition` for `search_book` with parameters: `query` (str, required -- the search query) and `top_k` (int, optional, default 5 -- number of results)
 - Execute the tool by calling `SearchBooksUseCase.execute()` with the extracted arguments
 - Format results as text with page references: each chunk labeled with `[Pages X-Y]` followed by content, joined by double newlines
+- Emit `ToolInvocationEvent` before executing each tool and `ToolResultEvent` after receiving results (when `on_event` is provided)
+- Emit `TokenUsageEvent` after each LLM call that returns `ChatResponse.usage`
 
 #### Scenario: search_book tool definition
 
@@ -174,3 +200,23 @@ Tool result messages (containing search results returned to the LLM) SHALL be pe
 
 - **WHEN** a follow-up message is sent after a tool-use turn
 - **THEN** the persisted tool result messages appear in the conversation context
+
+### CA-9: ChatEvent value objects for observability
+
+The domain layer SHALL define the following frozen dataclasses in `domain/chat_event.py`:
+
+- `ToolInvocationEvent(tool_name: str, arguments: dict[str, object])` — emitted when the retrieval strategy invokes a tool
+- `ToolResultEvent(query: str, result_count: int, results: list[SearchResult])` — emitted when a tool invocation returns search results
+- `TokenUsageEvent(input_tokens: int, output_tokens: int)` — emitted when an LLM call completes with token usage data
+
+`ChatEvent` SHALL be a type alias: `ChatEvent = ToolInvocationEvent | ToolResultEvent | TokenUsageEvent`
+
+#### Scenario: ToolInvocationEvent creation
+
+- **WHEN** a `ToolInvocationEvent` is created with `tool_name="search_book"` and `arguments={"query": "test"}`
+- **THEN** the event is a frozen dataclass with those fields
+
+#### Scenario: TokenUsageEvent creation
+
+- **WHEN** a `TokenUsageEvent` is created with `input_tokens=100` and `output_tokens=50`
+- **THEN** the event is a frozen dataclass with those fields
