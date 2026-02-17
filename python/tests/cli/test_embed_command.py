@@ -63,5 +63,5 @@ class TestEmbedVerbose:
             result = runner.invoke(app, ["--verbose", "embed", "book-1"])
 
         assert result.exit_code == 0
-        assert "[verbose] 10 chunks to embed" in result.output
+        assert "[verbose] Embedding 10 chunks" in result.output
         assert "[verbose] Provider: openai, Dimension: 1536" in result.output

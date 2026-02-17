@@ -84,11 +84,19 @@ def ingest(
         from interactive_books.infra.embeddings.openai import EmbeddingProvider
         from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
 
+        def _log_embed_progress(
+            batch_num: int, total_batches: int, batch_size: int
+        ) -> None:
+            typer.echo(
+                f"[verbose] Embedding batch {batch_num}/{total_batches} ({batch_size} chunks)"
+            )
+
         embed_use_case = EmbedBookUseCase(
             embedding_provider=EmbeddingProvider(api_key=openai_key),
             book_repo=book_repo,
             chunk_repo=chunk_repo,
             embedding_repo=EmbeddingRepository(db),
+            on_progress=_log_embed_progress if _verbose else None,
         )
 
     use_case = IngestBookUseCase(
@@ -118,7 +126,9 @@ def ingest(
         elif has_embed:
             typer.echo(f"Embedded:    {book.embedding_provider}")
         else:
-            typer.echo("Tip: Set OPENAI_API_KEY to auto-embed during ingest.")
+            typer.echo(
+                "Tip: Set OPENAI_API_KEY to auto-embed, or run 'embed <book-id>' manually."
+            )
     except BookError as e:
         typer.echo(f"Error: {e.message}", err=True)
         raise typer.Exit(code=1)
@@ -236,12 +246,15 @@ def chat(
             if isinstance(event, ToolInvocationEvent):
                 typer.echo(f"[verbose] Tool call: {event.tool_name}({event.arguments})")
             elif isinstance(event, ToolResultEvent):
+                page_ranges = ", ".join(
+                    f"pages {r.start_page}-{r.end_page}" for r in event.results
+                )
                 typer.echo(
-                    f"[verbose] Retrieved {event.result_count} passages for: {event.query}"
+                    f"[verbose]   → {event.result_count} results ({page_ranges})"
                 )
             elif isinstance(event, TokenUsageEvent):
                 typer.echo(
-                    f"[verbose] Tokens: {event.input_tokens} in, {event.output_tokens} out"
+                    f"[verbose] Tokens: {event.input_tokens:,} in / {event.output_tokens:,} out"
                 )
 
         chat_use_case = ChatWithBookUseCase(
@@ -349,17 +362,24 @@ def embed(
         on_retry=_log_retry if _verbose else None,
     )
     chunk_repo = ChunkRepository(db)
+
+    def _log_progress(batch_num: int, total_batches: int, batch_size: int) -> None:
+        typer.echo(
+            f"[verbose] Embedding batch {batch_num}/{total_batches} ({batch_size} chunks)"
+        )
+
     use_case = EmbedBookUseCase(
         embedding_provider=provider,
         book_repo=BookRepository(db),
         chunk_repo=chunk_repo,
         embedding_repo=EmbeddingRepository(db),
+        on_progress=_log_progress if _verbose else None,
     )
 
     try:
         chunk_count = chunk_repo.count_by_book(book_id)
         if _verbose:
-            typer.echo(f"[verbose] {chunk_count} chunks to embed")
+            typer.echo(f"[verbose] Embedding {chunk_count} chunks")
             typer.echo(
                 f"[verbose] Provider: {provider.provider_name}, Dimension: {provider.dimension}"
             )
