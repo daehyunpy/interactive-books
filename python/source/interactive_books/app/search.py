@@ -24,7 +24,13 @@ class SearchBooksUseCase:
         self._chunk_repo = chunk_repo
         self._embedding_repo = embedding_repo
 
-    def execute(self, book_id: str, query: str, top_k: int = 5) -> list[SearchResult]:
+    def execute(
+        self,
+        book_id: str,
+        query: str,
+        top_k: int = 5,
+        page_override: int | None = None,
+    ) -> list[SearchResult]:
         book = self._book_repo.get(book_id)
         if book is None:
             raise BookError(BookErrorCode.NOT_FOUND, f"Book '{book_id}' not found")
@@ -37,7 +43,8 @@ class SearchBooksUseCase:
 
         provider_name = book.embedding_provider
         dimension = book.embedding_dimension
-        page_filtering = book.current_page > 0
+        effective_page = page_override if page_override is not None else book.current_page
+        page_filtering = effective_page > 0
         fetch_k = top_k * OVER_FETCH_MULTIPLIER if page_filtering else top_k
 
         query_vector = self._provider.embed([query])[0]
@@ -57,7 +64,7 @@ class SearchBooksUseCase:
             chunk = chunk_map.get(chunk_id)
             if chunk is None:
                 continue
-            if page_filtering and chunk.start_page > book.current_page:
+            if page_filtering and chunk.start_page > effective_page:
                 continue
             results.append(
                 SearchResult(
