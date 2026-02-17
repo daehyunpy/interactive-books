@@ -6,10 +6,14 @@ dependencies = [
     "typer",
     "pydantic-settings",
     "httpx",
+    "pymupdf",
+    "openai",
+    "anthropic",
+    "sqlite-vec",
 ]
 
 [project.scripts]
-cli = "interactive_books.main:app"
+interactive-books = "interactive_books.main:app"
 
 [dependency-groups]
 dev = [
@@ -19,7 +23,14 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
+addopts = ["--import-mode=importlib", "-m", "not integration"]
 testpaths = ["tests"]
+markers = [
+    "integration: tests that call external APIs (require API keys)",
+]
+filterwarnings = [
+    "ignore:builtin type Swig:DeprecationWarning",
+]
 
 [tool.pyright]
 pythonVersion = "3.13"

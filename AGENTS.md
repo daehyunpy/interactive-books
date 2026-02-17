@@ -105,8 +105,10 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 ### Clean Code
 
 - **Port naming** — domain Protocol classes keep clean names (`BookRepository`, not `BookRepositoryPort`). Infra adapters alias at import: `from ...protocols import BookRepository as BookRepositoryPort`. Never rename the protocol definition itself.
+- **Adapter naming** — infra adapter classes use the same name as their domain protocol. The module path provides disambiguation (e.g., `infra.parsers.pdf.BookParser` implements `domain.protocols.BookParser`). Don't encode implementation details in the class name — use the module path instead (`parsers.pdf`, not `PyMuPdfParser`). When two implementations coexist at a call site, use import aliases (`from ...pdf import BookParser as PdfBookParser`).
 - **Naming** — names reveal intent. `chunks_up_to_page(page)` not `get_filtered(p)`. Booleans read as assertions: `is_ingested`, `has_embeddings`.
 - **Functions** — do one thing. If it has "and" in its description, split it. Aim for < 20 lines.
+- **No empty `__init__.py`** — don't create empty `__init__.py` files. The project uses implicit namespace packages; they're unnecessary.
 - **No dead code** — no commented-out code, no unused imports. Delete it; git remembers.
 - **No magic values** — `MAX_CHUNK_TOKENS = 500`, not bare `500`.
 - **Dependency direction** — UI → App → Domain ← Infra. Never reverse.

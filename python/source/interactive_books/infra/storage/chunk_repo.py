@@ -5,7 +5,6 @@ from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.protocols import ChunkRepository as ChunkRepositoryPort
 from interactive_books.infra.storage.database import Database
 
-
 _CHUNK_COLUMNS = "id, book_id, content, start_page, end_page, chunk_index, created_at"
 
 
@@ -47,6 +46,12 @@ class ChunkRepository(ChunkRepositoryPort):
             (book_id, page),
         )
         return [self._row_to_chunk(row) for row in cursor.fetchall()]
+
+    def count_by_book(self, book_id: str) -> int:
+        cursor = self._conn.execute(
+            "SELECT COUNT(*) FROM chunks WHERE book_id = ?", (book_id,)
+        )
+        return cursor.fetchone()[0]
 
     def delete_by_book(self, book_id: str) -> None:
         self._conn.execute("DELETE FROM chunks WHERE book_id = ?", (book_id,))

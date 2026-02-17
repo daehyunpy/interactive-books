@@ -2,7 +2,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-
 from interactive_books.domain.errors import StorageError, StorageErrorCode
 from interactive_books.infra.storage.database import Database
 
@@ -116,6 +115,19 @@ class TestMigrationRunner:
             with pytest.raises(StorageError) as exc_info:
                 db.run_migrations(schema_dir)
             assert exc_info.value.code == StorageErrorCode.MIGRATION_FAILED
+            db.close()
+
+    def test_applies_migration_with_vec_extension(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            schema_dir = Path(tmpdir)
+            (schema_dir / "001_initial.sql").write_text("SELECT 1;")
+
+            db = Database(":memory:", enable_vec=True)
+            db.run_migrations(schema_dir)
+
+            cursor = db.connection.execute("SELECT vec_version()")
+            version = cursor.fetchone()[0]
+            assert version is not None
             db.close()
 
     def test_ignores_non_matching_files(self) -> None:

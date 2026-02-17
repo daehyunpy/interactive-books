@@ -14,6 +14,7 @@ class BookErrorCode(Enum):
     UNSUPPORTED_FORMAT = "unsupported_format"
     ALREADY_EXISTS = "already_exists"
     INVALID_STATE = "invalid_state"
+    EMBEDDING_FAILED = "embedding_failed"
 
 
 class BookError(DomainError):
