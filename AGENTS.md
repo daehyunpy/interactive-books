@@ -75,19 +75,14 @@ Build order is bottom-up, TDD (write failing tests first). Each task is one comm
 - [ ] **6.15 CLI: Replace `ask` with `chat`** — In `main.py`, remove `ask` command, add `chat <book>` with interactive conversation loop, session persistence, `--verbose` for tool results.
 - [ ] **6.16 End-to-end verification** — Run full pipeline: ingest → embed → `cli chat` → multi-turn conversation. Verify tool-use, context awareness, persistence.
 
-#### What Exists Today (reference for implementation)
+#### Key Files (for implementation reference)
 
-| Component               | File                            | Status                                            |
-| ----------------------- | ------------------------------- | ------------------------------------------------- |
-| `ChatMessage` model     | `domain/chat.py`                | Defined but uses `book_id` (needs update in 6.3)  |
-| `MessageRole` enum      | `domain/chat.py`                | USER, ASSISTANT (needs TOOL_RESULT in 6.3)        |
-| `ChatProvider` protocol | `domain/protocols.py`           | `chat()` only (needs `chat_with_tools()` in 6.5)  |
-| `PromptMessage`         | `domain/prompt_message.py`      | Exists, usable as-is                              |
-| `SearchBooksUseCase`    | `app/search.py`                 | Exists — becomes the tool the agent invokes       |
-| `AskBookUseCase`        | `app/ask.py`                    | Will be replaced by `ChatWithBookUseCase` (6.14)  |
-| `chat_messages` table   | `shared/schema/001_initial.sql` | Has `book_id` FK (needs `conversation_id` in 6.1) |
-| Anthropic adapter       | `infra/llm/anthropic.py`        | `chat()` only (needs `chat_with_tools()` in 6.9)  |
-| Prompt templates        | `shared/prompts/`               | 3 files exist; 2 new needed (6.12)                |
+- `domain/chat.py` — `ChatMessage` (has `book_id`, needs `conversation_id` in 6.3)
+- `domain/protocols.py` — `ChatProvider` (has `chat()`, needs `chat_with_tools()` in 6.5)
+- `app/ask.py` — `AskBookUseCase` (replaced by `ChatWithBookUseCase` in 6.14)
+- `app/search.py` — `SearchBooksUseCase` (becomes the tool the agent invokes)
+- `infra/llm/anthropic.py` — Anthropic adapter (needs `chat_with_tools()` in 6.9)
+- `shared/schema/001_initial.sql` — schema (needs `conversations` table in 6.1)
 
 ## First-Time Setup
 
@@ -117,6 +112,20 @@ uv run pytest -x              # verify everything works
 | `MILVUS_ADDRESS`    | No       | Milvus vector DB address for claude-context MCP        |
 | `MILVUS_TOKEN`      | No       | Milvus authentication token                            |
 
+### Verify Setup
+
+After first-time setup, verify the full pipeline works:
+
+```bash
+cd python/
+uv run pytest -x                                           # all tests pass
+uv run ruff check .                                        # no lint errors
+uv run interactive-books ingest ../shared/fixtures/sample_book.pdf --title "Test"
+uv run interactive-books books                             # shows the ingested book
+uv run interactive-books embed <book_id>                   # requires OPENAI_API_KEY
+uv run interactive-books search <book_id> "test query"     # returns ranked chunks
+```
+
 ### Swift App (Phase 8)
 
 Setup instructions will be added when the Swift app is scaffolded.
@@ -125,16 +134,31 @@ Setup instructions will be added when the Swift app is scaffolded.
 
 All Python commands run from `python/`. All Swift commands run from `swift/` (Phase 8).
 
-| Task                | Command                     |
-| ------------------- | --------------------------- |
-| Install Python deps | `uv sync`                   |
-| Run Python tests    | `uv run pytest -x`          |
-| Lint Python         | `uv run ruff check .`       |
-| Format Python       | `uv run ruff format .`      |
-| Type check Python   | `uv run pyright`            |
-| Run Swift tests     | `swift test` _(Phase 8)_    |
-| Lint Swift          | `swiftlint` _(Phase 8)_     |
-| Format Swift        | `swiftformat .` _(Phase 8)_ |
+| Task                  | Command                              |
+| --------------------- | ------------------------------------ |
+| Install Python deps   | `uv sync`                            |
+| Run Python tests      | `uv run pytest -x`                   |
+| Run integration tests | `uv run pytest -m integration`       |
+| Lint Python           | `uv run ruff check .`                |
+| Format Python         | `uv run ruff format .`               |
+| Type check Python     | `uv run pyright`                     |
+| Run CLI               | `uv run interactive-books <command>` |
+| Run Swift tests       | `swift test` _(Phase 8)_             |
+| Lint Swift            | `swiftlint` _(Phase 8)_              |
+| Format Swift          | `swiftformat .` _(Phase 8)_          |
+
+### CLI Commands (current)
+
+```bash
+uv run interactive-books ingest <file> --title "Book Title"
+uv run interactive-books embed <book_id>
+uv run interactive-books search <book_id> <query> --top-k 5
+uv run interactive-books ask <book_id> <question>       # will be replaced by chat in Phase 6
+uv run interactive-books books
+uv run interactive-books show <book_id>
+uv run interactive-books delete <book_id> --yes
+uv run interactive-books set-page <book_id> <page>
+```
 
 ## Coding Disciplines
 
