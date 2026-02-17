@@ -16,22 +16,26 @@ Read all three before making changes.
 
 ## Current State
 
-**Phases 1–6 complete.** Entering Phase 7 (CLI polish).
+**Phases 1–7 complete.** The Python CLI is fully functional.
 
-The Python CLI can ingest books (PDF/TXT), generate embeddings, run vector search, and have multi-turn agentic conversations about books. The agent decides when to retrieve via tool-use, maintains conversation history, and persists sessions.
+The Python CLI can ingest books (PDF, TXT — more formats coming), generate embeddings, run vector search, and have multi-turn agentic conversations about books. The agent decides when to retrieve via tool-use, maintains conversation history, and persists sessions.
+
+**Next up:** Additional format support (EPUB, DOCX, HTML, Markdown, URL), then iOS/macOS app.
 
 Build order: CLI first, bottom-up, one feature at a time.
 
-| Phase | What               | Status   |
-| ----- | ------------------ | -------- |
-| 1     | Project scaffold   | Done     |
-| 2     | DB schema          | Done     |
-| 3     | Book ingestion     | Done     |
-| 4     | Embeddings         | Done     |
-| 5     | Retrieval          | Done     |
-| 6     | Q&A (Agentic Chat) | Done     |
-| 7     | CLI polish         | **Next** |
-| 8     | iOS/macOS app      | —        |
+| Phase | What                      | Status   |
+| ----- | ------------------------- | -------- |
+| 1     | Project scaffold          | Done     |
+| 2     | DB schema                 | Done     |
+| 3     | Book ingestion            | Done     |
+| 4     | Embeddings                | Done     |
+| 5     | Retrieval                 | Done     |
+| 6     | Q&A (Agentic Chat)        | Done     |
+| 7     | CLI polish                | Done     |
+| 8     | Structured format parsers | **Next** |
+| 9     | Text format parsers       | —        |
+| 10    | iOS/macOS app             | —        |
 
 See `docs/technical_design.md` → "Build Order" for details on each phase. See "Directory Layout" for the full project tree.
 
@@ -97,6 +101,23 @@ uv run pytest -x              # verify everything works
 | `OLLAMA_BASE_URL`   | No       | Local LLM endpoint (default: `http://localhost:11434`) |
 | `MILVUS_ADDRESS`    | No       | Milvus vector DB address for claude-context MCP        |
 | `MILVUS_TOKEN`      | No       | Milvus authentication token                            |
+
+### Supported Book Formats
+
+| Format   | Extension     | Page Mapping                  | Notes                                   |
+| -------- | ------------- | ----------------------------- | --------------------------------------- |
+| PDF      | `.pdf`        | Document structure            | Physical page index as fallback         |
+| TXT      | `.txt`        | Estimated by character count  | Labeled as "estimated page"             |
+| EPUB     | `.epub`       | One page per chapter          | DRM-free only; pluggable strategy       |
+| DOCX     | `.docx`       | H1 + H2 headings              | Pluggable strategy; images ignored      |
+| HTML     | `.html`       | Single page (entire document) | Single file only; no linked resources   |
+| Markdown | `.md`         | H1 + H2 headings              | Single file only; same strategy as DOCX |
+| URL      | `http(s)://…` | Single page (fetched content) | Fetches one page; no crawling           |
+
+Format detection: file extension for local files, HTTP Content-Type for URLs.
+Page mapping is pluggable via `PageMappingStrategy` — defaults above, swappable per format.
+Nested resource resolution (URL crawling, multi-file HTML/MD) is deferred to v2.
+Build order: Batch 1 (EPUB + DOCX), then Batch 2 (HTML + MD + URL).
 
 ### Verify Setup
 
