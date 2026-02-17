@@ -6,11 +6,11 @@ Book ingestion pipeline: parsing, chunking, persistence, and optional auto-embed
 
 ### Requirement: IngestBookUseCase orchestrates the ingestion pipeline
 
-The application layer SHALL provide an `IngestBookUseCase` class in `app/ingest.py` that accepts `BookParser` (pdf and txt), `TextChunker`, `BookRepository`, and `ChunkRepository` via constructor injection. It SHALL also accept an optional `embed_use_case: EmbedBookUseCase | None = None` parameter.
+The application layer SHALL provide an `IngestBookUseCase` class in `app/ingest.py` that accepts `BookParser` instances (pdf, txt, epub, docx), `TextChunker`, `BookRepository`, and `ChunkRepository` via constructor injection. It SHALL also accept an optional `embed_use_case: EmbedBookUseCase | None = None` parameter. Parser selection SHALL use a `dict[str, BookParser]` mapping keyed by file extension.
 
 It SHALL expose an `execute(file_path: Path, title: str) -> tuple[Book, Exception | None]` method that:
 
-1. Validates file extension (`.pdf` or `.txt`); raises `BookError(UNSUPPORTED_FORMAT)` otherwise
+1. Validates file extension (`.pdf`, `.txt`, `.epub`, or `.docx`); raises `BookError(UNSUPPORTED_FORMAT)` otherwise
 2. Creates a `Book` entity, transitions to INGESTING, saves
 3. Parses the file with the appropriate parser
 4. Chunks the parsed pages
@@ -70,7 +70,7 @@ The use case SHALL transition the `Book` through status states: PENDING → INGE
 
 ### Requirement: File format determines parser selection
 
-The use case SHALL select the appropriate `BookParser` based on file extension: `.pdf` uses the PDF parser, `.txt` uses the plain text parser. Unsupported extensions SHALL raise `BookError` with code `UNSUPPORTED_FORMAT` before creating a `Book`.
+The use case SHALL select the appropriate `BookParser` based on file extension using a `dict[str, BookParser]` mapping: `.pdf` uses the PDF parser, `.txt` uses the plain text parser, `.epub` uses the EPUB parser, `.docx` uses the DOCX parser. Unsupported extensions SHALL raise `BookError` with code `UNSUPPORTED_FORMAT` before creating a `Book`.
 
 #### Scenario: PDF file selects PDF parser
 
@@ -82,9 +82,24 @@ The use case SHALL select the appropriate `BookParser` based on file extension: 
 - **WHEN** a file with `.txt` extension is provided
 - **THEN** the plain text parser is used for extraction
 
-#### Scenario: Unsupported format rejected before Book creation
+#### Scenario: EPUB file selects EPUB parser
 
 - **WHEN** a file with `.epub` extension is provided
+- **THEN** the EPUB parser is used for extraction
+
+#### Scenario: DOCX file selects DOCX parser
+
+- **WHEN** a file with `.docx` extension is provided
+- **THEN** the DOCX parser is used for extraction
+
+#### Scenario: DRM-protected EPUB rejected during ingestion
+
+- **WHEN** a DRM-protected EPUB file is provided for ingestion
+- **THEN** `BookError(DRM_PROTECTED)` is raised by the EPUB parser during ingestion
+
+#### Scenario: Unsupported format rejected before Book creation
+
+- **WHEN** a file with `.xyz` extension is provided
 - **THEN** `BookError(UNSUPPORTED_FORMAT)` is raised and no `Book` is created in the repository
 
 ### Requirement: Chunks are persisted with correct book association
