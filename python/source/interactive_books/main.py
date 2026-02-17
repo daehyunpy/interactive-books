@@ -61,6 +61,7 @@ def ingest(
     ),
 ) -> None:
     """Parse, chunk, and ingest a book file."""
+    from interactive_books.app.embed import EmbedBookUseCase
     from interactive_books.app.ingest import IngestBookUseCase
     from interactive_books.domain.errors import BookError
     from interactive_books.infra.chunkers.recursive import TextChunker
@@ -72,22 +73,52 @@ def ingest(
     if not title:
         title = file_path.stem
 
-    db = _open_db()
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    has_embed = bool(openai_key)
+    db = _open_db(enable_vec=has_embed)
+    book_repo = BookRepository(db)
     chunk_repo = ChunkRepository(db)
+
+    embed_use_case: EmbedBookUseCase | None = None
+    if has_embed:
+        from interactive_books.infra.embeddings.openai import EmbeddingProvider
+        from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
+
+        embed_use_case = EmbedBookUseCase(
+            embedding_provider=EmbeddingProvider(api_key=openai_key),
+            book_repo=book_repo,
+            chunk_repo=chunk_repo,
+            embedding_repo=EmbeddingRepository(db),
+        )
+
     use_case = IngestBookUseCase(
         pdf_parser=PdfBookParser(),
         txt_parser=TxtBookParser(),
         chunker=TextChunker(),
-        book_repo=BookRepository(db),
+        book_repo=book_repo,
         chunk_repo=chunk_repo,
+        embed_use_case=embed_use_case,
     )
 
     try:
-        book = use_case.execute(file_path, title)
+        book, embed_error = use_case.execute(file_path, title)
+        chunk_count = chunk_repo.count_by_book(book.id)
         typer.echo(f"Book ID:     {book.id}")
         typer.echo(f"Title:       {book.title}")
         typer.echo(f"Status:      {book.status.value}")
-        typer.echo(f"Chunks:      {chunk_repo.count_by_book(book.id)}")
+        typer.echo(f"Chunks:      {chunk_count}")
+        if _verbose:
+            typer.echo(f"[verbose] {chunk_count} chunks created")
+        if embed_error is not None:
+            typer.echo(
+                f"Warning: Embedding failed: {embed_error}",
+                err=True,
+            )
+            typer.echo("Tip: Run 'embed' command separately to retry.", err=True)
+        elif has_embed:
+            typer.echo(f"Embedded:    {book.embedding_provider}")
+        else:
+            typer.echo("Tip: Set OPENAI_API_KEY to auto-embed during ingest.")
     except BookError as e:
         typer.echo(f"Error: {e.message}", err=True)
         raise typer.Exit(code=1)
@@ -194,6 +225,25 @@ def chat(
         typer.echo("Type your message (or 'quit' to exit).\n")
 
         chat_provider = ChatProvider(api_key=anthropic_key)
+
+        def _on_event(event: object) -> None:
+            from interactive_books.domain.chat_event import (
+                TokenUsageEvent,
+                ToolInvocationEvent,
+                ToolResultEvent,
+            )
+
+            if isinstance(event, ToolInvocationEvent):
+                typer.echo(f"[verbose] Tool call: {event.tool_name}({event.arguments})")
+            elif isinstance(event, ToolResultEvent):
+                typer.echo(
+                    f"[verbose] Retrieved {event.result_count} passages for: {event.query}"
+                )
+            elif isinstance(event, TokenUsageEvent):
+                typer.echo(
+                    f"[verbose] Tokens: {event.input_tokens} in, {event.output_tokens} out"
+                )
+
         chat_use_case = ChatWithBookUseCase(
             chat_provider=chat_provider,
             retrieval_strategy=RetrievalStrategy(),
@@ -207,6 +257,7 @@ def chat(
             conversation_repo=conversation_repo,
             message_repo=message_repo,
             prompts_dir=PROMPTS_DIR,
+            on_event=_on_event if _verbose else None,
         )
 
         if _verbose:
@@ -235,6 +286,9 @@ def chat(
         db.close()
 
 
+MAX_SELECTION_RETRIES = 3
+
+
 def _select_or_create_conversation(
     manage: "ManageConversationsUseCase",  # noqa: F821
     book_id: str,
@@ -247,15 +301,25 @@ def _select_or_create_conversation(
         for i, conv in enumerate(existing, 1):
             typer.echo(f"  [{i}] {conv.title} ({conv.id[:8]}...)")
         typer.echo("  [N] New conversation")
-        choice = typer.prompt("Select", default="N")
-        if choice.upper() != "N":
+
+        for attempt in range(MAX_SELECTION_RETRIES):
+            choice = typer.prompt("Select", default="N")
+            if choice.upper() == "N":
+                break
             try:
                 idx = int(choice) - 1
                 if 0 <= idx < len(existing):
                     return existing[idx]
             except ValueError:
                 pass
-            typer.echo("Invalid choice, creating new conversation.")
+            remaining = MAX_SELECTION_RETRIES - attempt - 1
+            if remaining > 0:
+                typer.echo(
+                    f"Invalid choice. Please enter 1-{len(existing)} or N. "
+                    f"({remaining} {'attempt' if remaining == 1 else 'attempts'} left)"
+                )
+            else:
+                typer.echo("Invalid choice, creating new conversation.")
 
     return manage.create(book_id)
 
@@ -284,17 +348,25 @@ def embed(
         api_key=api_key,
         on_retry=_log_retry if _verbose else None,
     )
+    chunk_repo = ChunkRepository(db)
     use_case = EmbedBookUseCase(
         embedding_provider=provider,
         book_repo=BookRepository(db),
-        chunk_repo=ChunkRepository(db),
+        chunk_repo=chunk_repo,
         embedding_repo=EmbeddingRepository(db),
     )
 
     try:
+        chunk_count = chunk_repo.count_by_book(book_id)
+        if _verbose:
+            typer.echo(f"[verbose] {chunk_count} chunks to embed")
+            typer.echo(
+                f"[verbose] Provider: {provider.provider_name}, Dimension: {provider.dimension}"
+            )
         book = use_case.execute(book_id)
         typer.echo(f"Book ID:     {book.id}")
         typer.echo(f"Title:       {book.title}")
+        typer.echo(f"Chunks:      {chunk_count}")
         typer.echo(f"Provider:    {book.embedding_provider}")
         typer.echo(f"Dimension:   {book.embedding_dimension}")
     except BookError as e:

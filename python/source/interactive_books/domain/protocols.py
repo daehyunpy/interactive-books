@@ -4,6 +4,7 @@ from typing import Protocol
 
 from interactive_books.domain.book import Book
 from interactive_books.domain.chat import ChatMessage
+from interactive_books.domain.chat_event import ChatEvent
 from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.chunk_data import ChunkData
 from interactive_books.domain.conversation import Conversation
@@ -101,6 +102,7 @@ class RetrievalStrategy(Protocol):
         messages: list[PromptMessage],
         tools: list[ToolDefinition],
         search_fn: Callable[[str], list[SearchResult]],
+        on_event: Callable[[ChatEvent], None] | None = None,
     ) -> tuple[str, list[ChatMessage]]: ...
 
 

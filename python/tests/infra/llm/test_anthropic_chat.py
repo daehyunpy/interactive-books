@@ -7,6 +7,13 @@ from interactive_books.domain.tool import ToolDefinition, ToolInvocation
 from interactive_books.infra.llm.anthropic import ChatProvider
 
 
+def _mock_usage(input_tokens: int = 100, output_tokens: int = 50) -> MagicMock:
+    usage = MagicMock()
+    usage.input_tokens = input_tokens
+    usage.output_tokens = output_tokens
+    return usage
+
+
 class TestModelName:
     def test_returns_configured_model(self) -> None:
         provider = ChatProvider(api_key="test-key")
@@ -94,6 +101,7 @@ class TestChatWithTools:
         text_block.text = "No search needed."
         mock_response = MagicMock()
         mock_response.content = [text_block]
+        mock_response.usage = _mock_usage()
 
         with patch.object(
             provider._client.messages, "create", return_value=mock_response
@@ -118,6 +126,7 @@ class TestChatWithTools:
         tool_block.input = {"query": "chapter 3 themes"}
         mock_response = MagicMock()
         mock_response.content = [tool_block]
+        mock_response.usage = _mock_usage()
 
         with patch.object(
             provider._client.messages, "create", return_value=mock_response
@@ -145,6 +154,7 @@ class TestChatWithTools:
         tool_block.input = {"query": "main character"}
         mock_response = MagicMock()
         mock_response.content = [text_block, tool_block]
+        mock_response.usage = _mock_usage()
 
         with patch.object(
             provider._client.messages, "create", return_value=mock_response
@@ -183,6 +193,7 @@ class TestChatWithTools:
         text_block.text = "Based on the passage..."
         mock_response = MagicMock()
         mock_response.content = [text_block]
+        mock_response.usage = _mock_usage()
 
         with patch.object(
             provider._client.messages, "create", return_value=mock_response
@@ -221,3 +232,24 @@ class TestChatWithTools:
         assert messages[2]["role"] == "user"
         assert messages[2]["content"][0]["type"] == "tool_result"
         assert messages[2]["content"][0]["tool_use_id"] == "tu_1"
+
+    def test_token_usage_populated_from_response(self) -> None:
+        provider = ChatProvider(api_key="test-key")
+        text_block = MagicMock()
+        text_block.type = "text"
+        text_block.text = "Here is the answer."
+        mock_response = MagicMock()
+        mock_response.content = [text_block]
+        mock_response.usage = _mock_usage(input_tokens=1234, output_tokens=567)
+
+        with patch.object(
+            provider._client.messages, "create", return_value=mock_response
+        ):
+            result = provider.chat_with_tools(
+                [PromptMessage(role="user", content="Hello")],
+                [_search_tool()],
+            )
+
+        assert result.usage is not None
+        assert result.usage.input_tokens == 1234
+        assert result.usage.output_tokens == 567

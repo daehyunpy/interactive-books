@@ -2,6 +2,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from interactive_books.domain.chat_event import ChatEvent, ToolResultEvent
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.search_result import SearchResult
 from interactive_books.domain.tool import ChatResponse, ToolDefinition
@@ -121,3 +122,47 @@ class TestAlwaysRetrieveContextFormatting:
         last_call = provider.chat_calls[-1]
         user_msg = [m for m in last_call if m.role == "user"][-1]
         assert "No relevant passages" in user_msg.content
+
+
+class TestAlwaysRetrieveEventEmission:
+    def test_emits_tool_result_event(self, prompts_dir: Path) -> None:
+        provider = FakeChatProvider(["The answer."])
+        strategy = RetrievalStrategy(prompts_dir)
+        results = [
+            SearchResult(
+                chunk_id="c1",
+                content="Content.",
+                start_page=1,
+                end_page=3,
+                distance=0.1,
+            )
+        ]
+        search_fn = _make_search_fn(results)
+        events: list[ChatEvent] = []
+
+        strategy.execute(
+            provider,
+            [PromptMessage(role="user", content="Question?")],
+            [],
+            search_fn,
+            on_event=events.append,
+        )
+
+        assert len(events) == 1
+        assert isinstance(events[0], ToolResultEvent)
+        assert events[0].query == "Question?"
+        assert events[0].result_count == 1
+
+    def test_no_events_when_callback_is_none(self, prompts_dir: Path) -> None:
+        provider = FakeChatProvider(["The answer."])
+        strategy = RetrievalStrategy(prompts_dir)
+
+        # Should not raise
+        text, _ = strategy.execute(
+            provider,
+            [PromptMessage(role="user", content="Question?")],
+            [],
+            _make_search_fn(),
+        )
+
+        assert text == "The answer."
