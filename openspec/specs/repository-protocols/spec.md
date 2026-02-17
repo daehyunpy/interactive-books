@@ -24,11 +24,11 @@ Storage protocol definitions in the domain layer. Located in `python/source/inte
 
 ### RP-3: Domain layer isolation
 
-`protocols.py` imports only from domain modules (Book, Chunk, ChatMessage) and the standard library. No imports from `infra/`, `app/`, or third-party packages.
+`protocols.py` imports only from domain modules (Book, Chunk, ChatMessage, PromptMessage) and the standard library. No imports from `infra/`, `app/`, or third-party packages.
 
 ### RP-4: Domain types only
 
-All protocol method signatures use domain types (Book, Chunk, SearchResult, EmbeddingVector, etc.), not raw dicts, tuples, or database-specific types. The `EmbeddingRepository.search` method returns `list[tuple[str, float]]` as a lightweight return type for chunk_id + distance pairs.
+All protocol method signatures use domain types (Book, Chunk, SearchResult, EmbeddingVector, PromptMessage, etc.), not raw dicts, tuples, or database-specific types. The `EmbeddingRepository.search` method returns `list[tuple[str, float]]` as a lightweight return type for chunk_id + distance pairs. The `ChatProvider.chat` method accepts `list[PromptMessage]` and returns `str`.
 
 ### RP-5: Protocols enable testing
 
