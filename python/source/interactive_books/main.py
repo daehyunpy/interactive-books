@@ -1,5 +1,4 @@
 import os
-from collections.abc import Callable
 from pathlib import Path
 
 import typer
@@ -216,17 +215,15 @@ def embed(
     api_key = _require_env("OPENAI_API_KEY")
     db = _open_db(enable_vec=True)
 
-    on_retry: Callable[[int, float], None] | None = None
-    if _verbose:
+    def _log_retry(attempt: int, delay: float) -> None:
+        typer.echo(
+            f"[verbose] Rate limited, retrying in {delay:.1f}s (attempt {attempt})"
+        )
 
-        def _on_retry_verbose(attempt: int, delay: float) -> None:
-            typer.echo(
-                f"[verbose] Rate limited, retrying in {delay:.1f}s (attempt {attempt})"
-            )
-
-        on_retry = _on_retry_verbose
-
-    provider = EmbeddingProvider(api_key=api_key, on_retry=on_retry)
+    provider = EmbeddingProvider(
+        api_key=api_key,
+        on_retry=_log_retry if _verbose else None,
+    )
     use_case = EmbedBookUseCase(
         embedding_provider=provider,
         book_repo=BookRepository(db),
