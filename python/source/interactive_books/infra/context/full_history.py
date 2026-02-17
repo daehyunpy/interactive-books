@@ -8,6 +8,4 @@ class ConversationContextStrategy:
         self._max_messages = max_messages
 
     def build_context(self, history: list[ChatMessage]) -> list[ChatMessage]:
-        if len(history) <= self._max_messages:
-            return list(history)
         return list(history[-self._max_messages :])

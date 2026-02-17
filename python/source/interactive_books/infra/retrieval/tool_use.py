@@ -5,9 +5,11 @@ from interactive_books.domain.chat import ChatMessage, MessageRole
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.protocols import ChatProvider
 from interactive_books.domain.search_result import SearchResult
-from interactive_books.domain.tool import ChatResponse, ToolDefinition, ToolInvocation
+from interactive_books.domain.tool import ToolDefinition, ToolInvocation
 
 MAX_TOOL_ITERATIONS = 3
+NO_CONTEXT_MESSAGE = "No relevant passages found in the book for this query."
+_PLACEHOLDER_CONVERSATION_ID = ""
 
 
 class RetrievalStrategy:
@@ -20,12 +22,9 @@ class RetrievalStrategy:
     ) -> tuple[str, list[ChatMessage]]:
         current_messages = list(messages)
         new_chat_messages: list[ChatMessage] = []
-        conversation_id = ""
 
         for _ in range(MAX_TOOL_ITERATIONS):
-            response: ChatResponse = chat_provider.chat_with_tools(
-                current_messages, tools
-            )
+            response = chat_provider.chat_with_tools(current_messages, tools)
 
             if not response.tool_invocations:
                 return response.text or "", new_chat_messages
@@ -51,7 +50,7 @@ class RetrievalStrategy:
                 new_chat_messages.append(
                     ChatMessage(
                         id=str(uuid.uuid4()),
-                        conversation_id=conversation_id,
+                        conversation_id=_PLACEHOLDER_CONVERSATION_ID,
                         role=MessageRole.TOOL_RESULT,
                         content=tool_result_content,
                     )
@@ -71,7 +70,7 @@ class RetrievalStrategy:
     @staticmethod
     def _format_results(results: list[SearchResult]) -> str:
         if not results:
-            return "No relevant passages found in the book for this query."
+            return NO_CONTEXT_MESSAGE
         passages = [
             f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}" for r in results
         ]

@@ -66,13 +66,13 @@ class ChatWithBookUseCase:
         system_prompt = self._load_template("conversation_system_prompt.md")
 
         prompt_messages: list[PromptMessage] = [
-            PromptMessage(role="system", content=system_prompt)
-        ]
-        for msg in context_window:
-            prompt_messages.append(
+            PromptMessage(role="system", content=system_prompt),
+            *[
                 PromptMessage(role=msg.role.value, content=msg.content)
-            )
-        prompt_messages.append(PromptMessage(role="user", content=user_message))
+                for msg in context_window
+            ],
+            PromptMessage(role="user", content=user_message),
+        ]
 
         book_id = conversation.book_id
 
@@ -92,13 +92,14 @@ class ChatWithBookUseCase:
         self._message_repo.save(user_chat_message)
 
         for msg in new_messages:
-            persisted_msg = ChatMessage(
-                id=msg.id,
-                conversation_id=conversation_id,
-                role=msg.role,
-                content=msg.content,
+            self._message_repo.save(
+                ChatMessage(
+                    id=msg.id,
+                    conversation_id=conversation_id,
+                    role=msg.role,
+                    content=msg.content,
+                )
             )
-            self._message_repo.save(persisted_msg)
 
         assistant_chat_message = ChatMessage(
             id=str(uuid.uuid4()),
@@ -108,7 +109,7 @@ class ChatWithBookUseCase:
         )
         self._message_repo.save(assistant_chat_message)
 
-        if len(history) == 0:
+        if not history:
             auto_title = ManageConversationsUseCase.auto_title(user_message)
             conversation.rename(auto_title)
             self._conversation_repo.save(conversation)
