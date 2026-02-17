@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.infra.embeddings.openai import EmbeddingProvider
-from openai import APIConnectionError, AuthenticationError
+from openai import APIConnectionError, AuthenticationError, RateLimitError
 
 
 def _mock_embedding(index: int, vector: list[float]) -> MagicMock:
@@ -93,3 +93,67 @@ class TestEmbedErrors:
             with pytest.raises(BookError) as exc_info:
                 provider.embed(["Hello"])
             assert exc_info.value.code == BookErrorCode.EMBEDDING_FAILED
+
+
+def _rate_limit_error() -> RateLimitError:
+    mock_response = MagicMock()
+    mock_response.status_code = 429
+    mock_response.headers = {}
+    return RateLimitError(
+        message="Rate limit exceeded",
+        response=mock_response,
+        body=None,
+    )
+
+
+class TestEmbedRetry:
+    @patch("interactive_books.infra.retry.time.sleep")
+    def test_rate_limit_retries_and_succeeds(self, mock_sleep) -> None:
+        success_response = _mock_response([_mock_embedding(0, [0.1] * 1536)])
+        calls = 0
+
+        def side_effect(**kwargs):
+            nonlocal calls
+            calls += 1
+            if calls < 3:
+                raise _rate_limit_error()
+            return success_response
+
+        provider = EmbeddingProvider(api_key="test-key", base_delay=1.0)
+        with patch.object(
+            provider._client.embeddings, "create", side_effect=side_effect
+        ):
+            result = provider.embed(["Hello"])
+
+        assert len(result) == 1
+        assert calls == 3
+        assert mock_sleep.call_count == 2
+
+    @patch("interactive_books.infra.retry.time.sleep")
+    def test_rate_limit_retries_exhausted_raises_book_error(self, mock_sleep) -> None:
+        provider = EmbeddingProvider(api_key="test-key", max_retries=2, base_delay=0.0)
+        with patch.object(
+            provider._client.embeddings,
+            "create",
+            side_effect=_rate_limit_error(),
+        ):
+            with pytest.raises(BookError) as exc_info:
+                provider.embed(["Hello"])
+            assert exc_info.value.code == BookErrorCode.EMBEDDING_FAILED
+            assert "Rate limit" in exc_info.value.message
+
+    def test_non_rate_limit_error_raises_immediately(self) -> None:
+        provider = EmbeddingProvider(api_key="test-key", max_retries=5)
+        error = APIConnectionError(request=MagicMock())
+
+        with patch.object(provider._client.embeddings, "create", side_effect=error):
+            with pytest.raises(BookError) as exc_info:
+                provider.embed(["Hello"])
+            assert exc_info.value.code == BookErrorCode.EMBEDDING_FAILED
+
+    def test_default_retry_configuration(self) -> None:
+        provider = EmbeddingProvider(api_key="test-key")
+        assert provider._max_retries == 6
+        assert provider._base_delay == 1.0
+        assert provider._max_delay == 60.0
+        assert provider._on_retry is None
