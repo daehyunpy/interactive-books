@@ -6,7 +6,7 @@ import typer
 app = typer.Typer()
 
 VERSION = "0.1.0"
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SCHEMA_DIR = PROJECT_ROOT / "shared" / "schema"
 PROMPTS_DIR = PROJECT_ROOT / "shared" / "prompts"
 DB_PATH = PROJECT_ROOT / "data" / "books.db"
