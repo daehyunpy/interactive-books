@@ -23,8 +23,11 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = ["--import-mode=importlib"]
+addopts = ["--import-mode=importlib", "-m", "not integration"]
 testpaths = ["tests"]
+markers = [
+    "integration: tests that call external APIs (require API keys)",
+]
 filterwarnings = [
     "ignore:builtin type Swig:DeprecationWarning",
 ]
