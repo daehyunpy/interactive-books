@@ -15,8 +15,22 @@ class TestChunkRepository:
         _make_book(db)
         repo = ChunkRepository(db)
         chunks = [
-            Chunk(id="c1", book_id="b1", content="First", start_page=1, end_page=1, chunk_index=0),
-            Chunk(id="c2", book_id="b1", content="Second", start_page=2, end_page=3, chunk_index=1),
+            Chunk(
+                id="c1",
+                book_id="b1",
+                content="First",
+                start_page=1,
+                end_page=1,
+                chunk_index=0,
+            ),
+            Chunk(
+                id="c2",
+                book_id="b1",
+                content="Second",
+                start_page=2,
+                end_page=3,
+                chunk_index=1,
+            ),
         ]
         repo.save_chunks("b1", chunks)
 
@@ -30,8 +44,22 @@ class TestChunkRepository:
         repo = ChunkRepository(db)
         # Insert in reverse order
         chunks = [
-            Chunk(id="c2", book_id="b1", content="Second", start_page=2, end_page=2, chunk_index=1),
-            Chunk(id="c1", book_id="b1", content="First", start_page=1, end_page=1, chunk_index=0),
+            Chunk(
+                id="c2",
+                book_id="b1",
+                content="Second",
+                start_page=2,
+                end_page=2,
+                chunk_index=1,
+            ),
+            Chunk(
+                id="c1",
+                book_id="b1",
+                content="First",
+                start_page=1,
+                end_page=1,
+                chunk_index=0,
+            ),
         ]
         repo.save_chunks("b1", chunks)
 
@@ -48,9 +76,30 @@ class TestChunkRepository:
         _make_book(db)
         repo = ChunkRepository(db)
         chunks = [
-            Chunk(id="c1", book_id="b1", content="Page 1", start_page=1, end_page=1, chunk_index=0),
-            Chunk(id="c2", book_id="b1", content="Page 2", start_page=2, end_page=3, chunk_index=1),
-            Chunk(id="c3", book_id="b1", content="Page 5", start_page=5, end_page=7, chunk_index=2),
+            Chunk(
+                id="c1",
+                book_id="b1",
+                content="Page 1",
+                start_page=1,
+                end_page=1,
+                chunk_index=0,
+            ),
+            Chunk(
+                id="c2",
+                book_id="b1",
+                content="Page 2",
+                start_page=2,
+                end_page=3,
+                chunk_index=1,
+            ),
+            Chunk(
+                id="c3",
+                book_id="b1",
+                content="Page 5",
+                start_page=5,
+                end_page=7,
+                chunk_index=2,
+            ),
         ]
         repo.save_chunks("b1", chunks)
 
@@ -62,8 +111,22 @@ class TestChunkRepository:
         _make_book(db)
         repo = ChunkRepository(db)
         chunks = [
-            Chunk(id="c1", book_id="b1", content="A", start_page=1, end_page=1, chunk_index=0),
-            Chunk(id="c2", book_id="b1", content="B", start_page=2, end_page=2, chunk_index=1),
+            Chunk(
+                id="c1",
+                book_id="b1",
+                content="A",
+                start_page=1,
+                end_page=1,
+                chunk_index=0,
+            ),
+            Chunk(
+                id="c2",
+                book_id="b1",
+                content="B",
+                start_page=2,
+                end_page=2,
+                chunk_index=1,
+            ),
         ]
         repo.save_chunks("b1", chunks)
 
@@ -74,8 +137,22 @@ class TestChunkRepository:
         _make_book(db)
         repo = ChunkRepository(db)
         chunks = [
-            Chunk(id="c2", book_id="b1", content="B", start_page=2, end_page=2, chunk_index=1),
-            Chunk(id="c1", book_id="b1", content="A", start_page=1, end_page=1, chunk_index=0),
+            Chunk(
+                id="c2",
+                book_id="b1",
+                content="B",
+                start_page=2,
+                end_page=2,
+                chunk_index=1,
+            ),
+            Chunk(
+                id="c1",
+                book_id="b1",
+                content="A",
+                start_page=1,
+                end_page=1,
+                chunk_index=0,
+            ),
         ]
         repo.save_chunks("b1", chunks)
 
@@ -87,22 +164,90 @@ class TestChunkRepository:
         _make_book(db)
         repo = ChunkRepository(db)
         chunks = [
-            Chunk(id="c1", book_id="b1", content="A", start_page=1, end_page=1, chunk_index=0),
+            Chunk(
+                id="c1",
+                book_id="b1",
+                content="A",
+                start_page=1,
+                end_page=1,
+                chunk_index=0,
+            ),
         ]
         repo.save_chunks("b1", chunks)
         repo.delete_by_book("b1")
         assert repo.get_by_book("b1") == []
 
+    def test_count_by_book_with_chunks(self, db: Database) -> None:
+        _make_book(db)
+        repo = ChunkRepository(db)
+        repo.save_chunks(
+            "b1",
+            [
+                Chunk(
+                    id="c1",
+                    book_id="b1",
+                    content="A",
+                    start_page=1,
+                    end_page=1,
+                    chunk_index=0,
+                ),
+                Chunk(
+                    id="c2",
+                    book_id="b1",
+                    content="B",
+                    start_page=2,
+                    end_page=2,
+                    chunk_index=1,
+                ),
+                Chunk(
+                    id="c3",
+                    book_id="b1",
+                    content="C",
+                    start_page=3,
+                    end_page=3,
+                    chunk_index=2,
+                ),
+            ],
+        )
+
+        assert repo.count_by_book("b1") == 3
+
+    def test_count_by_book_empty(self, db: Database) -> None:
+        _make_book(db)
+        repo = ChunkRepository(db)
+
+        assert repo.count_by_book("b1") == 0
+
     def test_chunks_scoped_to_book(self, db: Database) -> None:
         _make_book(db, "b1")
         _make_book(db, "b2")
         repo = ChunkRepository(db)
-        repo.save_chunks("b1", [
-            Chunk(id="c1", book_id="b1", content="Book 1", start_page=1, end_page=1, chunk_index=0),
-        ])
-        repo.save_chunks("b2", [
-            Chunk(id="c2", book_id="b2", content="Book 2", start_page=1, end_page=1, chunk_index=0),
-        ])
+        repo.save_chunks(
+            "b1",
+            [
+                Chunk(
+                    id="c1",
+                    book_id="b1",
+                    content="Book 1",
+                    start_page=1,
+                    end_page=1,
+                    chunk_index=0,
+                ),
+            ],
+        )
+        repo.save_chunks(
+            "b2",
+            [
+                Chunk(
+                    id="c2",
+                    book_id="b2",
+                    content="Book 2",
+                    start_page=1,
+                    end_page=1,
+                    chunk_index=0,
+                ),
+            ],
+        )
 
         b1_chunks = repo.get_by_book("b1")
         assert len(b1_chunks) == 1

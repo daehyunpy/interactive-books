@@ -37,6 +37,9 @@ class FakeChunkRepository:
     def get_up_to_page(self, book_id: str, page: int) -> list[Chunk]:
         return [c for c in self.get_by_book(book_id) if c.start_page <= page]
 
+    def count_by_book(self, book_id: str) -> int:
+        return len(self.chunks.get(book_id, []))
+
     def delete_by_book(self, book_id: str) -> None:
         self.chunks.pop(book_id, None)
 
