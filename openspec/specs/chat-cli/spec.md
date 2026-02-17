@@ -1,8 +1,8 @@
 # chat-cli
 
-Interactive `cli chat <book>` command replacing `cli ask`, with conversation selection, multi-turn REPL, and `--verbose` tool result display. Located in `python/source/interactive_books/main.py`.
+Interactive `cli chat <book>` command replacing `cli ask`, with conversation selection, multi-turn REPL, and `--verbose` event-based observability. Located in `python/source/interactive_books/main.py`.
 
-## ADDED Requirements
+## Requirements
 
 ### CCLI-1: CLI chat command starts an interactive conversation
 
@@ -51,6 +51,16 @@ When starting a chat, the CLI SHALL display existing conversations for the book 
 - **WHEN** `cli chat <book-id>` is executed for a book with no conversations
 - **THEN** a new conversation is started immediately without showing a selection menu
 
+#### Scenario: Re-prompt on invalid selection
+
+- **WHEN** the user enters an invalid conversation selection (e.g., "abc" or "99")
+- **THEN** an invalid choice message is printed and the prompt is shown again
+
+#### Scenario: Fallback after max retries
+
+- **WHEN** the user enters 3 consecutive invalid selections
+- **THEN** a new conversation is created automatically
+
 ### CCLI-3: Interactive REPL loop
 
 The chat REPL SHALL:
@@ -90,30 +100,38 @@ The REPL SHALL exit gracefully when the user types `exit`, `quit`, or sends EOF 
 - **WHEN** the user presses Ctrl+D (EOF)
 - **THEN** the REPL exits with a farewell message
 
-### CCLI-5: Verbose mode shows tool results
+### CCLI-5: Verbose mode shows tool results via event callback
 
-The `chat` command SHALL support a `--verbose` / `-v` flag. When enabled:
+The `chat` command SHALL support `--verbose`. When enabled:
 
-- Tool invocation details are printed: tool name and arguments
-- Tool results (search results with page references) are printed inline before the assistant response
-- Chat model name is displayed at the start of the session
+- Chat model name is displayed at the start of the session: `[verbose] Chat model: <name>`
+- Tool invocations are printed inline: `[verbose] Tool call: <tool_name>(<args>)`
+- Tool result summaries are printed: `[verbose]   → N results (pages X-Y, ...)`
+- Token usage is printed per turn: `[verbose] Tokens: X in / Y out`
 
-When `--verbose` is not set, tool invocations and results are hidden from the user -- only the final assistant response is shown.
+The CLI achieves this by passing an `on_event` callback to `ChatWithBookUseCase`. The callback receives `ChatEvent` objects and prints the appropriate `[verbose]` line for each event type.
 
-#### Scenario: Verbose mode shows tool invocation
+When `--verbose` is not set, `on_event` is `None` and no debug output is printed.
 
-- **WHEN** `cli chat <book-id> --verbose` is used and the LLM invokes `search_book`
-- **THEN** the tool name, arguments, and formatted search results are printed before the assistant response
+#### Scenario: Verbose mode prints tool invocation details
 
-#### Scenario: Normal mode hides tool results
+- **WHEN** `cli chat <book-id> --verbose` is used and the LLM invokes `search_book` with query "protagonist motivations"
+- **THEN** `[verbose] Tool call: search_book(query="protagonist motivations")` is printed
 
-- **WHEN** `cli chat <book-id>` is used without `--verbose` and the LLM invokes `search_book`
-- **THEN** only the final assistant response is printed; tool details are hidden
+#### Scenario: Verbose mode prints tool result summary
 
-#### Scenario: Verbose mode shows model name
+- **WHEN** a tool invocation returns 3 results
+- **THEN** `[verbose]   → 3 results (pages 12-14, 45-47, 89-91)` is printed
 
-- **WHEN** `cli chat <book-id> --verbose` is started
-- **THEN** the chat model name is displayed at the beginning of the session
+#### Scenario: Verbose mode prints token usage
+
+- **WHEN** an LLM call completes with 1234 input tokens and 567 output tokens
+- **THEN** `[verbose] Tokens: 1,234 in / 567 out` is printed
+
+#### Scenario: Non-verbose hides all debug output
+
+- **WHEN** `cli chat <book-id>` is used without `--verbose`
+- **THEN** only the assistant response is printed; no `[verbose]` lines appear
 
 ### CCLI-6: New conversation is created on first message
 
