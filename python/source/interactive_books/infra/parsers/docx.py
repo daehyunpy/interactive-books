@@ -2,16 +2,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from docx import Document
-from docx.opc.exceptions import PackageNotFoundError
 from docx.table import Table
 from docx.text.paragraph import Paragraph
-
-if TYPE_CHECKING:
-    from docx.document import Document as DocumentClass
 
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.domain.page_content import PageContent
 from interactive_books.domain.protocols import BookParser as BookParserPort
+
+if TYPE_CHECKING:
+    from docx.document import Document as DocumentClass
 
 HEADING_STYLES = frozenset({"Heading 1", "Heading 2"})
 
@@ -25,7 +24,7 @@ class BookParser(BookParserPort):
             )
         try:
             doc = Document(str(file_path))
-        except (PackageNotFoundError, Exception) as e:
+        except Exception as e:
             raise BookError(
                 BookErrorCode.PARSE_FAILED,
                 f"Failed to open DOCX: {e}",
@@ -33,7 +32,7 @@ class BookParser(BookParserPort):
 
         sections = self._split_by_headings(doc)
 
-        all_text = "".join(text for text in sections)
+        all_text = "".join(sections)
         if not all_text.strip():
             raise BookError(
                 BookErrorCode.PARSE_FAILED,
