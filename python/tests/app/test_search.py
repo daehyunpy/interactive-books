@@ -283,3 +283,53 @@ class TestPageFiltering:
         use_case.execute("book-1", "query", top_k=5)
 
         assert embedding_repo.last_search_top_k == 5
+
+
+class TestPageOverride:
+    def test_page_override_takes_precedence_over_current_page(self) -> None:
+        use_case, book_repo, chunk_repo, _, embedding_repo = _make_use_case()
+        book = _ready_book_with_embeddings(current_page=0)  # no filtering by default
+        book_repo.save(book)
+        chunk_repo.save_chunks("book-1", _chunks_with_pages())
+        embedding_repo.set_search_results([("c1", 0.1), ("c2", 0.5), ("c3", 0.9)])
+
+        results = use_case.execute("book-1", "query", page_override=50)
+
+        chunk_ids = [r.chunk_id for r in results]
+        assert "c1" in chunk_ids
+        assert "c2" in chunk_ids
+        assert "c3" not in chunk_ids  # start_page=80 > page_override=50
+
+    def test_page_override_zero_disables_filtering_despite_current_page(self) -> None:
+        use_case, book_repo, chunk_repo, _, embedding_repo = _make_use_case()
+        book = _ready_book_with_embeddings(current_page=50)  # filtering active
+        book_repo.save(book)
+        chunk_repo.save_chunks("book-1", _chunks_with_pages())
+        embedding_repo.set_search_results([("c1", 0.1), ("c2", 0.5), ("c3", 0.9)])
+
+        results = use_case.execute("book-1", "query", page_override=0)
+
+        assert len(results) == 3  # all chunks returned, filtering disabled
+
+    def test_page_override_none_falls_back_to_current_page(self) -> None:
+        use_case, book_repo, chunk_repo, _, embedding_repo = _make_use_case()
+        book = _ready_book_with_embeddings(current_page=50)
+        book_repo.save(book)
+        chunk_repo.save_chunks("book-1", _chunks_with_pages())
+        embedding_repo.set_search_results([("c1", 0.1), ("c2", 0.5), ("c3", 0.9)])
+
+        results = use_case.execute("book-1", "query", page_override=None)
+
+        chunk_ids = [r.chunk_id for r in results]
+        assert "c3" not in chunk_ids  # filtered by book.current_page=50
+
+    def test_over_fetches_when_page_override_enables_filtering(self) -> None:
+        use_case, book_repo, chunk_repo, _, embedding_repo = _make_use_case()
+        book = _ready_book_with_embeddings(current_page=0)  # no filtering by default
+        book_repo.save(book)
+        chunk_repo.save_chunks("book-1", _chunks_with_pages())
+        embedding_repo.set_search_results([("c1", 0.1)])
+
+        use_case.execute("book-1", "query", top_k=5, page_override=50)
+
+        assert embedding_repo.last_search_top_k == 15  # 5 * 3, over-fetch active

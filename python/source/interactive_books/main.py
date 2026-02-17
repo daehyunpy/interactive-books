@@ -141,6 +141,9 @@ def search(
     book_id: str = typer.Argument(..., help="ID of the book to search"),
     query: str = typer.Argument(..., help="Search query text"),
     top_k: int = typer.Option(5, "--top-k", "-k", help="Number of results to return"),
+    page: int | None = typer.Option(
+        None, "--page", "-p", help="Temporary page limit (overrides set-page)"
+    ),
 ) -> None:
     """Search a book's chunks using vector similarity."""
     import time
@@ -169,7 +172,7 @@ def search(
                 f"[verbose] Provider: {provider.provider_name}, Dimension: {provider.dimension}"
             )
         t0 = time.monotonic()
-        results = use_case.execute(book_id, query, top_k=top_k)
+        results = use_case.execute(book_id, query, top_k=top_k, page_override=page)
         elapsed = time.monotonic() - t0
         if _verbose:
             typer.echo(
