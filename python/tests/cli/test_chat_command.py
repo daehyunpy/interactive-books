@@ -132,13 +132,12 @@ class TestVerboseEventFormatting:
         if isinstance(event, ToolInvocationEvent):
             return f"[verbose] Tool call: {event.tool_name}({event.arguments})"
         if isinstance(event, ToolResultEvent):
-            return (
-                f"[verbose] Retrieved {event.result_count} passages for: {event.query}"
+            page_ranges = ", ".join(
+                f"pages {r.start_page}-{r.end_page}" for r in event.results
             )
+            return f"[verbose]   → {event.result_count} results ({page_ranges})"
         if isinstance(event, TokenUsageEvent):
-            return (
-                f"[verbose] Tokens: {event.input_tokens} in, {event.output_tokens} out"
-            )
+            return f"[verbose] Tokens: {event.input_tokens:,} in / {event.output_tokens:,} out"
         return None
 
     def test_tool_invocation_event_format(self) -> None:
@@ -157,15 +156,22 @@ class TestVerboseEventFormatting:
                     chunk_id="c1",
                     content="About whales",
                     start_page=1,
-                    end_page=1,
+                    end_page=2,
                     distance=0.1,
-                )
+                ),
+                SearchResult(
+                    chunk_id="c2",
+                    content="More whales",
+                    start_page=5,
+                    end_page=5,
+                    distance=0.2,
+                ),
             ],
         )
         line = self._format_event(event)
-        assert line == "[verbose] Retrieved 3 passages for: whales"
+        assert line == "[verbose]   → 3 results (pages 1-2, pages 5-5)"
 
     def test_token_usage_event_format(self) -> None:
-        event = TokenUsageEvent(input_tokens=500, output_tokens=120)
+        event = TokenUsageEvent(input_tokens=1500, output_tokens=120)
         line = self._format_event(event)
-        assert line == "[verbose] Tokens: 500 in, 120 out"
+        assert line == "[verbose] Tokens: 1,500 in / 120 out"

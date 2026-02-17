@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from interactive_books.domain.book import Book
 from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.embedding_vector import EmbeddingVector
@@ -21,12 +23,14 @@ class EmbedBookUseCase:
         chunk_repo: ChunkRepository,
         embedding_repo: EmbeddingRepository,
         batch_size: int = DEFAULT_BATCH_SIZE,
+        on_progress: Callable[[int, int, int], None] | None = None,
     ) -> None:
         self._provider = embedding_provider
         self._book_repo = book_repo
         self._chunk_repo = chunk_repo
         self._embedding_repo = embedding_repo
         self._batch_size = batch_size
+        self._on_progress = on_progress
 
     def execute(self, book_id: str) -> Book:
         book = self._book_repo.get(book_id)
@@ -63,8 +67,12 @@ class EmbedBookUseCase:
 
     def _embed_in_batches(self, chunks: list[Chunk]) -> list[EmbeddingVector]:
         all_vectors: list[EmbeddingVector] = []
+        total_batches = (len(chunks) + self._batch_size - 1) // self._batch_size
         for i in range(0, len(chunks), self._batch_size):
             batch = chunks[i : i + self._batch_size]
+            batch_num = i // self._batch_size + 1
+            if self._on_progress:
+                self._on_progress(batch_num, total_batches, len(batch))
             texts = [c.content for c in batch]
             vectors = self._provider.embed(texts)
             all_vectors.extend(
