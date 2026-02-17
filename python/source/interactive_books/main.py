@@ -1,7 +1,12 @@
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
+
+if TYPE_CHECKING:
+    from interactive_books.app.conversations import ManageConversationsUseCase
+    from interactive_books.domain.conversation import Conversation
 
 app = typer.Typer()
 
@@ -147,57 +152,112 @@ def search(
 
 
 @app.command()
-def ask(
-    book_id: str = typer.Argument(..., help="ID of the book to ask about"),
-    question: str = typer.Argument(..., help="Question to ask about the book"),
-    top_k: int = typer.Option(5, "--top-k", "-k", help="Number of context passages"),
+def chat(
+    book_id: str = typer.Argument(..., help="ID of the book to chat about"),
 ) -> None:
-    """Ask a question about a book using RAG."""
-    import time
+    """Start a conversation about a book."""
 
-    from interactive_books.app.ask import AskBookUseCase
+    from interactive_books.app.chat import ChatWithBookUseCase
+    from interactive_books.app.conversations import ManageConversationsUseCase
     from interactive_books.app.search import SearchBooksUseCase
     from interactive_books.domain.errors import BookError, LLMError
+    from interactive_books.infra.context.full_history import ConversationContextStrategy
     from interactive_books.infra.embeddings.openai import EmbeddingProvider
     from interactive_books.infra.llm.anthropic import ChatProvider
+    from interactive_books.infra.retrieval.tool_use import RetrievalStrategy
     from interactive_books.infra.storage.book_repo import BookRepository
+    from interactive_books.infra.storage.chat_message_repo import ChatMessageRepository
     from interactive_books.infra.storage.chunk_repo import ChunkRepository
+    from interactive_books.infra.storage.conversation_repo import ConversationRepository
     from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
 
     openai_key = _require_env("OPENAI_API_KEY")
     anthropic_key = _require_env("ANTHROPIC_API_KEY")
     db = _open_db(enable_vec=True)
 
-    chat_provider = ChatProvider(api_key=anthropic_key)
-    search_use_case = SearchBooksUseCase(
-        embedding_provider=EmbeddingProvider(api_key=openai_key),
-        book_repo=BookRepository(db),
-        chunk_repo=ChunkRepository(db),
-        embedding_repo=EmbeddingRepository(db),
-    )
-
-    use_case = AskBookUseCase(
-        chat_provider=chat_provider,
-        search_use_case=search_use_case,
-        prompts_dir=PROMPTS_DIR,
-    )
-
     try:
+        book_repo = BookRepository(db)
+        book = book_repo.get(book_id)
+        if book is None:
+            typer.echo(f"Error: Book not found: {book_id}", err=True)
+            raise typer.Exit(code=1)
+
+        conversation_repo = ConversationRepository(db)
+        message_repo = ChatMessageRepository(db)
+        manage = ManageConversationsUseCase(
+            conversation_repo=conversation_repo,
+            book_repo=book_repo,
+        )
+
+        conversation = _select_or_create_conversation(manage, book_id)
+        typer.echo(f"Conversation: {conversation.title} ({conversation.id[:8]}...)")
+        typer.echo("Type your message (or 'quit' to exit).\n")
+
+        chat_provider = ChatProvider(api_key=anthropic_key)
+        chat_use_case = ChatWithBookUseCase(
+            chat_provider=chat_provider,
+            retrieval_strategy=RetrievalStrategy(),
+            context_strategy=ConversationContextStrategy(),
+            search_use_case=SearchBooksUseCase(
+                embedding_provider=EmbeddingProvider(api_key=openai_key),
+                book_repo=book_repo,
+                chunk_repo=ChunkRepository(db),
+                embedding_repo=EmbeddingRepository(db),
+            ),
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=PROMPTS_DIR,
+        )
+
         if _verbose:
-            typer.echo(
-                f"[verbose] Chat model: {chat_provider.model_name}, top_k: {top_k}"
-            )
-        t0 = time.monotonic()
-        answer = use_case.execute(book_id, question, top_k=top_k)
-        elapsed = time.monotonic() - t0
-        if _verbose:
-            typer.echo(f"[verbose] Answer generated in {elapsed:.2f}s")
-        typer.echo(answer)
-    except (BookError, LLMError) as e:
-        typer.echo(f"Error: {e.message}", err=True)
-        raise typer.Exit(code=1)
+            typer.echo(f"[verbose] Chat model: {chat_provider.model_name}")
+
+        while True:
+            try:
+                user_input = typer.prompt("You")
+            except (KeyboardInterrupt, EOFError):
+                typer.echo("\nGoodbye!")
+                break
+
+            if user_input.strip().lower() in ("quit", "exit"):
+                typer.echo("Goodbye!")
+                break
+
+            if not user_input.strip():
+                continue
+
+            try:
+                answer = chat_use_case.execute(conversation.id, user_input)
+                typer.echo(f"\nAssistant: {answer}\n")
+            except (BookError, LLMError) as e:
+                typer.echo(f"Error: {e.message}", err=True)
     finally:
         db.close()
+
+
+def _select_or_create_conversation(
+    manage: "ManageConversationsUseCase",  # noqa: F821
+    book_id: str,
+) -> "Conversation":  # noqa: F821
+    """Let the user pick an existing conversation or create a new one."""
+
+    existing = manage.list_by_book(book_id)
+    if existing:
+        typer.echo("Existing conversations:")
+        for i, conv in enumerate(existing, 1):
+            typer.echo(f"  [{i}] {conv.title} ({conv.id[:8]}...)")
+        typer.echo("  [N] New conversation")
+        choice = typer.prompt("Select", default="N")
+        if choice.upper() != "N":
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(existing):
+                    return existing[idx]
+            except ValueError:
+                pass
+            typer.echo("Invalid choice, creating new conversation.")
+
+    return manage.create(book_id)
 
 
 @app.command()

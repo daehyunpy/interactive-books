@@ -54,7 +54,13 @@ class TestBookError:
 
 class TestLLMError:
     def test_all_codes_exist(self) -> None:
-        expected = {"api_key_missing", "api_call_failed", "rate_limited", "timeout"}
+        expected = {
+            "api_key_missing",
+            "api_call_failed",
+            "rate_limited",
+            "timeout",
+            "unsupported_feature",
+        }
         actual = {code.value for code in LLMErrorCode}
         assert actual == expected
 

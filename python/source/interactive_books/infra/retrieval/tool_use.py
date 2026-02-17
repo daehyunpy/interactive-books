@@ -1,0 +1,78 @@
+import uuid
+from collections.abc import Callable
+
+from interactive_books.domain.chat import ChatMessage, MessageRole
+from interactive_books.domain.prompt_message import PromptMessage
+from interactive_books.domain.protocols import ChatProvider
+from interactive_books.domain.search_result import SearchResult
+from interactive_books.domain.tool import ChatResponse, ToolDefinition, ToolInvocation
+
+MAX_TOOL_ITERATIONS = 3
+
+
+class RetrievalStrategy:
+    def execute(
+        self,
+        chat_provider: ChatProvider,
+        messages: list[PromptMessage],
+        tools: list[ToolDefinition],
+        search_fn: Callable[[str], list[SearchResult]],
+    ) -> tuple[str, list[ChatMessage]]:
+        current_messages = list(messages)
+        new_chat_messages: list[ChatMessage] = []
+        conversation_id = ""
+
+        for _ in range(MAX_TOOL_ITERATIONS):
+            response: ChatResponse = chat_provider.chat_with_tools(
+                current_messages, tools
+            )
+
+            if not response.tool_invocations:
+                return response.text or "", new_chat_messages
+
+            for invocation in response.tool_invocations:
+                assistant_msg = PromptMessage(
+                    role="assistant",
+                    content=response.text or "",
+                    tool_invocations=[invocation],
+                )
+                current_messages.append(assistant_msg)
+
+                results = self._execute_tool(invocation, search_fn)
+                tool_result_content = self._format_results(results)
+
+                tool_result_msg = PromptMessage(
+                    role="tool_result",
+                    content=tool_result_content,
+                    tool_use_id=invocation.tool_use_id,
+                )
+                current_messages.append(tool_result_msg)
+
+                new_chat_messages.append(
+                    ChatMessage(
+                        id=str(uuid.uuid4()),
+                        conversation_id=conversation_id,
+                        role=MessageRole.TOOL_RESULT,
+                        content=tool_result_content,
+                    )
+                )
+
+        final_response = chat_provider.chat_with_tools(current_messages, tools)
+        return final_response.text or "", new_chat_messages
+
+    @staticmethod
+    def _execute_tool(
+        invocation: ToolInvocation,
+        search_fn: Callable[[str], list[SearchResult]],
+    ) -> list[SearchResult]:
+        query = str(invocation.arguments.get("query", ""))
+        return search_fn(query)
+
+    @staticmethod
+    def _format_results(results: list[SearchResult]) -> str:
+        if not results:
+            return "No relevant passages found in the book for this query."
+        passages = [
+            f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}" for r in results
+        ]
+        return "\n\n".join(passages)

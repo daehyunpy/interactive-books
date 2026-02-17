@@ -1,0 +1,63 @@
+import pytest
+from interactive_books.domain.tool import ChatResponse, ToolDefinition, ToolInvocation
+
+
+class TestToolDefinition:
+    def test_create_tool_definition(self) -> None:
+        td = ToolDefinition(
+            name="search_book",
+            description="Search the book for relevant passages",
+            parameters={
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+            },
+        )
+        assert td.name == "search_book"
+        assert td.description == "Search the book for relevant passages"
+        assert td.parameters["type"] == "object"
+
+    def test_tool_definition_is_immutable(self) -> None:
+        td = ToolDefinition(name="t", description="d", parameters={})
+        with pytest.raises(AttributeError):
+            td.name = "other"  # type: ignore[misc]
+
+
+class TestToolInvocation:
+    def test_create_tool_invocation(self) -> None:
+        ti = ToolInvocation(
+            tool_name="search_book",
+            tool_use_id="tu_123",
+            arguments={"query": "What is chapter 3 about?"},
+        )
+        assert ti.tool_name == "search_book"
+        assert ti.tool_use_id == "tu_123"
+        assert ti.arguments["query"] == "What is chapter 3 about?"
+
+    def test_tool_invocation_is_immutable(self) -> None:
+        ti = ToolInvocation(tool_name="t", tool_use_id="id", arguments={})
+        with pytest.raises(AttributeError):
+            ti.tool_name = "other"  # type: ignore[misc]
+
+
+class TestChatResponse:
+    def test_text_only_response(self) -> None:
+        cr = ChatResponse(text="Here is the answer.")
+        assert cr.text == "Here is the answer."
+        assert cr.tool_invocations == []
+
+    def test_tool_invocation_response(self) -> None:
+        invocation = ToolInvocation(
+            tool_name="search_book",
+            tool_use_id="tu_456",
+            arguments={"query": "chapter 3"},
+        )
+        cr = ChatResponse(tool_invocations=[invocation])
+        assert cr.text is None
+        assert len(cr.tool_invocations) == 1
+        assert cr.tool_invocations[0].tool_name == "search_book"
+
+    def test_defaults(self) -> None:
+        cr = ChatResponse()
+        assert cr.text is None
+        assert cr.tool_invocations == []

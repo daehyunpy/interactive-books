@@ -1,12 +1,17 @@
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
 from interactive_books.domain.book import Book
+from interactive_books.domain.chat import ChatMessage
 from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.chunk_data import ChunkData
+from interactive_books.domain.conversation import Conversation
 from interactive_books.domain.embedding_vector import EmbeddingVector
 from interactive_books.domain.page_content import PageContent
 from interactive_books.domain.prompt_message import PromptMessage
+from interactive_books.domain.search_result import SearchResult
+from interactive_books.domain.tool import ChatResponse, ToolDefinition
 
 
 class BookRepository(Protocol):
@@ -36,6 +41,11 @@ class ChatProvider(Protocol):
     @property
     def model_name(self) -> str: ...
     def chat(self, messages: list[PromptMessage]) -> str: ...
+    def chat_with_tools(
+        self,
+        messages: list[PromptMessage],
+        tools: list[ToolDefinition],
+    ) -> ChatResponse: ...
 
 
 class EmbeddingProvider(Protocol):
@@ -69,3 +79,33 @@ class EmbeddingRepository(Protocol):
         query_vector: list[float],
         top_k: int,
     ) -> list[tuple[str, float]]: ...
+
+
+class ConversationRepository(Protocol):
+    def save(self, conversation: Conversation) -> None: ...
+    def get(self, conversation_id: str) -> Conversation | None: ...
+    def get_by_book(self, book_id: str) -> list[Conversation]: ...
+    def delete(self, conversation_id: str) -> None: ...
+
+
+class ChatMessageRepository(Protocol):
+    def save(self, message: ChatMessage) -> None: ...
+    def get_by_conversation(self, conversation_id: str) -> list[ChatMessage]: ...
+    def delete_by_conversation(self, conversation_id: str) -> None: ...
+
+
+class RetrievalStrategy(Protocol):
+    def execute(
+        self,
+        chat_provider: "ChatProvider",
+        messages: list[PromptMessage],
+        tools: list[ToolDefinition],
+        search_fn: Callable[[str], list[SearchResult]],
+    ) -> tuple[str, list[ChatMessage]]: ...
+
+
+class ConversationContextStrategy(Protocol):
+    def build_context(
+        self,
+        history: list[ChatMessage],
+    ) -> list[ChatMessage]: ...

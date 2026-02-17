@@ -26,12 +26,21 @@ CREATE TABLE chunks (
 CREATE INDEX idx_chunks_book_id ON chunks(book_id);
 CREATE INDEX idx_chunks_book_page_range ON chunks(book_id, start_page, end_page);
 
-CREATE TABLE chat_messages (
+CREATE TABLE conversations (
     id         TEXT PRIMARY KEY,
     book_id    TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
-    role       TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-    content    TEXT NOT NULL,
+    title      TEXT NOT NULL CHECK (length(trim(title)) > 0),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_chat_messages_book_id ON chat_messages(book_id);
+CREATE INDEX idx_conversations_book_id ON conversations(book_id);
+
+CREATE TABLE chat_messages (
+    id              TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    role            TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'tool_result')),
+    content         TEXT NOT NULL,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_chat_messages_conversation_id ON chat_messages(conversation_id);
