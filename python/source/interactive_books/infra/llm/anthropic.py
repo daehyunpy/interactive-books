@@ -3,7 +3,7 @@ from interactive_books.domain.errors import LLMError, LLMErrorCode
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.protocols import ChatProvider as ChatProviderPort
 
-MODEL = "claude-sonnet-4-5-20250514"
+MODEL = "claude-sonnet-4-5-20250929"
 MAX_TOKENS = 4096
 
 

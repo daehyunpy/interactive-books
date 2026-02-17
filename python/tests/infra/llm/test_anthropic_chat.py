@@ -10,7 +10,7 @@ class TestModelName:
     def test_returns_configured_model(self) -> None:
         provider = ChatProvider(api_key="test-key")
 
-        assert provider.model_name == "claude-sonnet-4-5-20250514"
+        assert provider.model_name == "claude-sonnet-4-5-20250929"
 
 
 class TestChat:
