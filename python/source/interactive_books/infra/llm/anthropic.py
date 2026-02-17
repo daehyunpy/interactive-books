@@ -117,6 +117,12 @@ class ChatProvider(ChatProviderPort):
                         ],
                     }
                 )
+            elif m.role == "tool_result":
+                # History-loaded tool_result without tool_use_id —
+                # drop it. The assistant's next message already
+                # incorporates the search results, so replaying raw
+                # chunks is redundant and confuses the model.
+                continue
             elif m.tool_invocations:
                 content_blocks: list[dict[str, Any]] = []
                 if m.content:
