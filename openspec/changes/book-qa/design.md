@@ -10,7 +10,7 @@ The technical design specifies a `ChatProvider` protocol abstraction with Anthro
 
 **Goals:**
 
-- Add `ChatMessage` domain model for LLM message representation (role + content)
+- Add `PromptMessage` domain model for LLM message representation (role + content)
 - Add `ChatProvider` protocol for LLM chat abstraction
 - Implement Anthropic adapter as the default ChatProvider
 - Create shared prompt templates (system prompt, query template, citation instructions)
@@ -28,11 +28,11 @@ The technical design specifies a `ChatProvider` protocol abstraction with Anthro
 
 ## Decisions
 
-### 1. ChatMessage as a frozen dataclass
+### 1. PromptMessage as a frozen dataclass
 
-**Decision:** Define `ChatMessage` in `domain/chat.py` as a frozen dataclass with `role: str` and `content: str`. The `role` is one of `"system"`, `"user"`, `"assistant"`.
+**Decision:** Define `PromptMessage` in `domain/prompt_message.py` as a frozen dataclass with `role: str` and `content: str`. The `role` is one of `"system"`, `"user"`, `"assistant"`. This is separate from the existing `ChatMessage` entity in `domain/chat.py` which has `id`, `book_id`, `role: MessageRole`, `content`, and `created_at` for persisting chat history.
 
-**Rationale:** The technical design already specifies `chat.py` in the directory layout. A frozen dataclass matches the pattern of other domain value objects (`EmbeddingVector`, `SearchResult`, `ChunkData`). Role is a plain string rather than an enum because LLM providers may add roles and we don't want to update an enum for every provider quirk.
+**Rationale:** `PromptMessage` is a lightweight value object for LLM API calls, while `ChatMessage` is a richer entity for chat history persistence. A frozen dataclass matches the pattern of other domain value objects (`EmbeddingVector`, `SearchResult`, `ChunkData`). Role is a plain string rather than an enum because LLM providers may add roles and we don't want to update an enum for every provider quirk.
 
 **Alternatives considered:**
 
@@ -41,7 +41,7 @@ The technical design specifies a `ChatProvider` protocol abstraction with Anthro
 
 ### 2. ChatProvider protocol — synchronous, non-streaming
 
-**Decision:** `ChatProvider` protocol with a single method: `chat(messages: list[ChatMessage]) → str`. Returns the full response as a string. Has a `model_name` property.
+**Decision:** `ChatProvider` protocol with a single method: `chat(messages: list[PromptMessage]) → str`. Returns the full response as a string. Has a `model_name` property.
 
 **Rationale:** For the CLI, synchronous is simplest and sufficient. Streaming adds complexity (generators, partial responses) that isn't needed until the iOS/macOS app (Phase 8). The protocol can be extended with a `stream` method later without breaking existing code.
 
@@ -55,7 +55,7 @@ The technical design specifies a `ChatProvider` protocol abstraction with Anthro
 
 **Decision:** Implement `ChatProvider` in `infra/llm/anthropic.py` using the `anthropic` Python SDK's `messages.create()` API. Default model: `claude-sonnet-4-5-20250514`. System message is passed via the `system` parameter (not as a message).
 
-**Rationale:** Anthropic's Messages API expects the system prompt as a separate parameter, not in the messages array. The adapter handles this translation — callers always use `ChatMessage(role="system", ...)` and the adapter extracts it. Claude Sonnet 4.5 balances quality and speed for a CLI tool.
+**Rationale:** Anthropic's Messages API expects the system prompt as a separate parameter, not in the messages array. The adapter handles this translation — callers always use `PromptMessage(role="system", ...)` and the adapter extracts it. Claude Sonnet 4.5 balances quality and speed for a CLI tool.
 
 **Alternatives considered:**
 

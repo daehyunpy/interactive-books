@@ -1,8 +1,8 @@
 ## 1. Domain Layer
 
-- [x] 1.1 Create `ChatMessage` frozen dataclass in `domain/chat.py` with `role: str` and `content: str`
-- [x] 1.2 Add `ChatProvider` protocol to `domain/protocols.py`: `model_name` property + `chat(messages: list[ChatMessage]) → str`
-- [x] 1.3 Write domain tests for `ChatMessage` (creation, immutability)
+- [x] 1.1 Create `PromptMessage` frozen dataclass in `domain/prompt_message.py` with `role: str` and `content: str`
+- [x] 1.2 Add `ChatProvider` protocol to `domain/protocols.py`: `model_name` property + `chat(messages: list[PromptMessage]) → str`
+- [x] 1.3 Write domain tests for `PromptMessage` (creation, immutability)
 
 ## 2. Shared Prompt Templates
 

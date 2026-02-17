@@ -4,7 +4,7 @@ Phases 3-5 built the ingestion and retrieval pipeline: books are parsed, chunked
 
 ## What Changes
 
-- Add `ChatMessage` domain model for representing messages (role + content)
+- Add `PromptMessage` domain model for representing LLM messages (role + content)
 - Add `ChatProvider` protocol for LLM chat abstraction (`chat(messages) → str`)
 - Add `LLMError` domain error type for LLM-specific failures (api_key_missing, api_call_failed, rate_limited, timeout)
 - Implement Anthropic adapter as the default `ChatProvider` (using `anthropic` SDK)
@@ -16,7 +16,7 @@ Phases 3-5 built the ingestion and retrieval pipeline: books are parsed, chunked
 
 ### New Capabilities
 
-- `chat-provider`: ChatProvider protocol, ChatMessage model, LLMError domain errors
+- `chat-provider`: ChatProvider protocol, PromptMessage model, LLMError domain errors
 - `anthropic-adapter`: Anthropic SDK implementation of ChatProvider
 - `prompt-templates`: Shared prompt templates for system prompt, query assembly, and citation instructions
 - `ask-pipeline`: AskBookUseCase orchestration and CLI ask command
@@ -28,7 +28,7 @@ Phases 3-5 built the ingestion and retrieval pipeline: books are parsed, chunked
 ## Impact
 
 - **New dependency**: `anthropic` SDK added to `pyproject.toml`
-- **New domain types**: `ChatMessage` dataclass, `LLMError` exception, `ChatProvider` protocol
+- **New domain types**: `PromptMessage` dataclass, `LLMError` exception, `ChatProvider` protocol
 - **New shared files**: `shared/prompts/system_prompt.md`, `shared/prompts/query_template.md`, `shared/prompts/citation_instructions.md`
 - **New infra adapter**: `infra/llm/anthropic.py`
 - **New use case**: `app/ask.py`
