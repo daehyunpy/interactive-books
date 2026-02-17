@@ -48,10 +48,11 @@ class RetrievalStrategy:
 
         template = self._load_template("reformulation_prompt.md")
 
-        history_lines = []
-        for m in messages:
-            if m.role in ("user", "assistant"):
-                history_lines.append(f"{m.role}: {m.content}")
+        history_lines = [
+            f"{m.role}: {m.content}"
+            for m in messages
+            if m.role in ("user", "assistant")
+        ]
         history = "\n".join(history_lines)
 
         latest = user_messages[-1].content
@@ -76,7 +77,7 @@ class RetrievalStrategy:
 
     @staticmethod
     def _find_last_user_message_index(messages: list[PromptMessage]) -> int:
-        for i in range(len(messages) - 1, -1, -1):
-            if messages[i].role == "user":
+        for i, msg in reversed(list(enumerate(messages))):
+            if msg.role == "user":
                 return i
         return -1
