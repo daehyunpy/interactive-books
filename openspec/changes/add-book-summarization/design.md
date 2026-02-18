@@ -16,7 +16,6 @@ Users want to see a structural overview of the book before starting a conversati
 
 **Non-Goals:**
 
-- Persisting summaries in the database (deferred — can cache later)
 - Extracting actual heading text from chunks (headings are mixed into chunk content; the LLM identifies them)
 - Summarizing across multiple books
 - Streaming summary generation (full generation, then display)
@@ -58,7 +57,36 @@ Users want to see a structural overview of the book before starting a conversati
 
 **Rationale:** The summary orients the user for their conversation. Injecting it into the system prompt means the LLM also has structural awareness, improving response quality. The opt-out flag respects users who want to jump straight into chat.
 
-### 5. Token budget for summarization
+### 5. Persistence
+
+**Decision:** Persist section summaries in a `section_summaries` table with FK to `books`. Schema:
+
+```sql
+CREATE TABLE IF NOT EXISTS section_summaries (
+    id TEXT PRIMARY KEY NOT NULL,
+    book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    title TEXT NOT NULL CHECK (length(title) > 0),
+    start_page INTEGER NOT NULL CHECK (start_page >= 1),
+    end_page INTEGER NOT NULL CHECK (end_page >= start_page),
+    summary TEXT NOT NULL CHECK (length(summary) > 0),
+    key_statements TEXT NOT NULL DEFAULT '[]',
+    section_index INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+```
+
+Key statements are stored as JSON in a TEXT column: `[{"statement": "...", "page": N}, ...]`.
+
+**Rationale:** Summaries are expensive to generate (one LLM call per section). Persisting avoids re-generating on every chat start. The `summarize` command generates and persists; subsequent calls return cached results unless `--regenerate` is passed. The `section_summaries` table uses CASCADE delete so summaries are cleaned up when a book is deleted.
+
+A `SummaryRepository` protocol in the domain layer provides `save_all(book_id, summaries)`, `get_by_book(book_id)`, and `delete_by_book(book_id)`. The infra adapter follows the same patterns as other repositories.
+
+**Alternatives considered:**
+
+- Store as a single JSON blob on the `books` table: loses queryability, schema validation
+- Separate `key_statements` table: over-normalized for read-heavy, write-once data
+
+### 6. Token budget for summarization
 
 **Decision:** Cap each section's content at 6000 tokens before sending to the LLM. If a section exceeds this, truncate with a note. Cap total sections at 30 to avoid excessive API calls.
 
@@ -68,6 +96,6 @@ Users want to see a structural overview of the book before starting a conversati
 
 **[Trade-off] LLM cost per summarization** - Each summarization requires one LLM call per section. A book with 20 sections means 20 API calls. This is acceptable for on-demand use but argues against running it automatically on every chat start for returning conversations (hence only on new conversations).
 
-**[Trade-off] No persistence** - Summaries are regenerated each time. For MVP this is fine; caching can be added later if users summarize the same book repeatedly.
+**[Trade-off] JSON key_statements column** - Storing key statements as JSON in a TEXT column trades queryability for simplicity. Since key statements are always read/written as a group with their parent section, this is acceptable.
 
 **[Risk] Section grouping heuristic** - The contiguous-page-range grouping may not perfectly match the book's actual structure. For formats like TXT where page numbers are estimated, sections may be less meaningful. Mitigation: the LLM identifies headings from content, compensating for imperfect grouping.

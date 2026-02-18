@@ -12,6 +12,7 @@ from interactive_books.domain.embedding_vector import EmbeddingVector
 from interactive_books.domain.page_content import PageContent
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.search_result import SearchResult
+from interactive_books.domain.section_summary import SectionSummary
 from interactive_books.domain.tool import ChatResponse, ToolDefinition
 
 
@@ -109,6 +110,12 @@ class RetrievalStrategy(Protocol):
         search_fn: Callable[[str], list[SearchResult]],
         on_event: Callable[[ChatEvent], None] | None = None,
     ) -> tuple[str, list[ChatMessage]]: ...
+
+
+class SummaryRepository(Protocol):
+    def save_all(self, book_id: str, summaries: list[SectionSummary]) -> None: ...
+    def get_by_book(self, book_id: str) -> list[SectionSummary]: ...
+    def delete_by_book(self, book_id: str) -> None: ...
 
 
 class ConversationContextStrategy(Protocol):
