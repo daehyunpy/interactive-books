@@ -76,7 +76,12 @@ class EmbedBookUseCase:
             texts = [c.content for c in batch]
             vectors = self._provider.embed(texts)
             all_vectors.extend(
-                EmbeddingVector(chunk_id=chunk.id, vector=vec)
+                EmbeddingVector(
+                    chunk_id=chunk.id,
+                    vector=vec,
+                    start_page=chunk.start_page,
+                    end_page=chunk.end_page,
+                )
                 for chunk, vec in zip(batch, vectors)
             )
         return all_vectors

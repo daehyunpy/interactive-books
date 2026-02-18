@@ -523,6 +523,43 @@ def delete(
         db.close()
 
 
+@app.command(name="search-page")
+def search_page(
+    book_id: str = typer.Argument(..., help="ID of the book"),
+    page: int = typer.Argument(..., help="Page number to retrieve"),
+) -> None:
+    """Retrieve all chunks overlapping a specific page."""
+    from interactive_books.domain.errors import BookError, BookErrorCode
+    from interactive_books.infra.storage.book_repo import BookRepository
+    from interactive_books.infra.storage.chunk_repo import ChunkRepository
+
+    db = _open_db()
+
+    try:
+        book_repo = BookRepository(db)
+        book = book_repo.get(book_id)
+        if book is None:
+            raise BookError(BookErrorCode.NOT_FOUND, f"Book not found: {book_id}")
+
+        chunk_repo = ChunkRepository(db)
+        chunks = chunk_repo.get_by_page(book_id, page)
+
+        if not chunks:
+            typer.echo(f"No content found on page {page}.")
+            raise typer.Exit()
+
+        typer.echo(f"Page {page} — {len(chunks)} chunk(s) from '{book.title}':\n")
+        for i, chunk in enumerate(chunks, 1):
+            typer.echo(f"[{i}] pages {chunk.start_page}-{chunk.end_page}")
+            typer.echo(f"    {chunk.content[:CONTENT_PREVIEW_LENGTH].replace(chr(10), ' ')}")
+            typer.echo()
+    except BookError as e:
+        typer.echo(f"Error: {e.message}", err=True)
+        raise typer.Exit(code=1)
+    finally:
+        db.close()
+
+
 @app.command(name="set-page")
 def set_page(
     book_id: str = typer.Argument(..., help="ID of the book"),
