@@ -13,7 +13,8 @@ Separately, there's no CLI command to retrieve all content on a specific page �
 - Update `EmbeddingRepository.save_embeddings()` to persist page ranges
 - Update `EmbeddingRepository.search()` to return page ranges alongside chunk_id and distance
 - Add a `search-page <book_id> <page>` CLI command that retrieves all chunks overlapping the given page
-- Add `ChunkRepository.get_by_page(book_id, page)` for direct page-based retrieval
+- Consolidate `ChunkRepository.get_by_page()` and `get_up_to_page()` into a single `get_by_page_range(book_id, start_page, end_page)` method
+- Refactor `RetrievalStrategy` to use a tool handler dispatch map instead of a single `search_fn` callback
 
 **Non-Goals:**
 
@@ -62,18 +63,47 @@ class EmbeddingVector:
 
 **Rationale:** Avoids the chunk lookup step in search, making the search path more efficient. The page data comes directly from the embedding table.
 
-### 4. Page-based content retrieval
+### 4. Page-range content retrieval (consolidated)
 
-**Decision:** Add `ChunkRepository.get_by_page(book_id: str, page: int) -> list[Chunk]` that returns all chunks where `start_page <= page AND end_page >= page`. Add a `search-page <book_id> <page>` CLI command that calls this method and displays results.
+**Decision:** Replace `ChunkRepository.get_by_page(book_id, page)` and `get_up_to_page(book_id, page)` with a single `get_by_page_range(book_id: str, start_page: int, end_page: int) -> list[Chunk]`. Returns all chunks overlapping the range `[start_page, end_page]` using `WHERE start_page <= end_page_param AND end_page >= start_page_param`. Add a `search-page <book_id> <page>` CLI command that calls `get_by_page_range(book_id, page, page)`.
 
-**Rationale:** This is a simple, direct lookup — no embeddings or vector search needed. It answers "what's on page N?" efficiently using the existing `idx_chunks_book_page_range` index.
+The previous two methods are subsumed:
+
+- `get_by_page(book_id, page)` → `get_by_page_range(book_id, page, page)`
+- `get_up_to_page(book_id, page)` → `get_by_page_range(book_id, 1, page)`
+
+**Rationale:** Three methods with overlapping semantics are really one operation with different default arguments. Collapsing into one method simplifies the protocol (one implementation, one test path) and eliminates the risk of inconsistent behavior between methods. Since no users exist yet, there's no backwards-compatibility concern.
 
 **Alternatives considered:**
 
+- Keep all three methods: redundant protocol surface, more test doubles to maintain
 - Use vector search with page filter: overkill for "show me page N" — no query needed
 - Add to existing `search` command: conflates two different operations (semantic search vs page lookup)
 
-### 5. EmbedBookUseCase modification
+### 5. RetrievalStrategy tool dispatch map
+
+**Decision:** Replace the single `search_fn: Callable[[str], list[SearchResult]]` parameter on `RetrievalStrategy.execute()` with a generic dispatch map:
+
+```python
+tool_handlers: dict[str, Callable[[dict[str, object]], str]]
+```
+
+Each handler takes the tool's `arguments` dict and returns a formatted string result. The strategy dispatches by tool name: `handler = tool_handlers[invocation.tool_name]`.
+
+**Rationale:** The current design hardcodes a single tool callback and blindly calls `search_fn(query)` for every invocation, ignoring `invocation.tool_name`. This breaks the moment a second tool (`read_pages`) is added with different argument shapes. A dispatch map:
+
+- Separates routing from execution — each handler knows its own argument extraction
+- Scales to N tools without protocol changes
+- Makes each handler independently testable
+
+The `AlwaysRetrieveStrategy` (Ollama fallback) doesn't use tool dispatch at all — it reformulates and always searches. It ignores `tool_handlers` the same way it currently ignores the `tools` parameter.
+
+**Alternatives considered:**
+
+- Separate named parameters (`search_fn`, `read_pages_fn`): doesn't scale — every new tool changes the protocol signature
+- Single polymorphic callback with tool name: possible, but the dispatch map is more explicit and testable
+
+### 6. EmbedBookUseCase modification
 
 **Decision:** Modify `EmbedBookUseCase` to populate `start_page` and `end_page` on `EmbeddingVector` by looking up the corresponding chunk's page ranges before embedding.
 
