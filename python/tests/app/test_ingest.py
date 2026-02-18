@@ -7,7 +7,7 @@ from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.chunk_data import ChunkData
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.domain.page_content import PageContent
-from interactive_books.domain.protocols import BookParser, TextChunker
+from interactive_books.domain.protocols import BookParser, TextChunker, UrlParser
 
 
 class FakeEmbedBookUseCase:
@@ -70,6 +70,23 @@ class FakeParser:
         return self._pages
 
 
+class FakeUrlParser:
+    def __init__(self, pages: list[PageContent] | None = None) -> None:
+        self._pages = pages or [
+            PageContent(page_number=1, text="URL page content."),
+        ]
+        self.last_url: str | None = None
+
+    def parse_url(self, url: str) -> list[PageContent]:
+        self.last_url = url
+        return self._pages
+
+
+class FailingUrlParser:
+    def parse_url(self, url: str) -> list[PageContent]:
+        raise BookError(BookErrorCode.FETCH_FAILED, "Fetch failed")
+
+
 class FailingParser:
     def parse(self, file_path: Path) -> list[PageContent]:
         raise BookError(BookErrorCode.PARSE_FAILED, "Parse failed")
@@ -99,6 +116,11 @@ def make_use_case(
     *,
     pdf_parser: BookParser | None = None,
     txt_parser: BookParser | None = None,
+    epub_parser: BookParser | None = None,
+    docx_parser: BookParser | None = None,
+    html_parser: BookParser | None = None,
+    md_parser: BookParser | None = None,
+    url_parser: UrlParser | None = None,
     chunker: TextChunker | None = None,
     book_repo: FakeBookRepository | None = None,
     chunk_repo: FakeChunkRepository | None = None,
@@ -110,6 +132,11 @@ def make_use_case(
         IngestBookUseCase(
             pdf_parser=pdf_parser or FakeParser(),
             txt_parser=txt_parser or FakeParser(),
+            epub_parser=epub_parser or FakeParser(),
+            docx_parser=docx_parser or FakeParser(),
+            html_parser=html_parser or FakeParser(),
+            md_parser=md_parser or FakeParser(),
+            url_parser=url_parser or FakeUrlParser(),  # type: ignore[arg-type]
             chunker=chunker or FakeChunker(),
             book_repo=br,
             chunk_repo=cr,
@@ -146,15 +173,72 @@ class TestIngestSuccess:
         assert book_repo.get(book.id).status == BookStatus.READY  # type: ignore[union-attr]
 
 
+class TestIngestEpubSuccess:
+    def test_successful_epub_ingest_returns_ready_book(
+        self, tmp_path: Path
+    ) -> None:
+        use_case, _, _ = make_use_case()
+        epub_path = tmp_path / "test.epub"
+        epub_path.touch()
+        book, embed_error = use_case.execute(epub_path, "EPUB Book")
+        assert book.status == BookStatus.READY
+        assert embed_error is None
+
+    def test_epub_format_no_longer_rejected_as_unsupported(
+        self, tmp_path: Path
+    ) -> None:
+        use_case, book_repo, _ = make_use_case()
+        epub_path = tmp_path / "test.epub"
+        epub_path.touch()
+        book, _ = use_case.execute(epub_path, "EPUB Book")
+        assert book_repo.get(book.id) is not None
+
+
+class TestIngestDocxSuccess:
+    def test_successful_docx_ingest_returns_ready_book(
+        self, tmp_path: Path
+    ) -> None:
+        use_case, _, _ = make_use_case()
+        docx_path = tmp_path / "test.docx"
+        docx_path.touch()
+        book, embed_error = use_case.execute(docx_path, "DOCX Book")
+        assert book.status == BookStatus.READY
+        assert embed_error is None
+
+    def test_docx_format_no_longer_rejected_as_unsupported(
+        self, tmp_path: Path
+    ) -> None:
+        use_case, book_repo, _ = make_use_case()
+        docx_path = tmp_path / "test.docx"
+        docx_path.touch()
+        book, _ = use_case.execute(docx_path, "DOCX Book")
+        assert book_repo.get(book.id) is not None
+
+
+class DrmProtectedParser:
+    def parse(self, file_path: Path) -> list[PageContent]:
+        raise BookError(BookErrorCode.DRM_PROTECTED, "EPUB is DRM-protected")
+
+
+class TestIngestDrmProtectedEpub:
+    def test_drm_protected_epub_raises_drm_error(self, tmp_path: Path) -> None:
+        use_case, _, _ = make_use_case(epub_parser=DrmProtectedParser())
+        epub_path = tmp_path / "test.epub"
+        epub_path.touch()
+        with pytest.raises(BookError) as exc_info:
+            use_case.execute(epub_path, "DRM Book")
+        assert exc_info.value.code == BookErrorCode.DRM_PROTECTED
+
+
 class TestIngestUnsupportedFormat:
     def test_unsupported_format_raises_before_book_creation(
         self, tmp_path: Path
     ) -> None:
         use_case, book_repo, _ = make_use_case()
-        path = tmp_path / "test.epub"
+        path = tmp_path / "test.xyz"
         path.touch()
         with pytest.raises(BookError) as exc_info:
-            use_case.execute(path, "EPUB Book")
+            use_case.execute(path, "Unknown Book")
         assert exc_info.value.code == BookErrorCode.UNSUPPORTED_FORMAT
         assert len(book_repo.books) == 0
 
@@ -252,3 +336,57 @@ class TestAutoEmbed:
 
         assert book.status == BookStatus.READY
         assert embed_error is None
+
+
+# ── Tests: HTML/MD/URL Ingest ──────────────────────────────────
+
+
+class TestIngestHtmlSuccess:
+    def test_successful_html_ingest_returns_ready_book(
+        self, tmp_path: Path
+    ) -> None:
+        use_case, _, _ = make_use_case()
+        html_path = tmp_path / "test.html"
+        html_path.touch()
+        book, embed_error = use_case.execute(html_path, "HTML Book")
+        assert book.status == BookStatus.READY
+        assert embed_error is None
+
+
+class TestIngestMarkdownSuccess:
+    def test_successful_md_ingest_returns_ready_book(
+        self, tmp_path: Path
+    ) -> None:
+        use_case, _, _ = make_use_case()
+        md_path = tmp_path / "test.md"
+        md_path.touch()
+        book, embed_error = use_case.execute(md_path, "Markdown Book")
+        assert book.status == BookStatus.READY
+        assert embed_error is None
+
+
+class TestIngestUrlSuccess:
+    def test_successful_url_ingest_returns_ready_book(self) -> None:
+        use_case, _, _ = make_use_case()
+        book, embed_error = use_case.execute(
+            "https://example.com/page", "URL Book"
+        )
+        assert book.status == BookStatus.READY
+        assert embed_error is None
+
+    def test_url_source_uses_url_parser(self) -> None:
+        url_parser = FakeUrlParser()
+        use_case, _, _ = make_use_case(url_parser=url_parser)  # type: ignore[arg-type]
+        use_case.execute("https://example.com/article", "URL Book")
+        assert url_parser.last_url == "https://example.com/article"
+
+    def test_url_fetch_failure_propagates_error(self) -> None:
+        use_case, book_repo, _ = make_use_case(
+            url_parser=FailingUrlParser(),  # type: ignore[arg-type]
+        )
+        with pytest.raises(BookError) as exc_info:
+            use_case.execute("https://example.com/bad", "Bad URL")
+        assert exc_info.value.code == BookErrorCode.FETCH_FAILED
+        books = book_repo.get_all()
+        assert len(books) == 1
+        assert books[0].status == BookStatus.FAILED

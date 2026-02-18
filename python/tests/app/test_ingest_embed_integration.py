@@ -13,6 +13,7 @@ import pytest
 from interactive_books.app.embed import EmbedBookUseCase
 from interactive_books.app.ingest import IngestBookUseCase
 from interactive_books.domain.book import BookStatus
+from interactive_books.domain.page_content import PageContent
 from interactive_books.infra.chunkers.recursive import TextChunker
 from interactive_books.infra.parsers.txt import BookParser as TxtBookParser
 from interactive_books.infra.storage.book_repo import BookRepository
@@ -91,6 +92,11 @@ def _write_txt(tmp_path: Path, content: str) -> Path:
     return p
 
 
+class _StubUrlParser:
+    def parse_url(self, url: str) -> list[PageContent]:
+        return [PageContent(page_number=1, text="stub")]
+
+
 def _make_ingest_use_case(
     *,
     book_repo: BookRepository,
@@ -100,6 +106,11 @@ def _make_ingest_use_case(
     return IngestBookUseCase(
         pdf_parser=TxtBookParser(),  # unused for .txt files, but required
         txt_parser=TxtBookParser(),
+        epub_parser=TxtBookParser(),  # unused for .txt files, but required
+        docx_parser=TxtBookParser(),  # unused for .txt files, but required
+        html_parser=TxtBookParser(),  # unused for .txt files, but required
+        md_parser=TxtBookParser(),  # unused for .txt files, but required
+        url_parser=_StubUrlParser(),  # type: ignore[arg-type]
         chunker=TextChunker(),
         book_repo=book_repo,
         chunk_repo=chunk_repo,

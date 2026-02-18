@@ -32,6 +32,8 @@ class TestBookError:
             "already_exists",
             "invalid_state",
             "embedding_failed",
+            "drm_protected",
+            "fetch_failed",
         }
         actual = {code.value for code in BookErrorCode}
         assert actual == expected
@@ -50,6 +52,12 @@ class TestBookError:
             raise BookError(BookErrorCode.PARSE_FAILED, "Bad PDF")
         except BookError as e:
             assert e.code == BookErrorCode.PARSE_FAILED
+
+    def test_drm_protected_error(self) -> None:
+        error = BookError(BookErrorCode.DRM_PROTECTED, "EPUB is DRM-protected")
+        assert error.code == BookErrorCode.DRM_PROTECTED
+        assert error.message == "EPUB is DRM-protected"
+        assert str(error) == "EPUB is DRM-protected"
 
 
 class TestLLMError:

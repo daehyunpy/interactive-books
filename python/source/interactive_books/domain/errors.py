@@ -15,6 +15,8 @@ class BookErrorCode(Enum):
     ALREADY_EXISTS = "already_exists"
     INVALID_STATE = "invalid_state"
     EMBEDDING_FAILED = "embedding_failed"
+    DRM_PROTECTED = "drm_protected"
+    FETCH_FAILED = "fetch_failed"
 
 
 class BookError(DomainError):

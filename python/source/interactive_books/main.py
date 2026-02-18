@@ -55,23 +55,33 @@ def main(
 
 @app.command()
 def ingest(
-    file_path: Path = typer.Argument(..., help="Path to the book file (PDF or TXT)"),
+    source: str = typer.Argument(
+        ..., help="Path to a book file (PDF, TXT, EPUB, DOCX, HTML, MD) or a URL"
+    ),
     title: str = typer.Option(
-        "", "--title", "-t", help="Book title (defaults to filename)"
+        "", "--title", "-t", help="Book title (defaults to filename or URL)"
     ),
 ) -> None:
-    """Parse, chunk, and ingest a book file."""
+    """Parse, chunk, and ingest a book file or URL."""
     from interactive_books.app.embed import EmbedBookUseCase
     from interactive_books.app.ingest import IngestBookUseCase
     from interactive_books.domain.errors import BookError
     from interactive_books.infra.chunkers.recursive import TextChunker
+    from interactive_books.infra.parsers.docx import BookParser as DocxBookParser
+    from interactive_books.infra.parsers.epub import BookParser as EpubBookParser
+    from interactive_books.infra.parsers.html import BookParser as HtmlBookParser
+    from interactive_books.infra.parsers.markdown import BookParser as MdBookParser
     from interactive_books.infra.parsers.pdf import BookParser as PdfBookParser
     from interactive_books.infra.parsers.txt import BookParser as TxtBookParser
+    from interactive_books.infra.parsers.url import UrlParser
     from interactive_books.infra.storage.book_repo import BookRepository
     from interactive_books.infra.storage.chunk_repo import ChunkRepository
 
+    is_url = source.startswith(("http://", "https://"))
+    ingest_source: Path | str = source if is_url else Path(source)
+
     if not title:
-        title = file_path.stem
+        title = source.split("/")[-1] if is_url else Path(source).stem
 
     openai_key = os.environ.get("OPENAI_API_KEY", "")
     has_embed = bool(openai_key)
@@ -102,6 +112,11 @@ def ingest(
     use_case = IngestBookUseCase(
         pdf_parser=PdfBookParser(),
         txt_parser=TxtBookParser(),
+        epub_parser=EpubBookParser(),
+        docx_parser=DocxBookParser(),
+        html_parser=HtmlBookParser(),
+        md_parser=MdBookParser(),
+        url_parser=UrlParser(),
         chunker=TextChunker(),
         book_repo=book_repo,
         chunk_repo=chunk_repo,
@@ -109,7 +124,7 @@ def ingest(
     )
 
     try:
-        book, embed_error = use_case.execute(file_path, title)
+        book, embed_error = use_case.execute(ingest_source, title)
         chunk_count = chunk_repo.count_by_book(book.id)
         typer.echo(f"Book ID:     {book.id}")
         typer.echo(f"Title:       {book.title}")

@@ -17,11 +17,11 @@ Read all four before making changes to the Swift app.
 
 ## Current State
 
-**Phases 1–7 complete.** The Python CLI is fully functional.
+**Phases 1–9 complete.** The Python CLI is fully functional with all planned format support.
 
-The Python CLI can ingest books (PDF, TXT — more formats coming), generate embeddings, run vector search, and have multi-turn agentic conversations about books. The agent decides when to retrieve via tool-use, maintains conversation history, and persists sessions.
+The Python CLI can ingest books (PDF, TXT, EPUB, DOCX, HTML, Markdown, and URLs), generate embeddings, run vector search, and have multi-turn agentic conversations about books. The agent decides when to retrieve via tool-use, maintains conversation history, and persists sessions.
 
-**Next up:** Additional format support (EPUB, DOCX, HTML, Markdown, URL), then iOS/macOS/visionOS app.
+**Next up:** iOS/macOS/visionOS app.
 
 Build order: CLI first, bottom-up, one feature at a time.
 
@@ -34,9 +34,9 @@ Build order: CLI first, bottom-up, one feature at a time.
 | 5     | Retrieval                 | Done     |
 | 6     | Q&A (Agentic Chat)        | Done     |
 | 7     | CLI polish                | Done     |
-| 8     | Structured format parsers | **Next** |
-| 9     | Text format parsers       | —        |
-| 10    | iOS/macOS/visionOS app    | —        |
+| 8     | Structured format parsers | Done     |
+| 9     | Text format parsers       | Done     |
+| 10    | iOS/macOS/visionOS app    | **Next** |
 
 See `docs/technical_design.md` → "Build Order" for details on each phase. See "Directory Layout" for the full project tree.
 
@@ -118,7 +118,7 @@ uv run pytest -x              # verify everything works
 Format detection: file extension for local files, HTTP Content-Type for URLs.
 Page mapping is pluggable via `PageMappingStrategy` — defaults above, swappable per format.
 Nested resource resolution (URL crawling, multi-file HTML/MD) is deferred to v2.
-Build order: Batch 1 (EPUB + DOCX), then Batch 2 (HTML + MD + URL).
+All format batches complete: Batch 1 (EPUB + DOCX) and Batch 2 (HTML + MD + URL).
 
 ### Verify Setup
 
@@ -136,13 +136,13 @@ uv run interactive-books search <book_id> "test query"     # returns ranked chun
 uv run interactive-books chat <book_id>                    # interactive conversation
 ```
 
-### Swift App (Phase 8)
+### Swift App (Phase 10)
 
 Setup instructions will be added when the Swift app is scaffolded.
 
 ## Quick Commands
 
-All Python commands run from `python/`. All Swift commands run from `swift/` (Phase 8).
+All Python commands run from `python/`. All Swift commands run from `swift/` (Phase 10).
 
 | Task                  | Command                              |
 | --------------------- | ------------------------------------ |
@@ -153,14 +153,14 @@ All Python commands run from `python/`. All Swift commands run from `swift/` (Ph
 | Format Python         | `uv run ruff format .`               |
 | Type check Python     | `uv run pyright`                     |
 | Run CLI               | `uv run interactive-books <command>` |
-| Run Swift tests       | `swift test` _(Phase 8)_             |
-| Lint Swift            | `swiftlint` _(Phase 8)_              |
-| Format Swift          | `swiftformat .` _(Phase 8)_          |
+| Run Swift tests       | `swift test` _(Phase 10)_            |
+| Lint Swift            | `swiftlint` _(Phase 10)_             |
+| Format Swift          | `swiftformat .` _(Phase 10)_         |
 
 ### CLI Commands (current)
 
 ```bash
-uv run interactive-books ingest <file> --title "Book Title"
+uv run interactive-books ingest <file|url> --title "Book Title"
 uv run interactive-books embed <book_id>
 uv run interactive-books search <book_id> <query> --top-k 5
 uv run interactive-books chat <book_id>                  # interactive conversation REPL
