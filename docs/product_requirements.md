@@ -31,11 +31,12 @@ Individual readers who want more from the books they already own. Early adopters
 
 ## Platforms
 
-- **iOS** — native app, all data stored on-device
+- **iOS / iPadOS** — native app, all data stored on-device
 - **macOS** — native app, shared codebase with iOS
+- **visionOS** — native app, windowed SwiftUI interface
 - **CLI** — command-line tool for debugging and quick prototyping
 
-No backend server. No web interface.
+No backend server. No web interface. tvOS and watchOS are not supported (no keyboard input, insufficient storage/screen for book interaction).
 
 ## User Stories
 
@@ -237,4 +238,4 @@ Local-first is a core value proposition, not just an architecture choice. Users 
 - Source passages are shown alongside answers for verification
 - Works fully offline after initial book ingestion (except LLM API calls; local LLM = fully offline)
 - CLI can prototype and validate pipeline changes in seconds
-- macOS and iOS share the same codebase with platform-appropriate UI
+- macOS, iOS, and visionOS share the same codebase with platform-appropriate UI

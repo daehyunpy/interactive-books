@@ -52,7 +52,7 @@ Revenue comes later, once the product has proven value. Possible directions incl
 
 ## What We're Building (v1)
 
-A local-only iOS/macOS app and Python CLI that lets readers:
+A local-only iOS/macOS/visionOS app and Python CLI that lets readers:
 
 1. Upload books (PDF, TXT, EPUB, DOCX, HTML, Markdown) or import from a URL
 2. Set their reading position (page-aware, spoiler-free)

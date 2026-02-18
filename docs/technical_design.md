@@ -4,7 +4,7 @@
 
 ```
 ┌────────────────────────────────────┐
-│     iOS / macOS App                │
+│     iOS / macOS / visionOS App     │
 │     (SwiftUI, multiplatform)       │
 │                                    │
 │  ┌───────────┐  ┌────────────────┐│
@@ -82,7 +82,7 @@ interactive-books/
 │       ├── app/
 │       └── infra/
 │
-├── swift/                            # iOS/macOS app (Phase 8)
+├── swift/                            # iOS/macOS/visionOS app (Phase 10)
 │   └── InteractiveBooks/
 │       ├── InteractiveBooks.xcodeproj
 │       ├── Domain/
@@ -153,8 +153,8 @@ interactive-books/
 
 | Category             | Choice                  | Notes                                                      |
 | -------------------- | ----------------------- | ---------------------------------------------------------- |
-| Min deployment       | iOS 26 / macOS 26       | Latest, full SwiftData support                             |
-| UI framework         | SwiftUI                 | Multiplatform target (iOS + macOS)                         |
+| Min deployment       | iOS 26 / macOS 26 / visionOS 26 | Latest APIs, multiplatform SwiftUI                 |
+| UI framework         | SwiftUI                 | Multiplatform target (iOS + macOS + visionOS)              |
 | Storage              | SwiftData               | Modern stack, native                                       |
 | Testing              | Swift Testing           | Apple's modern test framework (@Test, #expect)             |
 | Linting              | SwiftLint + SwiftFormat | SwiftLint for diagnostics, SwiftFormat for auto-formatting |
@@ -196,7 +196,7 @@ interactive-books/
 | Chunk size & overlap       | Pluggable (configurable)                   | Default: 500 tokens, 100 overlap. Adjustable per strategy.                              |
 | Top-k retrieval            | Pluggable (configurable)                   | Default: 5. Adjustable per query.                                                       |
 | Project structure          | DDD (Domain-Driven Design)                 | Clean separation of domains                                                             |
-| Min deployment             | iOS 26 / macOS 26                          | Latest, full SwiftData support                                                          |
+| Min deployment             | iOS 26 / macOS 26 / visionOS 26            | Latest APIs, multiplatform SwiftUI                                                      |
 | Python version             | 3.13                                       | Latest stable                                                                           |
 | Python config              | pydantic-settings                          | Type-safe validation; direnv as dev convenience layer                                   |
 | Python type checking       | pyright                                    | Fast, strict, powers Pylance; catches bugs at dev time                                  |
@@ -341,7 +341,7 @@ Providers that don't support tool-use (Ollama, for now) fall back to always-retr
 
 ### Credential Storage
 
-- iOS/macOS: API keys stored in the Keychain. Local LLM endpoint URL stored in UserDefaults.
+- iOS/macOS/visionOS: API keys stored in the Keychain. Local LLM endpoint URL stored in UserDefaults.
 - CLI: API keys loaded from `.env` via pydantic-settings (direnv as dev convenience).
 
 ## Build Order
@@ -359,7 +359,7 @@ CLI first, bottom-up, one feature at a time.
 | 7     | **CLI polish**                | All commands working (`ingest`, `search`, `chat`, `books`, `--verbose`)                                                                                             |
 | 8     | **Structured format parsers** | EPUB (zipfile + selectolax) + DOCX (python-docx) parsers with `PageMappingStrategy`, sample fixtures, integration tests                                             |
 | 9     | **Text format parsers**       | HTML (selectolax) + Markdown (markdown-it-py) + URL (httpx + selectolax) parsers, Content-Type detection for URLs, sample fixtures, integration tests               |
-| 10    | **iOS/macOS app**             | Port pipeline to Swift, build SwiftUI interface                                                                                                                     |
+| 10    | **iOS/macOS/visionOS app**    | Port pipeline to Swift, build SwiftUI interface                                                                                                                     |
 
 ## First Implementations (Easiest First)
 
