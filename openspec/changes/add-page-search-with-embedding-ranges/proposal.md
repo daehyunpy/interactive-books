@@ -8,9 +8,10 @@ Storing `start_page` and `end_page` directly in the embedding table enables page
 
 - Extend the sqlite-vec virtual table schema to include `start_page` and `end_page` auxiliary columns
 - Modify `EmbeddingRepository` to save and query page ranges with embeddings
-- Add a `get_by_page` method to `ChunkRepository` for direct page-based chunk retrieval
-- Add a `search-page <book_id> <page>` CLI command (or `--page-range` option) to retrieve content by page
+- Consolidate `ChunkRepository.get_by_page()` and `get_up_to_page()` into a single `get_by_page_range(book_id, start_page, end_page)` method
+- Add a `search-page <book_id> <page>` CLI command for page-based content retrieval
 - Modify `SearchBooksUseCase` to leverage embedding-level page filtering when available
+- Refactor `RetrievalStrategy` to use a `tool_handlers` dispatch map instead of a single `search_fn` callback, enabling multiple tool support (e.g., `search_book` + future `read_pages`)
 
 ## Capabilities
 
@@ -27,6 +28,6 @@ Storing `start_page` and `end_page` directly in the embedding table enables page
 ## Impact
 
 - **New files**: None (modifications to existing files)
-- **Modified files**: `infra/storage/embedding_repo.py` (schema + queries), `domain/protocols.py` (updated protocol), `domain/embedding_vector.py` (add page fields), `app/search.py` (efficiency improvement), `main.py` (new CLI command)
+- **Modified files**: `infra/storage/embedding_repo.py` (schema + queries), `domain/protocols.py` (updated protocol — `ChunkRepository`, `RetrievalStrategy`), `domain/embedding_vector.py` (add page fields), `app/search.py` (efficiency improvement), `app/chat.py` (dispatch map wiring), `infra/retrieval/tool_use.py` (dispatch logic), `infra/retrieval/always_retrieve.py` (signature update), `main.py` (new CLI command)
 - **DB migration**: New virtual table schema version with auxiliary columns (backward-compatible — creates new table alongside old)
 - **Backward compatible**: Old embeddings without page ranges still work; re-embed to populate page data

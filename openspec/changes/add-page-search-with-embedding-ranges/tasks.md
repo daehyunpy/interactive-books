@@ -6,7 +6,9 @@
 
 ## 2. Domain Layer — ChunkRepository Protocol
 
-- [ ] 2.1 Add `get_by_page(book_id: str, page: int) -> list[Chunk]` to `ChunkRepository` protocol in `domain/protocols.py`
+- [ ] 2.1 Replace `get_by_page(book_id, page)` and `get_up_to_page(book_id, page)` with `get_by_page_range(book_id: str, start_page: int, end_page: int) -> list[Chunk]` in `domain/protocols.py`
+  - Returns chunks where `start_page <= end_page_param AND end_page >= start_page_param`
+  - Remove both old methods from the protocol
 
 ## 3. Domain Layer — EmbeddingRepository Protocol
 
@@ -22,8 +24,14 @@
 
 ## 5. Infrastructure — Chunk Storage
 
-- [ ] 5.1 Implement `get_by_page(book_id, page)` in `infra/storage/chunk_repo.py` using `WHERE start_page <= ? AND end_page >= ?`
-- [ ] 5.2 Add tests for `get_by_page`
+- [ ] 5.1 Replace `get_by_page()` and `get_up_to_page()` with `get_by_page_range(book_id, start_page, end_page)` in `infra/storage/chunk_repo.py`
+  - SQL: `WHERE book_id = ? AND start_page <= ? AND end_page >= ? ORDER BY chunk_index`
+- [ ] 5.2 Update/replace existing `get_by_page` and `get_up_to_page` tests with `get_by_page_range` tests
+  - Test single-page range (equivalent to old `get_by_page`)
+  - Test range from page 1 (equivalent to old `get_up_to_page`)
+  - Test multi-page range
+  - Test empty result for non-overlapping range
+- [ ] 5.3 Update all callers: `main.py` `search-page` command, test doubles in `tests/app/`
 
 ## 6. Application Layer — EmbedBookUseCase
 
@@ -36,14 +44,27 @@
 - [ ] 7.2 Add fallback: if page ranges not available from embeddings (old data), fall back to chunk lookup
 - [ ] 7.3 Update search tests for new return format
 
-## 8. CLI — `search-page` Command
+## 8. Domain Layer — RetrievalStrategy Dispatch Map
 
-- [ ] 8.1 Add `search-page <book_id> <page>` command to `main.py`
+- [ ] 8.1 Update `RetrievalStrategy` protocol in `domain/protocols.py`: replace `search_fn: Callable[[str], list[SearchResult]]` with `tool_handlers: dict[str, Callable[[dict[str, object]], str]]`
+- [ ] 8.2 Update `infra/retrieval/tool_use.py` to dispatch by `invocation.tool_name` via the handler map
+  - Look up handler: `handler = tool_handlers[invocation.tool_name]`
+  - Call handler with arguments: `result = handler(dict(invocation.arguments))`
+  - Remove hardcoded `query = str(invocation.arguments.get("query", ""))` extraction
+- [ ] 8.3 Update `infra/retrieval/always_retrieve.py` to accept `tool_handlers` in its signature (ignored — it reformulates and always searches)
+- [ ] 8.4 Update `app/chat.py` to build a `tool_handlers` dict and pass it to the strategy
+  - `search_book` handler wraps `search_use_case.execute()` and formats results
+- [ ] 8.5 Update all retrieval strategy tests and test doubles
+
+## 9. CLI — `search-page` Command
+
+- [ ] 9.1 Add `search-page <book_id> <page>` command to `main.py`
+  - Uses `chunk_repo.get_by_page_range(book_id, page, page)` for single-page lookup
   - Displays all chunks overlapping the given page, ordered by chunk_index
   - Shows chunk content with page range annotations
-- [ ] 8.2 Add CLI test for `search-page` command
+- [ ] 9.2 Add CLI test for `search-page` command
 
-## 9. Verification
+## 10. Verification
 
-- [ ] 9.1 Run full test suite (`uv run pytest -x`) — all tests pass
-- [ ] 9.2 Run lint and type checks (`uv run ruff check .` and `uv run pyright`) — clean
+- [ ] 10.1 Run full test suite (`uv run pytest -x`) — all tests pass
+- [ ] 10.2 Run lint and type checks (`uv run ruff check .` and `uv run pyright`) — clean
