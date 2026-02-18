@@ -12,6 +12,7 @@ dependencies = [
     "sqlite-vec",
     "selectolax",
     "python-docx",
+    "markdown-it-py",
 ]
 
 [project.scripts]

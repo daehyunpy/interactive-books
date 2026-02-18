@@ -34,6 +34,10 @@ class BookParser(Protocol):
     def parse(self, file_path: Path) -> list[PageContent]: ...
 
 
+class UrlParser(Protocol):
+    def parse_url(self, url: str) -> list[PageContent]: ...
+
+
 class TextChunker(Protocol):
     def chunk(self, pages: list[PageContent]) -> list[ChunkData]: ...
 

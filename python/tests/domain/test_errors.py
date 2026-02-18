@@ -33,6 +33,7 @@ class TestBookError:
             "invalid_state",
             "embedding_failed",
             "drm_protected",
+            "fetch_failed",
         }
         actual = {code.value for code in BookErrorCode}
         assert actual == expected

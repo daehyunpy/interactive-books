@@ -152,6 +152,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "httpx" },
+    { name = "markdown-it-py" },
     { name = "openai" },
     { name = "pydantic-settings" },
     { name = "pymupdf" },
@@ -172,6 +173,7 @@ dev = [
 requires-dist = [
     { name = "anthropic" },
     { name = "httpx" },
+    { name = "markdown-it-py" },
     { name = "openai" },
     { name = "pydantic-settings" },
     { name = "pymupdf" },

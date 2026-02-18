@@ -12,12 +12,13 @@ from interactive_books.domain.protocols import (
     BookRepository,
     ChunkRepository,
     TextChunker,
+    UrlParser,
 )
 
 if TYPE_CHECKING:
     from interactive_books.app.embed import EmbedBookUseCase
 
-SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".epub", ".docx"}
+SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".epub", ".docx", ".html", ".md"}
 
 
 class IngestBookUseCase:
@@ -28,6 +29,9 @@ class IngestBookUseCase:
         txt_parser: BookParser,
         epub_parser: BookParser,
         docx_parser: BookParser,
+        html_parser: BookParser,
+        md_parser: BookParser,
+        url_parser: UrlParser,
         chunker: TextChunker,
         book_repo: BookRepository,
         chunk_repo: ChunkRepository,
@@ -38,27 +42,41 @@ class IngestBookUseCase:
             ".txt": txt_parser,
             ".epub": epub_parser,
             ".docx": docx_parser,
+            ".html": html_parser,
+            ".md": md_parser,
         }
+        self._url_parser = url_parser
         self._chunker = chunker
         self._book_repo = book_repo
         self._chunk_repo = chunk_repo
         self._embed_use_case = embed_use_case
 
-    def execute(self, file_path: Path, title: str) -> tuple[Book, Exception | None]:
-        extension = file_path.suffix.lower()
-        if extension not in SUPPORTED_EXTENSIONS:
-            raise BookError(
-                BookErrorCode.UNSUPPORTED_FORMAT,
-                f"Unsupported file format: {extension}",
-            )
+    def execute(
+        self, source: Path | str, title: str
+    ) -> tuple[Book, Exception | None]:
+        is_url = isinstance(source, str) and (
+            source.startswith("http://") or source.startswith("https://")
+        )
+
+        if not is_url:
+            file_path = Path(source) if isinstance(source, str) else source
+            extension = file_path.suffix.lower()
+            if extension not in SUPPORTED_EXTENSIONS:
+                raise BookError(
+                    BookErrorCode.UNSUPPORTED_FORMAT,
+                    f"Unsupported file format: {extension}",
+                )
 
         book = Book(id=str(uuid.uuid4()), title=title)
         book.start_ingestion()
         self._book_repo.save(book)
 
         try:
-            parser = self._parsers[extension]
-            pages = parser.parse(file_path)
+            if is_url:
+                pages = self._url_parser.parse_url(str(source))
+            else:
+                parser = self._parsers[extension]  # type: ignore[possibly-undefined]
+                pages = parser.parse(file_path)  # type: ignore[possibly-undefined]
             chunk_data_list = self._chunker.chunk(pages)
 
             chunks = [

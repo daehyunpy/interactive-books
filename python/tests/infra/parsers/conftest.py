@@ -255,3 +255,109 @@ def invalid_docx(tmp_path: Path) -> Path:
     path = tmp_path / "invalid.docx"
     path.write_text("This is not a DOCX file.")
     return path
+
+
+# ── HTML fixtures ────────────────────────────────────────────
+
+
+@pytest.fixture
+def html_with_content(tmp_path: Path) -> Path:
+    """Well-formed HTML with paragraphs and headings."""
+    path = tmp_path / "content.html"
+    path.write_text(
+        "<html><body>"
+        "<h1>Title</h1>"
+        "<p>First paragraph.</p>"
+        "<p>Second paragraph.</p>"
+        "</body></html>",
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.fixture
+def html_empty_body(tmp_path: Path) -> Path:
+    """HTML with an empty body."""
+    path = tmp_path / "empty_body.html"
+    path.write_text(
+        "<html><body></body></html>",
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.fixture
+def html_no_body(tmp_path: Path) -> Path:
+    """HTML fragment with no body tag."""
+    path = tmp_path / "no_body.html"
+    path.write_text(
+        "<html><head><title>No Body</title></head></html>",
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.fixture
+def invalid_html(tmp_path: Path) -> Path:
+    """Malformed/non-HTML content with .html extension."""
+    path = tmp_path / "invalid.html"
+    path.write_text("This is not HTML at all, just plain text.", encoding="utf-8")
+    return path
+
+
+# ── Markdown fixtures ────────────────────────────────────────
+
+
+@pytest.fixture
+def md_with_headings(tmp_path: Path) -> Path:
+    """Markdown with H1, H2, content, and formatting."""
+    path = tmp_path / "headings.md"
+    path.write_text(
+        "Introduction before any heading.\n\n"
+        "# Chapter One\n\n"
+        "Chapter one **bold** content.\n\n"
+        "## Section 1.1\n\n"
+        "Section 1.1 *italic* content with [a link](http://example.com).\n\n"
+        "# Chapter Two\n\n"
+        "Chapter two content with `code`.\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.fixture
+def md_no_headings(tmp_path: Path) -> Path:
+    """Markdown with only paragraphs."""
+    path = tmp_path / "no_headings.md"
+    path.write_text(
+        "First paragraph of text.\n\n"
+        "Second paragraph of text.\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.fixture
+def md_with_code_block(tmp_path: Path) -> Path:
+    """Markdown with headings inside a fenced code block."""
+    path = tmp_path / "code_block.md"
+    path.write_text(
+        "# Real Heading\n\n"
+        "Some content.\n\n"
+        "```python\n"
+        "# This is a comment, not a heading\n"
+        "## Also not a heading\n"
+        "print('hello')\n"
+        "```\n\n"
+        "More content after code.\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.fixture
+def md_empty(tmp_path: Path) -> Path:
+    """Empty Markdown file."""
+    path = tmp_path / "empty.md"
+    path.write_text("", encoding="utf-8")
+    return path
