@@ -144,6 +144,9 @@ def search(
     page: int | None = typer.Option(
         None, "--page", "-p", help="Temporary page limit (overrides set-page)"
     ),
+    all_pages: bool = typer.Option(
+        False, "--all-pages", help="Search all pages, ignoring set-page"
+    ),
 ) -> None:
     """Search a book's chunks using vector similarity."""
     import time
@@ -154,6 +157,12 @@ def search(
     from interactive_books.infra.storage.book_repo import BookRepository
     from interactive_books.infra.storage.chunk_repo import ChunkRepository
     from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
+
+    if page is not None and all_pages:
+        typer.echo("Error: --page and --all-pages are mutually exclusive.", err=True)
+        raise typer.Exit(code=1)
+
+    page_override = 0 if all_pages else page
 
     api_key = _require_env("OPENAI_API_KEY")
     db = _open_db(enable_vec=True)
@@ -172,7 +181,7 @@ def search(
                 f"[verbose] Provider: {provider.provider_name}, Dimension: {provider.dimension}"
             )
         t0 = time.monotonic()
-        results = use_case.execute(book_id, query, top_k=top_k, page_override=page)
+        results = use_case.execute(book_id, query, top_k=top_k, page_override=page_override)
         elapsed = time.monotonic() - t0
         if _verbose:
             typer.echo(

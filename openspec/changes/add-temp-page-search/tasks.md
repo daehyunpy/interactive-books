@@ -16,7 +16,13 @@
 - [x] 3.1 Add `--page` / `-p` option to `search` command in `main.py` (type `int | None`, default `None`)
 - [x] 3.2 Pass `page_override=page` to `use_case.execute()`
 
-## 4. Verification
+## 4. CLI — `--all-pages` alias
 
-- [x] 4.1 Run full test suite (`uv run pytest -x`) — all tests pass
-- [x] 4.2 Run lint and type checks (`uv run ruff check .` and `uv run pyright`) — clean
+- [x] 4.1 Add `--all-pages` boolean flag to `search` command, mutually exclusive with `--page`
+- [x] 4.2 When `--all-pages` is set, pass `page_override=0` to `use_case.execute()`
+- [x] 4.3 Raise error if both `--page` and `--all-pages` are provided
+
+## 5. Verification
+
+- [x] 5.1 Run full test suite (`uv run pytest -x`) — all tests pass
+- [x] 5.2 Run lint and type checks (`uv run ruff check .` and `uv run pyright`) — clean
