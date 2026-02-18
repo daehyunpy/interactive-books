@@ -1,6 +1,5 @@
-import Testing
-
 @testable import InteractiveBooksCore
+import Testing
 
 @Suite("StorageError")
 struct StorageErrorTests {

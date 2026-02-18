@@ -8,7 +8,7 @@ public struct PromptMessage: @unchecked Sendable, Equatable {
         role: String,
         content: String,
         toolUseId: String? = nil,
-        toolInvocations: [ToolInvocation] = []
+        toolInvocations: [ToolInvocation] = [],
     ) {
         self.role = role
         self.content = content

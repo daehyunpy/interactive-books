@@ -6,7 +6,7 @@ public struct ChatResponse: @unchecked Sendable {
     public init(
         text: String? = nil,
         toolInvocations: [ToolInvocation] = [],
-        usage: TokenUsage? = nil
+        usage: TokenUsage? = nil,
     ) {
         self.text = text
         self.toolInvocations = toolInvocations

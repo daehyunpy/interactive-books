@@ -1,7 +1,6 @@
 import Foundation
-import Testing
-
 @testable import InteractiveBooksCore
+import Testing
 
 @Suite("BookStatus")
 struct BookStatusTests {

@@ -16,16 +16,16 @@ public struct Chunk: Sendable, Equatable {
         startPage: Int,
         endPage: Int,
         chunkIndex: Int,
-        createdAt: Date = .now
+        createdAt: Date = .now,
     ) throws {
         guard startPage >= 1 else {
             throw BookError.invalidState(
-                "Chunk start_page must be >= 1, got \(startPage)"
+                "Chunk start_page must be >= 1, got \(startPage)",
             )
         }
         guard endPage >= startPage else {
             throw BookError.invalidState(
-                "Chunk end_page (\(endPage)) must be >= start_page (\(startPage))"
+                "Chunk end_page (\(endPage)) must be >= start_page (\(startPage))",
             )
         }
         self.id = id

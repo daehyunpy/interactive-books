@@ -4,6 +4,6 @@ public protocol RetrievalStrategy: Sendable {
         messages: [PromptMessage],
         tools: [ToolDefinition],
         searchFn: @Sendable (String) -> [SearchResult],
-        onEvent: (@Sendable (ChatEvent) -> Void)?
+        onEvent: (@Sendable (ChatEvent) -> Void)?,
     ) async throws -> (String, [ChatMessage])
 }

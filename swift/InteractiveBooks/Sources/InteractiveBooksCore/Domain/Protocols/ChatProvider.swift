@@ -3,6 +3,6 @@ public protocol ChatProvider: Sendable {
     func chat(messages: [PromptMessage]) async throws -> String
     func chatWithTools(
         messages: [PromptMessage],
-        tools: [ToolDefinition]
+        tools: [ToolDefinition],
     ) async throws -> ChatResponse
 }

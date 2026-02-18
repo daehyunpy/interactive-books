@@ -18,7 +18,7 @@ public struct ChatMessage: Sendable, Equatable {
         conversationId: String,
         role: MessageRole,
         content: String,
-        createdAt: Date = .now
+        createdAt: Date = .now,
     ) {
         self.id = id
         self.conversationId = conversationId
