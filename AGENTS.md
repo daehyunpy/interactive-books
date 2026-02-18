@@ -11,8 +11,9 @@ Interactive Books — a local-only iOS/macOS/visionOS app for uploading books an
 - `docs/product_brief.md` — why this product exists (market gap, vision, competitive positioning, expansion roadmap)
 - `docs/product_requirements.md` — what to build (features, user stories, success criteria, privacy)
 - `docs/technical_design.md` — how to build it (architecture, stack, decisions, cross-platform contracts)
+- `docs/app_build_plan.md` — Phase 10 breakdown (Phases A–N for the iOS/macOS/visionOS Swift app)
 
-Read all three before making changes.
+Read all four before making changes to the Swift app.
 
 ## Current State
 
