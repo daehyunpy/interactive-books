@@ -1,10 +1,21 @@
-# Phase Breakdown: iOS/macOS App
+# Phase Breakdown: iOS/macOS/visionOS App
 
-Port the full RAG pipeline to Swift and build a native SwiftUI interface for iOS 26 and macOS 26. The app shares domain semantics, database schema, and prompt templates with the Python CLI but is implemented independently in Swift.
+Port the full RAG pipeline to Swift and build a native SwiftUI interface for iOS 26, macOS 26, and visionOS 2. The app shares domain semantics, database schema, and prompt templates with the Python CLI but is implemented independently in Swift.
 
 ## Overview
 
-The iOS/macOS app is the product's primary interface. It replicates the full Python CLI pipeline — ingestion, embedding, retrieval, and agentic chat — in a native Swift codebase with a SwiftUI frontend. Everything runs on-device except LLM API calls.
+The iOS/macOS/visionOS app is the product's primary interface. It replicates the full Python CLI pipeline — ingestion, embedding, retrieval, and agentic chat — in a native Swift codebase with a SwiftUI frontend. Everything runs on-device except LLM API calls.
+
+### Platform Targets
+
+| Platform | Min Version | Status |
+|----------|-------------|--------|
+| iOS      | 26          | Primary target |
+| iPadOS   | 26          | Primary target (shared with iOS) |
+| macOS    | 26          | Primary target |
+| visionOS | 2           | Supported |
+| tvOS     | —           | Not supported (no keyboard, no file import) |
+| watchOS  | —           | Not supported (screen/storage constraints) |
 
 ### CLI-First Approach
 
@@ -42,6 +53,7 @@ Set up the Swift Package, dependencies, tooling, and directory structure.
    - `InteractiveBooksCore` (library) — all business logic
    - `interactive-books` (executable) — ArgumentParser CLI
    - `InteractiveBooks` (app target, added later in Phase J)
+   - Platform targets: `.iOS(.v26)`, `.macOS(.v26)`, `.visionOS(.v2)`
 
 2. **Establish DDD directory structure** — inside `Sources/InteractiveBooksCore/`:
    ```
@@ -495,7 +507,7 @@ Build the book library screen. This is the first SwiftUI phase. Add the app targ
    - Tap → navigate to book detail
 
 4. **Book import flow**:
-   - **iOS**: `.fileImporter` supporting all formats
+   - **iOS / visionOS**: `.fileImporter` supporting all formats
    - **macOS**: File open dialog + drag-and-drop onto library view
    - Show progress during ingestion
    - Handle import errors with user-friendly messages
@@ -525,7 +537,7 @@ Build the book library screen. This is the first SwiftUI phase. Add the app targ
 ### Acceptance Criteria
 
 - Library displays all books with correct metadata
-- Import works on both iOS and macOS
+- Import works on iOS, macOS, and visionOS
 - Ingestion progress is visible
 - Navigation is declarative and type-safe
 - Empty states shown when appropriate
@@ -581,7 +593,7 @@ Build the conversation interface — the app's core interaction.
 
 ## Phase L: SwiftUI — Settings & Platform Adaptations
 
-Settings screen, Keychain integration, and iOS/macOS-specific navigation.
+Settings screen, Keychain integration, and platform-specific navigation for iOS, macOS, and visionOS.
 
 ### Tasks
 
@@ -605,13 +617,22 @@ Settings screen, Keychain integration, and iOS/macOS-specific navigation.
    - Library → Book Detail → Chat
    - Settings from tab bar or navigation bar
 
-6. **macOS drag-and-drop** — drop files onto library view to import.
+6. **visionOS navigation** — adapted from iOS stack navigation:
+   - `NavigationStack` in a window
+   - Library → Book Detail → Chat
+   - Settings via ornament or toolbar
+   - Use system-standard window sizing and placement
+   - No custom volumes or immersive spaces needed — standard windowed app
 
-7. **iOS Files picker** — `.fileImporter` with UTType filters.
+7. **macOS drag-and-drop** — drop files onto library view to import.
 
-8. **Keyboard shortcuts (macOS)** — `Cmd+N` (new conversation), `Cmd+O` (import), `Enter` (send), `Cmd+,` (settings).
+8. **iOS Files picker** — `.fileImporter` with UTType filters.
 
-9. **Platform-specific styling** — adapt spacing, font sizes, layout while sharing core views.
+9. **visionOS file import** — `.fileImporter` (same as iOS; visionOS supports the document picker).
+
+10. **Keyboard shortcuts (macOS)** — `Cmd+N` (new conversation), `Cmd+O` (import), `Enter` (send), `Cmd+,` (settings).
+
+11. **Platform-specific styling** — adapt spacing, font sizes, layout while sharing core views. Use `#if os()` conditional compilation where needed; keep platform branches minimal.
 
 ### Acceptance Criteria
 
@@ -619,8 +640,9 @@ Settings screen, Keychain integration, and iOS/macOS-specific navigation.
 - API keys stored in Keychain (never UserDefaults or disk)
 - Switching embedding provider warns about re-indexing
 - macOS uses sidebar navigation, iOS uses stack navigation
-- Drag-and-drop works on macOS, Files picker on iOS
-- Core views are shared; platform-specific code is minimal
+- visionOS uses windowed navigation adapted from iOS
+- Drag-and-drop works on macOS, Files picker on iOS and visionOS
+- Core views are shared; platform-specific code is minimal (`#if os()` branches only where necessary)
 
 ---
 
@@ -736,7 +758,7 @@ End-to-end testing, performance, and UX polish.
 
 ### Acceptance Criteria
 
-- Full pipeline works end-to-end on both platforms
+- Full pipeline works end-to-end on all platforms (iOS, macOS, visionOS)
 - Background processing doesn't block UI
 - All error states show actionable messages
 - Loading and empty states are present
