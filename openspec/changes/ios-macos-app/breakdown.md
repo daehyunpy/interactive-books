@@ -1,6 +1,6 @@
 # Phase Breakdown: iOS/macOS/visionOS App
 
-Port the full RAG pipeline to Swift and build a native SwiftUI interface for iOS 26, macOS 26, and visionOS 2. The app shares domain semantics, database schema, and prompt templates with the Python CLI but is implemented independently in Swift.
+Port the full RAG pipeline to Swift and build a native SwiftUI interface for iOS 26, macOS 26, and visionOS 26. The app shares domain semantics, database schema, and prompt templates with the Python CLI but is implemented independently in Swift.
 
 ## Overview
 
@@ -13,7 +13,7 @@ The iOS/macOS/visionOS app is the product's primary interface. It replicates the
 | iOS      | 26          | Primary target |
 | iPadOS   | 26          | Primary target (shared with iOS) |
 | macOS    | 26          | Primary target |
-| visionOS | 2           | Supported |
+| visionOS | 26          | Supported |
 | tvOS     | —           | Not supported (no keyboard, no file import) |
 | watchOS  | —           | Not supported (screen/storage constraints) |
 
@@ -53,7 +53,7 @@ Set up the Swift Package, dependencies, tooling, and directory structure.
    - `InteractiveBooksCore` (library) — all business logic
    - `interactive-books` (executable) — ArgumentParser CLI
    - `InteractiveBooks` (app target, added later in Phase J)
-   - Platform targets: `.iOS(.v26)`, `.macOS(.v26)`, `.visionOS(.v2)`
+   - Platform targets: `.iOS(.v26)`, `.macOS(.v26)`, `.visionOS(.v26)`
 
 2. **Establish DDD directory structure** — inside `Sources/InteractiveBooksCore/`:
    ```
