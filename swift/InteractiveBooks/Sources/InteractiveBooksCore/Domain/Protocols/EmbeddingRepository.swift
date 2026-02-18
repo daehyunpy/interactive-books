@@ -4,7 +4,7 @@ public protocol EmbeddingRepository: Sendable {
         providerName: String,
         dimension: Int,
         bookId: String,
-        embeddings: [EmbeddingVector]
+        embeddings: [EmbeddingVector],
     ) throws
     func deleteByBook(providerName: String, dimension: Int, bookId: String) throws
     func hasEmbeddings(bookId: String, providerName: String, dimension: Int) throws -> Bool
@@ -13,6 +13,6 @@ public protocol EmbeddingRepository: Sendable {
         dimension: Int,
         bookId: String,
         queryVector: [Float],
-        topK: Int
+        topK: Int,
     ) throws -> [(chunkId: String, distance: Float)]
 }

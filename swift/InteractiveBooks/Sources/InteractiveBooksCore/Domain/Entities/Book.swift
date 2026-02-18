@@ -25,7 +25,7 @@ public final class Book: @unchecked Sendable, Equatable {
         embeddingProvider: String? = nil,
         embeddingDimension: Int? = nil,
         createdAt: Date = .now,
-        updatedAt: Date = .now
+        updatedAt: Date = .now,
     ) throws {
         guard !title.trimmingCharacters(in: .whitespaces).isEmpty else {
             throw BookError.invalidState("Book title cannot be empty")
@@ -43,7 +43,7 @@ public final class Book: @unchecked Sendable, Equatable {
     public func startIngestion() throws {
         guard status == .pending else {
             throw BookError.invalidState(
-                "Cannot start ingestion from '\(status.rawValue)' status"
+                "Cannot start ingestion from '\(status.rawValue)' status",
             )
         }
         status = .ingesting
@@ -52,7 +52,7 @@ public final class Book: @unchecked Sendable, Equatable {
     public func completeIngestion() throws {
         guard status == .ingesting else {
             throw BookError.invalidState(
-                "Cannot complete ingestion from '\(status.rawValue)' status"
+                "Cannot complete ingestion from '\(status.rawValue)' status",
             )
         }
         status = .ready
@@ -61,7 +61,7 @@ public final class Book: @unchecked Sendable, Equatable {
     public func failIngestion() throws {
         guard status == .ingesting else {
             throw BookError.invalidState(
-                "Cannot fail ingestion from '\(status.rawValue)' status"
+                "Cannot fail ingestion from '\(status.rawValue)' status",
             )
         }
         status = .failed
@@ -74,7 +74,7 @@ public final class Book: @unchecked Sendable, Equatable {
     public func setCurrentPage(_ page: Int) throws {
         guard page >= 0 else {
             throw BookError.invalidState(
-                "Current page cannot be negative: \(page)"
+                "Current page cannot be negative: \(page)",
             )
         }
         currentPage = page

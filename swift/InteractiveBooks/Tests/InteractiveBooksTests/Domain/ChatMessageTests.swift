@@ -1,7 +1,6 @@
 import Foundation
-import Testing
-
 @testable import InteractiveBooksCore
+import Testing
 
 @Suite("MessageRole")
 struct MessageRoleTests {
@@ -21,7 +20,7 @@ struct ChatMessageCreationTests {
             id: "m1",
             conversationId: "conv1",
             role: .user,
-            content: "Hello"
+            content: "Hello",
         )
         #expect(message.id == "m1")
         #expect(message.conversationId == "conv1")
@@ -37,11 +36,11 @@ struct ChatMessageEquatableTests {
         let date = Date()
         let msg1 = ChatMessage(
             id: "m1", conversationId: "conv1",
-            role: .user, content: "Hello", createdAt: date
+            role: .user, content: "Hello", createdAt: date,
         )
         let msg2 = ChatMessage(
             id: "m1", conversationId: "conv1",
-            role: .user, content: "Hello", createdAt: date
+            role: .user, content: "Hello", createdAt: date,
         )
         #expect(msg1 == msg2)
     }
@@ -51,11 +50,11 @@ struct ChatMessageEquatableTests {
         let date = Date()
         let msg1 = ChatMessage(
             id: "m1", conversationId: "conv1",
-            role: .user, content: "Hello", createdAt: date
+            role: .user, content: "Hello", createdAt: date,
         )
         let msg2 = ChatMessage(
             id: "m1", conversationId: "conv1",
-            role: .user, content: "World", createdAt: date
+            role: .user, content: "World", createdAt: date,
         )
         #expect(msg1 != msg2)
     }

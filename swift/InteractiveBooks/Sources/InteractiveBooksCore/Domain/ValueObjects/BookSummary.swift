@@ -12,7 +12,7 @@ public struct BookSummary: Sendable, Equatable {
         status: BookStatus,
         chunkCount: Int,
         embeddingProvider: String?,
-        currentPage: Int
+        currentPage: Int,
     ) {
         self.id = id
         self.title = title

@@ -10,7 +10,7 @@ public struct SearchResult: Sendable, Equatable {
         content: String,
         startPage: Int,
         endPage: Int,
-        distance: Float
+        distance: Float,
     ) {
         self.chunkId = chunkId
         self.content = content
