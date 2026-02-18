@@ -149,6 +149,12 @@ def search(
     ),
 ) -> None:
     """Search a book's chunks using vector similarity."""
+    if page is not None and all_pages:
+        typer.echo("Error: --page and --all-pages are mutually exclusive.", err=True)
+        raise typer.Exit(code=1)
+
+    page_override = 0 if all_pages else page
+
     import time
 
     from interactive_books.app.search import SearchBooksUseCase
@@ -157,12 +163,6 @@ def search(
     from interactive_books.infra.storage.book_repo import BookRepository
     from interactive_books.infra.storage.chunk_repo import ChunkRepository
     from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
-
-    if page is not None and all_pages:
-        typer.echo("Error: --page and --all-pages are mutually exclusive.", err=True)
-        raise typer.Exit(code=1)
-
-    page_override = 0 if all_pages else page
 
     api_key = _require_env("OPENAI_API_KEY")
     db = _open_db(enable_vec=True)
