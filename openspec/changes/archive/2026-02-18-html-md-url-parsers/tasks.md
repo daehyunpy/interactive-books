@@ -70,7 +70,7 @@
   - Raise `BookError(PARSE_FAILED)` if all text is empty
   - Return `list[PageContent]` with sequential page numbers
 - [x] Verify all Markdown parser tests pass
-- [ ] Verify pyright passes
+- [x] Verify pyright passes
 
 ## 9.6 — Infrastructure: URL parser
 
@@ -99,7 +99,7 @@
   - Raise `BookError(FETCH_FAILED)` if extracted text is empty
   - Return `[PageContent(page_number=1, text=extracted_text)]`
 - [x] Verify all URL parser tests pass (using httpx mock transport or monkeypatch)
-- [ ] Verify pyright passes
+- [x] Verify pyright passes
 
 ## 9.7 — Application: extend IngestBookUseCase for HTML, MD, and URL
 

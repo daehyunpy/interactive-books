@@ -6,13 +6,13 @@ Book ingestion pipeline: parsing, chunking, persistence, and optional auto-embed
 
 ### Requirement: IngestBookUseCase orchestrates the ingestion pipeline
 
-The application layer SHALL provide an `IngestBookUseCase` class in `app/ingest.py` that accepts `BookParser` instances (pdf, txt, epub, docx), `TextChunker`, `BookRepository`, and `ChunkRepository` via constructor injection. It SHALL also accept an optional `embed_use_case: EmbedBookUseCase | None = None` parameter. Parser selection SHALL use a `dict[str, BookParser]` mapping keyed by file extension.
+The application layer SHALL provide an `IngestBookUseCase` class in `app/ingest.py` that accepts `BookParser` instances (pdf, txt, epub, docx, html, md), a `UrlParser` instance, `TextChunker`, `BookRepository`, and `ChunkRepository` via constructor injection. It SHALL also accept an optional `embed_use_case: EmbedBookUseCase | None = None` parameter. Parser selection for file-based sources SHALL use a `dict[str, BookParser]` mapping keyed by file extension. The `url_parser` SHALL be stored separately for URL source handling.
 
-It SHALL expose an `execute(file_path: Path, title: str) -> tuple[Book, Exception | None]` method that:
+It SHALL expose an `execute(source: Path | str, title: str) -> tuple[Book, Exception | None]` method that:
 
-1. Validates file extension (`.pdf`, `.txt`, `.epub`, or `.docx`); raises `BookError(UNSUPPORTED_FORMAT)` otherwise
+1. Validates source: if `source` is a `str` starting with `http://` or `https://`, accepts as URL; otherwise validates file extension (`.pdf`, `.txt`, `.epub`, `.docx`, `.html`, or `.md`); raises `BookError(UNSUPPORTED_FORMAT)` for unsupported extensions
 2. Creates a `Book` entity, transitions to INGESTING, saves
-3. Parses the file with the appropriate parser
+3. Parses the source: URL sources delegate to `url_parser.parse_url(source)`; file sources use the extension-based parser mapping
 4. Chunks the parsed pages
 5. Persists chunks via `ChunkRepository.save_chunks()`
 6. Transitions to READY, saves
@@ -28,6 +28,26 @@ It SHALL expose an `execute(file_path: Path, title: str) -> tuple[Book, Exceptio
 
 - **WHEN** `execute` is called with a valid TXT file path and title
 - **THEN** a `Book` is created with status `READY`, chunks are persisted, and `(book, None)` is returned
+
+#### Scenario: Successful ingestion of an HTML file
+
+- **WHEN** `execute` is called with a valid HTML file path and title
+- **THEN** a `Book` is created with status `READY`, chunks are persisted, and `(book, None)` is returned
+
+#### Scenario: Successful ingestion of a Markdown file
+
+- **WHEN** `execute` is called with a valid Markdown file path and title
+- **THEN** a `Book` is created with status `READY`, chunks are persisted, and `(book, None)` is returned
+
+#### Scenario: Successful ingestion of a URL
+
+- **WHEN** `execute` is called with a URL string starting with `https://` and a title
+- **THEN** the URL parser's `parse_url` method is called and `(book, None)` is returned
+
+#### Scenario: URL fetch failure during ingestion
+
+- **WHEN** the URL parser raises `BookError(FETCH_FAILED)`
+- **THEN** the book is saved with status FAILED and the error is re-raised
 
 #### Scenario: Successful ingestion with auto-embed
 
@@ -70,7 +90,7 @@ The use case SHALL transition the `Book` through status states: PENDING → INGE
 
 ### Requirement: File format determines parser selection
 
-The use case SHALL select the appropriate `BookParser` based on file extension using a `dict[str, BookParser]` mapping: `.pdf` uses the PDF parser, `.txt` uses the plain text parser, `.epub` uses the EPUB parser, `.docx` uses the DOCX parser. Unsupported extensions SHALL raise `BookError` with code `UNSUPPORTED_FORMAT` before creating a `Book`.
+The use case SHALL select the appropriate `BookParser` based on file extension using a `dict[str, BookParser]` mapping: `.pdf` uses the PDF parser, `.txt` uses the plain text parser, `.epub` uses the EPUB parser, `.docx` uses the DOCX parser, `.html` uses the HTML parser, `.md` uses the Markdown parser. Unsupported extensions SHALL raise `BookError` with code `UNSUPPORTED_FORMAT` before creating a `Book`.
 
 #### Scenario: PDF file selects PDF parser
 
@@ -91,6 +111,16 @@ The use case SHALL select the appropriate `BookParser` based on file extension u
 
 - **WHEN** a file with `.docx` extension is provided
 - **THEN** the DOCX parser is used for extraction
+
+#### Scenario: HTML file selects HTML parser
+
+- **WHEN** a file with `.html` extension is provided
+- **THEN** the HTML parser is used for extraction
+
+#### Scenario: Markdown file selects Markdown parser
+
+- **WHEN** a file with `.md` extension is provided
+- **THEN** the Markdown parser is used for extraction
 
 #### Scenario: DRM-protected EPUB rejected during ingestion
 
@@ -118,7 +148,7 @@ The use case SHALL convert `ChunkData` objects from the chunker into `Chunk` dom
 
 ### Requirement: CLI ingest command wires the pipeline
 
-The CLI SHALL provide an `ingest` command that accepts a file path and optional `--title` (defaulting to filename stem). It SHALL construct `IngestBookUseCase` with parsers, chunker, and repositories. If `OPENAI_API_KEY` is available in the environment, it SHALL also construct `EmbedBookUseCase` and pass it as `embed_use_case` to `IngestBookUseCase` for auto-embedding.
+The CLI SHALL provide an `ingest` command that accepts a file path or URL and optional `--title` (defaulting to filename stem for files, last path segment for URLs). It SHALL construct `IngestBookUseCase` with parsers (including HTML, Markdown, and URL parsers), chunker, and repositories. It SHALL detect URLs by prefix (`http://` or `https://`). If `OPENAI_API_KEY` is available in the environment, it SHALL also construct `EmbedBookUseCase` and pass it as `embed_use_case` to `IngestBookUseCase` for auto-embedding.
 
 After successful execution, the command SHALL print:
 
