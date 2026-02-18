@@ -62,5 +62,5 @@
 ## 5. Verification
 
 - [x] 5.1 Verify all domain files have zero imports from Infra/ or third-party packages (only Foundation allowed)
-- [ ] 5.2 Verify `swift build` succeeds
-- [ ] 5.3 Verify `swift test` passes — all domain invariant tests green
+- [x] 5.2 Verify `swift build` succeeds
+- [x] 5.3 Verify `swift test` passes — all domain invariant tests green
