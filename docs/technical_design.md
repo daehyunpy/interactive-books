@@ -153,7 +153,7 @@ interactive-books/
 
 | Category             | Choice                  | Notes                                                      |
 | -------------------- | ----------------------- | ---------------------------------------------------------- |
-| Min deployment       | iOS 26 / macOS 26 / visionOS 2 | Latest APIs, multiplatform SwiftUI                  |
+| Min deployment       | iOS 26 / macOS 26 / visionOS 26 | Latest APIs, multiplatform SwiftUI                 |
 | UI framework         | SwiftUI                 | Multiplatform target (iOS + macOS + visionOS)              |
 | Storage              | SwiftData               | Modern stack, native                                       |
 | Testing              | Swift Testing           | Apple's modern test framework (@Test, #expect)             |
@@ -196,7 +196,7 @@ interactive-books/
 | Chunk size & overlap       | Pluggable (configurable)                   | Default: 500 tokens, 100 overlap. Adjustable per strategy.                              |
 | Top-k retrieval            | Pluggable (configurable)                   | Default: 5. Adjustable per query.                                                       |
 | Project structure          | DDD (Domain-Driven Design)                 | Clean separation of domains                                                             |
-| Min deployment             | iOS 26 / macOS 26 / visionOS 2             | Latest APIs, multiplatform SwiftUI                                                      |
+| Min deployment             | iOS 26 / macOS 26 / visionOS 26            | Latest APIs, multiplatform SwiftUI                                                      |
 | Python version             | 3.13                                       | Latest stable                                                                           |
 | Python config              | pydantic-settings                          | Type-safe validation; direnv as dev convenience layer                                   |
 | Python type checking       | pyright                                    | Fast, strict, powers Pylance; catches bugs at dev time                                  |

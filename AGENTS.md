@@ -209,7 +209,7 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 ## What NOT to Do
 
 - Don't add a backend server, remote database, or web interface
-- Don't target below iOS 26 / macOS 26 / visionOS 2
+- Don't target below iOS 26 / macOS 26 / visionOS 26
 - Don't use Core Data — we use SwiftData
 - Don't hardcode a single LLM provider — always go through the protocol abstraction
 - Don't write code without a failing test first
