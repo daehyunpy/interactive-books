@@ -39,8 +39,8 @@ class TestSaveEmbeddings:
         repo.ensure_table(PROVIDER, DIMENSION)
 
         embeddings = [
-            EmbeddingVector(chunk_id="chunk-1", vector=[0.1] * DIMENSION),
-            EmbeddingVector(chunk_id="chunk-2", vector=[0.2] * DIMENSION),
+            EmbeddingVector(chunk_id="chunk-1", vector=[0.1] * DIMENSION, start_page=1, end_page=5),
+            EmbeddingVector(chunk_id="chunk-2", vector=[0.2] * DIMENSION, start_page=6, end_page=10),
         ]
         repo.save_embeddings(PROVIDER, DIMENSION, "book-1", embeddings)
 
@@ -57,10 +57,10 @@ class TestDeleteByBook:
         repo.ensure_table(PROVIDER, DIMENSION)
 
         book1_embeddings = [
-            EmbeddingVector(chunk_id="b1-c1", vector=[0.1] * DIMENSION),
+            EmbeddingVector(chunk_id="b1-c1", vector=[0.1] * DIMENSION, start_page=1, end_page=1),
         ]
         book2_embeddings = [
-            EmbeddingVector(chunk_id="b2-c1", vector=[0.2] * DIMENSION),
+            EmbeddingVector(chunk_id="b2-c1", vector=[0.2] * DIMENSION, start_page=1, end_page=1),
         ]
         repo.save_embeddings(PROVIDER, DIMENSION, "book-1", book1_embeddings)
         repo.save_embeddings(PROVIDER, DIMENSION, "book-2", book2_embeddings)
@@ -81,9 +81,9 @@ class TestSearch:
         """Seed 3 vectors in 3D space with known distances from [1,0,0]."""
         repo.ensure_table(PROVIDER, SEARCH_DIM)
         embeddings = [
-            EmbeddingVector(chunk_id="close", vector=[0.9, 0.0, 0.0]),
-            EmbeddingVector(chunk_id="mid", vector=[0.5, 0.5, 0.0]),
-            EmbeddingVector(chunk_id="far", vector=[0.0, 1.0, 0.0]),
+            EmbeddingVector(chunk_id="close", vector=[0.9, 0.0, 0.0], start_page=1, end_page=5),
+            EmbeddingVector(chunk_id="mid", vector=[0.5, 0.5, 0.0], start_page=6, end_page=10),
+            EmbeddingVector(chunk_id="far", vector=[0.0, 1.0, 0.0], start_page=11, end_page=15),
         ]
         repo.save_embeddings(PROVIDER, SEARCH_DIM, book_id, embeddings)
 
@@ -100,6 +100,18 @@ class TestSearch:
         # distances should be ascending
         distances = [r[1] for r in results]
         assert distances[0] < distances[1] < distances[2]
+
+    def test_returns_page_ranges_with_results(
+        self, repo: EmbeddingRepository
+    ) -> None:
+        self._seed_vectors(repo, "book-1")
+
+        results = repo.search(PROVIDER, SEARCH_DIM, "book-1", [1.0, 0.0, 0.0], top_k=3)
+
+        # Each result is (chunk_id, distance, start_page, end_page)
+        assert len(results[0]) == 4
+        assert results[0][2] == 1  # close: start_page
+        assert results[0][3] == 5  # close: end_page
 
     def test_respects_top_k(self, repo: EmbeddingRepository) -> None:
         self._seed_vectors(repo, "book-1")
@@ -124,7 +136,7 @@ class TestSearch:
             PROVIDER,
             SEARCH_DIM,
             "book-2",
-            [EmbeddingVector(chunk_id="b2-close", vector=[0.99, 0.0, 0.0])],
+            [EmbeddingVector(chunk_id="b2-close", vector=[0.99, 0.0, 0.0], start_page=1, end_page=1)],
         )
 
         results = repo.search(PROVIDER, SEARCH_DIM, "book-1", [1.0, 0.0, 0.0], top_k=5)
@@ -139,7 +151,7 @@ class TestHasEmbeddings:
         self, repo: EmbeddingRepository
     ) -> None:
         repo.ensure_table(PROVIDER, DIMENSION)
-        embeddings = [EmbeddingVector(chunk_id="c1", vector=[0.1] * DIMENSION)]
+        embeddings = [EmbeddingVector(chunk_id="c1", vector=[0.1] * DIMENSION, start_page=1, end_page=1)]
         repo.save_embeddings(PROVIDER, DIMENSION, "book-1", embeddings)
 
         assert repo.has_embeddings("book-1", PROVIDER, DIMENSION) is True
@@ -151,7 +163,7 @@ class TestHasEmbeddings:
 
     def test_returns_false_after_deletion(self, repo: EmbeddingRepository) -> None:
         repo.ensure_table(PROVIDER, DIMENSION)
-        embeddings = [EmbeddingVector(chunk_id="c1", vector=[0.1] * DIMENSION)]
+        embeddings = [EmbeddingVector(chunk_id="c1", vector=[0.1] * DIMENSION, start_page=1, end_page=1)]
         repo.save_embeddings(PROVIDER, DIMENSION, "book-1", embeddings)
         repo.delete_by_book(PROVIDER, DIMENSION, "book-1")
 

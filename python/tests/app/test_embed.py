@@ -112,7 +112,7 @@ class FakeEmbeddingRepository:
         book_id: str,
         query_vector: list[float],
         top_k: int,
-    ) -> list[tuple[str, float]]:
+    ) -> list[tuple[str, float, int, int]]:
         return []
 
     def count_for_book(self, book_id: str, provider_name: str, dimension: int) -> int:

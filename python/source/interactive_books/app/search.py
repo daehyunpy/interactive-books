@@ -56,22 +56,21 @@ class SearchBooksUseCase:
         if not hits:
             return []
 
-        chunks = self._chunk_repo.get_by_book(book_id)
-        chunk_map = {c.id: c for c in chunks}
+        chunk_map = {c.id: c for c in self._chunk_repo.get_by_book(book_id)}
 
         results: list[SearchResult] = []
-        for chunk_id, distance in hits:
+        for chunk_id, distance, start_page, end_page in hits:
+            if page_filtering and start_page > effective_page:
+                continue
             chunk = chunk_map.get(chunk_id)
             if chunk is None:
-                continue
-            if page_filtering and chunk.start_page > effective_page:
                 continue
             results.append(
                 SearchResult(
                     chunk_id=chunk_id,
                     content=chunk.content,
-                    start_page=chunk.start_page,
-                    end_page=chunk.end_page,
+                    start_page=start_page,
+                    end_page=end_page,
                     distance=distance,
                 )
             )

@@ -218,6 +218,59 @@ class TestChunkRepository:
 
         assert repo.count_by_book("b1") == 0
 
+    def test_get_by_page_returns_overlapping_chunks(self, db: Database) -> None:
+        _make_book(db)
+        repo = ChunkRepository(db)
+        chunks = [
+            Chunk(
+                id="c1",
+                book_id="b1",
+                content="Pages 1-3",
+                start_page=1,
+                end_page=3,
+                chunk_index=0,
+            ),
+            Chunk(
+                id="c2",
+                book_id="b1",
+                content="Pages 3-5",
+                start_page=3,
+                end_page=5,
+                chunk_index=1,
+            ),
+            Chunk(
+                id="c3",
+                book_id="b1",
+                content="Pages 7-9",
+                start_page=7,
+                end_page=9,
+                chunk_index=2,
+            ),
+        ]
+        repo.save_chunks("b1", chunks)
+
+        result = repo.get_by_page("b1", 3)
+        assert len(result) == 2
+        assert {c.id for c in result} == {"c1", "c2"}
+
+    def test_get_by_page_returns_empty_for_no_overlap(self, db: Database) -> None:
+        _make_book(db)
+        repo = ChunkRepository(db)
+        chunks = [
+            Chunk(
+                id="c1",
+                book_id="b1",
+                content="Pages 1-3",
+                start_page=1,
+                end_page=3,
+                chunk_index=0,
+            ),
+        ]
+        repo.save_chunks("b1", chunks)
+
+        result = repo.get_by_page("b1", 5)
+        assert result == []
+
     def test_chunks_scoped_to_book(self, db: Database) -> None:
         _make_book(db, "b1")
         _make_book(db, "b2")
