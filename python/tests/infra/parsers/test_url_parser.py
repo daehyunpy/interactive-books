@@ -11,7 +11,6 @@ def _mock_transport(
     content_type: str = "text/html",
     headers: dict[str, str] | None = None,
 ) -> httpx.MockTransport:
-    """Create a mock transport that returns a fixed response."""
     all_headers = {"content-type": content_type}
     if headers is not None:
         all_headers.update(headers)
@@ -27,8 +26,6 @@ def _mock_transport(
 
 
 def _no_content_type_transport(content: bytes) -> httpx.MockTransport:
-    """Create a transport that returns no Content-Type header."""
-
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(status_code=200, content=content)
 
@@ -36,8 +33,6 @@ def _no_content_type_transport(content: bytes) -> httpx.MockTransport:
 
 
 def _error_transport() -> httpx.MockTransport:
-    """Create a transport that raises a connection error."""
-
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("Connection refused")
 
