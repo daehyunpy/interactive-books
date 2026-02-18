@@ -4,7 +4,7 @@ Instructions for AI agents working on this codebase. `CLAUDE.md` is a symlink to
 
 ## Project
 
-Interactive Books — a local-only iOS/macOS app for uploading books and chatting about them using RAG. No backend server.
+Interactive Books — a local-only iOS/macOS/visionOS app for uploading books and chatting about them using RAG. No backend server.
 
 ## Key Docs
 
@@ -20,7 +20,7 @@ Read all three before making changes.
 
 The Python CLI can ingest books (PDF, TXT — more formats coming), generate embeddings, run vector search, and have multi-turn agentic conversations about books. The agent decides when to retrieve via tool-use, maintains conversation history, and persists sessions.
 
-**Next up:** Additional format support (EPUB, DOCX, HTML, Markdown, URL), then iOS/macOS app.
+**Next up:** Additional format support (EPUB, DOCX, HTML, Markdown, URL), then iOS/macOS/visionOS app.
 
 Build order: CLI first, bottom-up, one feature at a time.
 
@@ -35,7 +35,7 @@ Build order: CLI first, bottom-up, one feature at a time.
 | 7     | CLI polish                | Done     |
 | 8     | Structured format parsers | **Next** |
 | 9     | Text format parsers       | —        |
-| 10    | iOS/macOS app             | —        |
+| 10    | iOS/macOS/visionOS app    | —        |
 
 See `docs/technical_design.md` → "Build Order" for details on each phase. See "Directory Layout" for the full project tree.
 
@@ -209,7 +209,7 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 ## What NOT to Do
 
 - Don't add a backend server, remote database, or web interface
-- Don't target below iOS 26 / macOS 26
+- Don't target below iOS 26 / macOS 26 / visionOS 2
 - Don't use Core Data — we use SwiftData
 - Don't hardcode a single LLM provider — always go through the protocol abstraction
 - Don't write code without a failing test first
