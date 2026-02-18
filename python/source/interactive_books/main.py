@@ -141,8 +141,20 @@ def search(
     book_id: str = typer.Argument(..., help="ID of the book to search"),
     query: str = typer.Argument(..., help="Search query text"),
     top_k: int = typer.Option(5, "--top-k", "-k", help="Number of results to return"),
+    page: int | None = typer.Option(
+        None, "--page", "-p", help="Temporary page limit (overrides set-page)"
+    ),
+    all_pages: bool = typer.Option(
+        False, "--all-pages", help="Search all pages, ignoring set-page"
+    ),
 ) -> None:
     """Search a book's chunks using vector similarity."""
+    if page is not None and all_pages:
+        typer.echo("Error: --page and --all-pages are mutually exclusive.", err=True)
+        raise typer.Exit(code=1)
+
+    page_override = 0 if all_pages else page
+
     import time
 
     from interactive_books.app.search import SearchBooksUseCase
@@ -169,7 +181,7 @@ def search(
                 f"[verbose] Provider: {provider.provider_name}, Dimension: {provider.dimension}"
             )
         t0 = time.monotonic()
-        results = use_case.execute(book_id, query, top_k=top_k)
+        results = use_case.execute(book_id, query, top_k=top_k, page_override=page_override)
         elapsed = time.monotonic() - t0
         if _verbose:
             typer.echo(
