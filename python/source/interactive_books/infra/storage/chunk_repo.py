@@ -40,6 +40,15 @@ class ChunkRepository(ChunkRepositoryPort):
         )
         return [self._row_to_chunk(row) for row in cursor.fetchall()]
 
+    def get_by_page(self, book_id: str, page: int) -> list[Chunk]:
+        cursor = self._conn.execute(
+            f"SELECT {_CHUNK_COLUMNS} FROM chunks "
+            "WHERE book_id = ? AND start_page <= ? AND end_page >= ? "
+            "ORDER BY chunk_index",
+            (book_id, page, page),
+        )
+        return [self._row_to_chunk(row) for row in cursor.fetchall()]
+
     def get_up_to_page(self, book_id: str, page: int) -> list[Chunk]:
         cursor = self._conn.execute(
             f"SELECT {_CHUNK_COLUMNS} FROM chunks WHERE book_id = ? AND start_page <= ? ORDER BY chunk_index",
