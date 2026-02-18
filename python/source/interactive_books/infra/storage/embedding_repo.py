@@ -26,6 +26,8 @@ class EmbeddingRepository(EmbeddingRepositoryPort):
             CREATE VIRTUAL TABLE IF NOT EXISTS {table} USING vec0(
                 book_id text partition key,
                 +chunk_id text,
+                +start_page integer,
+                +end_page integer,
                 vector float[{dimension}]
             )
             """
@@ -40,8 +42,18 @@ class EmbeddingRepository(EmbeddingRepositoryPort):
     ) -> None:
         table = _table_name(provider_name, dimension)
         self._conn.executemany(
-            f"INSERT INTO {table}(book_id, chunk_id, vector) VALUES (?, ?, ?)",
-            [(book_id, ev.chunk_id, _serialize_f32(ev.vector)) for ev in embeddings],
+            f"INSERT INTO {table}(book_id, chunk_id, start_page, end_page, vector) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [
+                (
+                    book_id,
+                    ev.chunk_id,
+                    ev.start_page,
+                    ev.end_page,
+                    _serialize_f32(ev.vector),
+                )
+                for ev in embeddings
+            ],
         )
         self._conn.commit()
 
@@ -57,14 +69,14 @@ class EmbeddingRepository(EmbeddingRepositoryPort):
         book_id: str,
         query_vector: list[float],
         top_k: int,
-    ) -> list[tuple[str, float]]:
+    ) -> list[tuple[str, float, int, int]]:
         table = _table_name(provider_name, dimension)
         cursor = self._conn.execute(
-            f"SELECT chunk_id, distance FROM {table} "
+            f"SELECT chunk_id, distance, start_page, end_page FROM {table} "
             "WHERE vector MATCH ? AND k = ? AND book_id = ?",
             (_serialize_f32(query_vector), top_k, book_id),
         )
-        return [(row[0], row[1]) for row in cursor.fetchall()]
+        return [(row[0], row[1], row[2], row[3]) for row in cursor.fetchall()]
 
     def has_embeddings(self, book_id: str, provider_name: str, dimension: int) -> bool:
         table = _table_name(provider_name, dimension)
