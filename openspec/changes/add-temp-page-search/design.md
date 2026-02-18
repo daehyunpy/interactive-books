@@ -11,6 +11,7 @@ Users who want a one-off page-filtered search must mutate persistent state (set-
 - Add `page_override: int | None` parameter to `SearchBooksUseCase.execute()`
 - When set, use `page_override` instead of `book.current_page` for filtering decisions
 - Add `--page` / `-p` CLI option to the `search` command
+- Add `--all-pages` flag as a readable alias for `--page 0`, mutually exclusive with `--page`
 - Preserve all existing behavior when `page_override` is not provided
 
 **Non-Goals:**
@@ -51,6 +52,17 @@ Then use `effective_page` everywhere `book.current_page` was used.
 **Decision:** `--page` / `-p` as a Typer `Option` with `default=None`, type `int | None`.
 
 **Rationale:** Matches the existing `--top-k` / `-k` pattern. `None` default means the flag is truly optional — omitting it preserves existing behavior. `-p` is the natural short form.
+
+### 4. `--all-pages` flag
+
+**Decision:** Add `--all-pages` boolean flag (default `False`) to the `search` command, mutually exclusive with `--page`. When set, pass `page_override=0` to the use case, which disables page filtering regardless of the persisted `current_page`.
+
+**Rationale:** `--page 0` works but isn't self-documenting — a user reading `--page 0` has to know that `0` means "disable filtering." `--all-pages` makes the intent explicit. Mutual exclusivity is enforced with a guard clause that prints an error and exits with code 1.
+
+**Alternatives considered:**
+
+- Make `--page` accept a string like `"all"`: breaks the `int | None` type, adds parsing complexity
+- Use a `--no-page` flag: double-negative is confusing
 
 ## Risks / Trade-offs
 

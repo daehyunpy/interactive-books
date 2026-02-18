@@ -7,6 +7,7 @@ The `search` command currently filters results based on `book.current_page`, whi
 - Add `page_override: int | None` parameter to `SearchBooksUseCase.execute()`
 - When `page_override` is provided, use it instead of `book.current_page` for filtering
 - Add `--page` / `-p` CLI option to the `search` command
+- Add `--all-pages` CLI flag as a readable alias for `--page 0` (mutually exclusive with `--page`)
 - Pass the CLI option through to the use case
 
 ## Capabilities
@@ -14,7 +15,7 @@ The `search` command currently filters results based on `book.current_page`, whi
 ### Modified Capabilities
 
 - `search-pipeline`: Add `page_override` parameter to `SearchBooksUseCase.execute()`
-- `cli-commands`: Add `--page` / `-p` option to the `search` CLI command
+- `cli-commands`: Add `--page` / `-p` option and `--all-pages` flag to the `search` CLI command
 
 ## Impact
 
