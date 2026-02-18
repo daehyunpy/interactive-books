@@ -9,6 +9,7 @@ from interactive_books.infra.parsers._html_text import extract_block_text
 from interactive_books.infra.parsers.markdown import _split_by_headings
 
 FETCH_TIMEOUT = 30
+SUPPORTED_CONTENT_TYPES = frozenset({"text/html", "text/plain", "text/markdown"})
 
 
 class UrlParser(UrlParserPort):
@@ -28,12 +29,12 @@ class UrlParser(UrlParserPort):
 
     def _fetch(self, url: str) -> httpx.Response:
         try:
-            client = httpx.Client(
+            with httpx.Client(
                 transport=self._transport,
                 timeout=FETCH_TIMEOUT,
                 follow_redirects=True,
-            )
-            response = client.get(url)
+            ) as client:
+                response = client.get(url)
         except httpx.HTTPError as e:
             raise BookError(
                 BookErrorCode.FETCH_FAILED,
@@ -54,8 +55,7 @@ class UrlParser(UrlParserPort):
             return "text/html"
         media_type = raw.split(";")[0].strip().lower()
 
-        supported = {"text/html", "text/plain", "text/markdown"}
-        if media_type not in supported:
+        if media_type not in SUPPORTED_CONTENT_TYPES:
             raise BookError(
                 BookErrorCode.FETCH_FAILED,
                 f"Unsupported content type: {media_type}",

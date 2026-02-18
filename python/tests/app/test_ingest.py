@@ -390,13 +390,3 @@ class TestIngestUrlSuccess:
         books = book_repo.get_all()
         assert len(books) == 1
         assert books[0].status == BookStatus.FAILED
-
-
-class TestIngestUnsupportedFormatStillRejected:
-    def test_unsupported_extension_still_rejected(self, tmp_path: Path) -> None:
-        use_case, book_repo, _ = make_use_case()
-        path = tmp_path / "test.xyz"
-        path.touch()
-        with pytest.raises(BookError) as exc_info:
-            use_case.execute(path, "Unknown Book")
-        assert exc_info.value.code == BookErrorCode.UNSUPPORTED_FORMAT

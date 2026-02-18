@@ -21,7 +21,10 @@ class BookParser(BookParserPort):
         body = tree.body
 
         if body is None:
-            return [PageContent(page_number=1, text="")]
+            raise BookError(
+                BookErrorCode.PARSE_FAILED,
+                f"HTML has no body element: {file_path}",
+            )
 
         extracted = extract_block_text(body)
         if not extracted.strip():

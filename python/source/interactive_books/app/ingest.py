@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from interactive_books.domain.book import Book
 from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.errors import BookError, BookErrorCode
+from interactive_books.domain.page_content import PageContent
 from interactive_books.domain.protocols import (
     BookParser,
     BookRepository,
@@ -54,29 +55,14 @@ class IngestBookUseCase:
     def execute(
         self, source: Path | str, title: str
     ) -> tuple[Book, Exception | None]:
-        is_url = isinstance(source, str) and (
-            source.startswith("http://") or source.startswith("https://")
-        )
-
-        if not is_url:
-            file_path = Path(source) if isinstance(source, str) else source
-            extension = file_path.suffix.lower()
-            if extension not in SUPPORTED_EXTENSIONS:
-                raise BookError(
-                    BookErrorCode.UNSUPPORTED_FORMAT,
-                    f"Unsupported file format: {extension}",
-                )
+        self._validate_source(source)
 
         book = Book(id=str(uuid.uuid4()), title=title)
         book.start_ingestion()
         self._book_repo.save(book)
 
         try:
-            if is_url:
-                pages = self._url_parser.parse_url(str(source))
-            else:
-                parser = self._parsers[extension]  # type: ignore[possibly-undefined]
-                pages = parser.parse(file_path)  # type: ignore[possibly-undefined]
+            pages = self._parse_source(source)
             chunk_data_list = self._chunker.chunk(pages)
 
             chunks = [
@@ -102,6 +88,23 @@ class IngestBookUseCase:
 
         embed_error = self._auto_embed(book)
         return book, embed_error
+
+    def _validate_source(self, source: Path | str) -> None:
+        if isinstance(source, str) and source.startswith(("http://", "https://")):
+            return
+        file_path = Path(source) if isinstance(source, str) else source
+        extension = file_path.suffix.lower()
+        if extension not in SUPPORTED_EXTENSIONS:
+            raise BookError(
+                BookErrorCode.UNSUPPORTED_FORMAT,
+                f"Unsupported file format: {extension}",
+            )
+
+    def _parse_source(self, source: Path | str) -> list[PageContent]:
+        if isinstance(source, str) and source.startswith(("http://", "https://")):
+            return self._url_parser.parse_url(source)
+        file_path = Path(source) if isinstance(source, str) else source
+        return self._parsers[file_path.suffix.lower()].parse(file_path)
 
     def _auto_embed(self, book: Book) -> Exception | None:
         if self._embed_use_case is None:

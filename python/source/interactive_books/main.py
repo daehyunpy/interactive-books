@@ -77,7 +77,7 @@ def ingest(
     from interactive_books.infra.storage.book_repo import BookRepository
     from interactive_books.infra.storage.chunk_repo import ChunkRepository
 
-    is_url = source.startswith("http://") or source.startswith("https://")
+    is_url = source.startswith(("http://", "https://"))
     ingest_source: Path | str = source if is_url else Path(source)
 
     if not title:
