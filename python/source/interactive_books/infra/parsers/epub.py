@@ -7,15 +7,12 @@ from selectolax.parser import HTMLParser
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.domain.page_content import PageContent
 from interactive_books.domain.protocols import BookParser as BookParserPort
+from interactive_books.infra.parsers._html_text import extract_block_text
 
 OPF_NAMESPACE = "http://www.idpf.org/2007/opf"
 CONTAINER_NAMESPACE = "urn:oasis:names:tc:opendocument:xmlns:container"
 CONTAINER_PATH = "META-INF/container.xml"
 ENCRYPTION_PATH = "META-INF/encryption.xml"
-BLOCK_TAGS = frozenset({
-    "p", "div", "h1", "h2", "h3", "h4", "h5", "h6",
-    "li", "blockquote", "tr", "br", "section", "article",
-})
 
 
 class BookParser(BookParserPort):
@@ -121,15 +118,4 @@ class BookParser(BookParserPort):
         body = tree.body
         if body is None:
             return ""
-        return _extract_block_text(body)
-
-
-def _extract_block_text(node: object) -> str:
-    parts: list[str] = []
-    for child in node.iter():  # type: ignore[union-attr]
-        if child.tag in BLOCK_TAGS and parts and parts[-1] != "\n":
-            parts.append("\n")
-        text = child.text(deep=False, strip=False) if hasattr(child, "text") else ""
-        if text:
-            parts.append(text)
-    return "".join(parts).strip()
+        return extract_block_text(body)

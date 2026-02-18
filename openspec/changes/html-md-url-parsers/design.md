@@ -68,11 +68,11 @@ Phase 9 adds HTML, Markdown, and URL parsers as Batch 2 of the multi-format expa
 - Force URL through `BookParser` by saving to temp file: loses Content-Type info, adds temp file management, couples network I/O with file parsing
 - Expand `BookParser` to accept `Path | str`: breaks the clean interface for all existing parsers
 
-### 6. URL Content-Type validation: accept text/html and text/plain only
+### 6. URL Content-Type validation: accept text/html, text/plain, and text/markdown
 
-**Decision:** After fetching the URL response, check the `Content-Type` header. Accept `text/html` (extract via selectolax) and `text/plain` (use raw text). Reject all other content types with `BookError(FETCH_FAILED)`.
+**Decision:** After fetching the URL response, check the `Content-Type` header. Accept `text/html` (extract via selectolax), `text/plain` (use raw text), and `text/markdown` (parse with markdown-it-py for heading-based pages). Reject all other content types with `BookError(FETCH_FAILED)`.
 
-**Rationale:** Product requirements state: "URL returns non-text: Reject with message explaining only text content is supported." Accepting only text/html and text/plain covers the vast majority of web pages and plain text URLs. PDFs, images, and other binary content types are rejected clearly.
+**Rationale:** Product requirements state: "URL returns non-text: Reject with message explaining only text content is supported." Accepting text/html, text/plain, and text/markdown covers web pages, plain text URLs, and raw Markdown URLs (e.g., GitHub raw files). `text/markdown` is a registered IANA media type (RFC 7763). PDFs, images, and other binary content types are rejected clearly.
 
 ### 7. URL error handling: FETCH_FAILED error code
 
