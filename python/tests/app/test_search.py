@@ -66,10 +66,10 @@ class FakeEmbeddingRepository:
     """Fake that returns pre-configured search results."""
 
     def __init__(self) -> None:
-        self._search_results: list[tuple[str, float]] = []
+        self._search_results: list[tuple[str, float, int, int]] = []
         self.last_search_top_k: int | None = None
 
-    def set_search_results(self, results: list[tuple[str, float]]) -> None:
+    def set_search_results(self, results: list[tuple[str, float, int, int]]) -> None:
         self._search_results = results
 
     def ensure_table(self, provider_name: str, dimension: int) -> None:
@@ -97,7 +97,7 @@ class FakeEmbeddingRepository:
         book_id: str,
         query_vector: list[float],
         top_k: int,
-    ) -> list[tuple[str, float]]:
+    ) -> list[tuple[str, float, int, int]]:
         self.last_search_top_k = top_k
         return self._search_results[:top_k]
 
@@ -180,7 +180,7 @@ class TestSearchSuccess:
         book = _ready_book_with_embeddings()
         book_repo.save(book)
         chunk_repo.save_chunks("book-1", _chunks_with_pages())
-        embedding_repo.set_search_results([("c1", 0.1), ("c2", 0.5), ("c3", 0.9)])
+        embedding_repo.set_search_results([("c1", 0.1, 1, 10), ("c2", 0.5, 40, 50), ("c3", 0.9, 80, 90)])
 
         results = use_case.execute("book-1", "test query")
 
@@ -195,7 +195,7 @@ class TestSearchSuccess:
         book = _ready_book_with_embeddings()
         book_repo.save(book)
         chunk_repo.save_chunks("book-1", _chunks_with_pages())
-        embedding_repo.set_search_results([("c1", 0.1)])
+        embedding_repo.set_search_results([("c1", 0.1, 1, 10)])
 
         use_case.execute("book-1", "what is the meaning?")
 
@@ -206,7 +206,7 @@ class TestSearchSuccess:
         book = _ready_book_with_embeddings()
         book_repo.save(book)
         chunk_repo.save_chunks("book-1", _chunks_with_pages())
-        embedding_repo.set_search_results([("c1", 0.1), ("c2", 0.5), ("c3", 0.9)])
+        embedding_repo.set_search_results([("c1", 0.1, 1, 10), ("c2", 0.5, 40, 50), ("c3", 0.9, 80, 90)])
 
         results = use_case.execute("book-1", "query", top_k=2)
 
@@ -242,7 +242,7 @@ class TestPageFiltering:
         book_repo.save(book)
         chunk_repo.save_chunks("book-1", _chunks_with_pages())
         # All 3 returned from vector search, but c3 starts at page 80
-        embedding_repo.set_search_results([("c1", 0.1), ("c2", 0.5), ("c3", 0.9)])
+        embedding_repo.set_search_results([("c1", 0.1, 1, 10), ("c2", 0.5, 40, 50), ("c3", 0.9, 80, 90)])
 
         results = use_case.execute("book-1", "query")
 
@@ -256,7 +256,7 @@ class TestPageFiltering:
         book = _ready_book_with_embeddings(current_page=0)
         book_repo.save(book)
         chunk_repo.save_chunks("book-1", _chunks_with_pages())
-        embedding_repo.set_search_results([("c1", 0.1), ("c2", 0.5), ("c3", 0.9)])
+        embedding_repo.set_search_results([("c1", 0.1, 1, 10), ("c2", 0.5, 40, 50), ("c3", 0.9, 80, 90)])
 
         results = use_case.execute("book-1", "query")
 
@@ -267,7 +267,7 @@ class TestPageFiltering:
         book = _ready_book_with_embeddings(current_page=50)
         book_repo.save(book)
         chunk_repo.save_chunks("book-1", _chunks_with_pages())
-        embedding_repo.set_search_results([("c1", 0.1)])
+        embedding_repo.set_search_results([("c1", 0.1, 1, 10)])
 
         use_case.execute("book-1", "query", top_k=5)
 
@@ -278,7 +278,7 @@ class TestPageFiltering:
         book = _ready_book_with_embeddings(current_page=0)
         book_repo.save(book)
         chunk_repo.save_chunks("book-1", _chunks_with_pages())
-        embedding_repo.set_search_results([("c1", 0.1)])
+        embedding_repo.set_search_results([("c1", 0.1, 1, 10)])
 
         use_case.execute("book-1", "query", top_k=5)
 
@@ -291,7 +291,7 @@ class TestPageOverride:
         book = _ready_book_with_embeddings(current_page=0)  # no filtering by default
         book_repo.save(book)
         chunk_repo.save_chunks("book-1", _chunks_with_pages())
-        embedding_repo.set_search_results([("c1", 0.1), ("c2", 0.5), ("c3", 0.9)])
+        embedding_repo.set_search_results([("c1", 0.1, 1, 10), ("c2", 0.5, 40, 50), ("c3", 0.9, 80, 90)])
 
         results = use_case.execute("book-1", "query", page_override=50)
 
@@ -305,7 +305,7 @@ class TestPageOverride:
         book = _ready_book_with_embeddings(current_page=50)  # filtering active
         book_repo.save(book)
         chunk_repo.save_chunks("book-1", _chunks_with_pages())
-        embedding_repo.set_search_results([("c1", 0.1), ("c2", 0.5), ("c3", 0.9)])
+        embedding_repo.set_search_results([("c1", 0.1, 1, 10), ("c2", 0.5, 40, 50), ("c3", 0.9, 80, 90)])
 
         results = use_case.execute("book-1", "query", page_override=0)
 
@@ -316,7 +316,7 @@ class TestPageOverride:
         book = _ready_book_with_embeddings(current_page=50)
         book_repo.save(book)
         chunk_repo.save_chunks("book-1", _chunks_with_pages())
-        embedding_repo.set_search_results([("c1", 0.1), ("c2", 0.5), ("c3", 0.9)])
+        embedding_repo.set_search_results([("c1", 0.1, 1, 10), ("c2", 0.5, 40, 50), ("c3", 0.9, 80, 90)])
 
         results = use_case.execute("book-1", "query", page_override=None)
 
@@ -328,7 +328,7 @@ class TestPageOverride:
         book = _ready_book_with_embeddings(current_page=0)  # no filtering by default
         book_repo.save(book)
         chunk_repo.save_chunks("book-1", _chunks_with_pages())
-        embedding_repo.set_search_results([("c1", 0.1)])
+        embedding_repo.set_search_results([("c1", 0.1, 1, 10)])
 
         use_case.execute("book-1", "query", top_k=5, page_override=50)
 
