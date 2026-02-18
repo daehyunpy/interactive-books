@@ -25,6 +25,7 @@ When a user starts a chat session about a book, they currently see no overview �
 
 - **New files**: `app/summarize.py` (use case), `domain/section_summary.py` (value object), `shared/prompts/summarization_prompt.md`
 - **Modified files**: `main.py` (CLI commands), `app/chat.py` (summary display integration)
-- **No DB changes**: Summaries are generated on-demand, not persisted (can be cached later)
+- **New DB migration**: `003_add_section_summaries.sql` — `section_summaries` table with FK to `books`
+- **New infra files**: `infra/storage/summary_repo.py` — `SummaryRepository` adapter
 - **New dependency on ChatProvider**: Uses existing Anthropic adapter for LLM summarization
 - **Backward compatible**: Summary display is opt-out; existing chat flow unchanged when `--no-summary` is passed
