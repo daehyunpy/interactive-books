@@ -1,0 +1,41 @@
+disabled_rules:
+  - trailing_comma
+  - opening_brace
+
+opt_in_rules:
+  - empty_count
+  - closure_spacing
+  - contains_over_first_not_nil
+  - fatal_error_message
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - overridden_super_call
+
+excluded:
+  - .build
+  - Package.swift
+
+line_length:
+  warning: 120
+  error: 150
+  ignores_comments: true
+
+type_body_length:
+  warning: 300
+  error: 500
+
+file_length:
+  warning: 500
+  error: 1000
+
+function_body_length:
+  warning: 30
+  error: 50
+
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  max_length:
+    warning: 50
+    error: 60
