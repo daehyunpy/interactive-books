@@ -34,6 +34,19 @@ FIXTURE_DIR = Path(__file__).resolve().parents[3] / "shared" / "fixtures"
 PDF_1984 = FIXTURE_DIR / "1984.pdf"
 FAKE_PROVIDER = "fake"
 FAKE_DIMENSION = 4
+LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
+
+
+def _is_lfs_pointer(path: Path) -> bool:
+    """Return True if the file is an unresolved Git LFS pointer."""
+    with open(path, "rb") as f:
+        return f.read(len(LFS_POINTER_PREFIX)) == LFS_POINTER_PREFIX
+
+
+_skip_no_lfs = pytest.mark.skipif(
+    not PDF_1984.exists() or _is_lfs_pointer(PDF_1984),
+    reason="1984.pdf not available (Git LFS not pulled)",
+)
 
 
 class HashEmbeddingProvider:
@@ -174,6 +187,7 @@ def ingested_1984(
     )
 
 
+@_skip_no_lfs
 class TestSpoilerPreventionIntegration:
     """Full pipeline: ingest 1984.pdf → embed → search with page filtering."""
 
