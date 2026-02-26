@@ -36,9 +36,11 @@ The existing test infrastructure uses in-memory SQLite (`Database(":memory:")`) 
 **DB setup details:**
 - Copy the LFS `.db` file to a temp directory at test start (avoids modifying the fixture)
 - Open with `Database(tmp_copy, enable_vec=True)` and skip migrations (already applied)
-- The book's `current_page` will be set to a known midpoint before each test
+- The book's `current_page` will be set to a natural chapter boundary from the chunk data
 
-**Trade-off:** The DB is coupled to a specific embedding provider and dimension. If the provider changes, the fixture must be regenerated. This is acceptable because the fixture is easy to rebuild via a script.
+**Fixture creation:** Build the DB manually (ingest 1984, embed, verify), then commit the `.db` file to Git LFS. No build script — the DB is a static fixture that rarely needs regeneration.
+
+**Trade-off:** The DB is coupled to a specific embedding provider and dimension. If the provider changes, the fixture must be manually rebuilt. This is acceptable because provider changes are rare and the rebuild process is straightforward (ingest → embed → copy `.db`).
 
 ### 2. Real Anthropic ChatProvider for the agent
 
@@ -67,6 +69,8 @@ The existing test infrastructure uses in-memory SQLite (`Database(":memory:")`) 
 **Decision:** Organize tests into two classes:
 - `TestSpoilerPreventionViaSearch` — User asks about content the LLM *should* find via search (content exists in early pages). Verifies the agent uses `search_book` and the response stays within bounds.
 - `TestSpoilerPreventionViaKnowledge` — User asks a leading question about late-book content (e.g., "How does the book end?"). The search returns no results (page-filtered), and we verify the agent doesn't answer from parametric knowledge.
+
+**Test count:** 2–3 focused scenarios total — one per spoiler vector, plus an optional edge case. Keeps API cost and runtime low while covering both leak paths.
 
 **Rationale:** These are the two spoiler leak vectors. The first tests that the search pipeline + agent work together correctly. The second tests that the system prompt prevents knowledge leakage when search can't help.
 
@@ -101,7 +105,7 @@ Test setup:
 
 Test flow:
   1. Copy fixture DB → tmp_path
-  2. Open Database, set book.current_page = midpoint
+  2. Open Database, set book.current_page = chapter boundary
   3. Create fresh Conversation
   4. Call use_case.execute(conversation_id, spoiler_question)
   5. Pass response to judge LLM → verdict (YES spoiler / NO safe)
@@ -110,5 +114,4 @@ Test flow:
 
 **File layout:**
 - `python/tests/app/test_spoiler_agent.py` — test file with both scenario classes
-- `shared/fixtures/1984_embedded.db` — pre-built SQLite DB in Git LFS
-- `scripts/build_spoiler_fixture.py` (optional) — script to regenerate the fixture DB
+- `shared/fixtures/1984_embedded.db` — pre-built SQLite DB in Git LFS (manually built, no generation script)
