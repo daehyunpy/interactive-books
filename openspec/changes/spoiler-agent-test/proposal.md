@@ -11,10 +11,10 @@ This change adds an **agent-level spoiler prevention test** that exercises the f
 
 ## What Changes
 
-- Add integration tests in `tests/app/test_spoiler_agent.py` that exercise `ChatWithBookUseCase` end-to-end with a controlled `ChatProvider` fake
-- The fake `ChatProvider` simulates an LLM that either (a) calls `search_book` and synthesizes from results, or (b) attempts to answer from "parametric knowledge" — both scenarios are tested
-- Assertions verify the agent response does NOT contain spoiler content (specific plot points, character names, or quotes from pages beyond `current_page`)
-- Tests use synthetic book data (no LFS dependency) with known content at specific page ranges so assertions are deterministic
+- Add a generic `judge_response()` utility in `tests/helpers/llm_judge.py` — reusable LLM-as-judge for evaluating any prompt output against pre-decided expected behavior
+- Add integration tests in `tests/app/test_spoiler_agent.py` that exercise `ChatWithBookUseCase` end-to-end with a real Anthropic `ChatProvider`
+- Tests use a pre-built SQLite database (1984 with embeddings) stored in Git LFS — no re-ingestion or embedding API calls at test time
+- Each test asks a spoiler-probing question, then uses `judge_response()` with a pre-decided expected-behavior description to evaluate the agent's response
 - No changes to production code — this is purely a test addition
 
 ## Capabilities
@@ -27,8 +27,9 @@ This change adds an **agent-level spoiler prevention test** that exercises the f
 
 ## Impact
 
+- **Test utilities** (`tests/helpers/llm_judge.py`): New generic LLM-as-judge utility
 - **Test layer** (`tests/app/test_spoiler_agent.py`): New test file with agent-level spoiler prevention scenarios
+- **Shared fixtures** (`shared/fixtures/1984_embedded.db`): Pre-built SQLite DB in Git LFS
 - **Domain layer**: No changes
 - **Application layer**: No changes
 - **Infrastructure layer**: No changes
-- **Shared fixtures**: May add synthetic book content fixtures for deterministic testing

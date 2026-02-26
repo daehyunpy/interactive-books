@@ -50,17 +50,31 @@ The existing test infrastructure uses in-memory SQLite (`Database(":memory:")`) 
 
 **Test marker:** `@pytest.mark.integration` — skipped when `ANTHROPIC_API_KEY` is not set.
 
-### 3. LLM-as-judge for response evaluation
+### 3. Generic LLM-as-judge for response evaluation
 
-**Decision:** After the agent responds, make a separate `ChatProvider.chat()` call with a judge prompt that evaluates whether the response contains spoiler content from pages beyond `current_page`.
+**Decision:** A reusable `judge_response(chat_provider, actual, expected) → bool` function in `tests/helpers/llm_judge.py`. It takes the agent's actual response and a pre-decided expected-behavior description, then asks the LLM whether the actual response matches. Domain-agnostic — knows nothing about books, pages, or spoilers.
 
-**Rationale:** String matching (checking for keywords like "Big Brother is watching") is brittle — the LLM can paraphrase, allude, or use different phrasing. An LLM judge understands semantic meaning and can detect implicit spoilers that keyword matching would miss.
+**Rationale:** String matching is brittle — the LLM can paraphrase or allude. An LLM judge understands semantic meaning. Making the judge generic means it can be reused for any prompt evaluation (not just spoiler tests).
 
-**Judge prompt structure:**
-- Provide the book title, the reader's current page, a summary of what happens after that page
-- Provide the agent's response
-- Ask: "Does this response reveal, discuss, or allude to content from beyond page N? Answer YES or NO, then explain."
+**Interface:**
+- `actual: str` — the response from the agent under test
+- `expected: str` — a plain-English description of what the correct response should (or should not) contain, written by the test author
+- Returns `True` if the response matches the expected criteria, `False` otherwise
+- The judge prompt asks: "Does this response match the expected behavior? Answer YES or NO, then explain."
 - Parse the first word for the verdict
+
+**Example usage in a spoiler test:**
+```python
+assert judge_response(
+    provider,
+    actual=response,
+    expected="The response should refuse to discuss how the book ends. "
+             "It must NOT mention Room 101, Winston's betrayal of Julia, "
+             "or his acceptance of Big Brother.",
+)
+```
+
+**Location:** `python/tests/helpers/llm_judge.py` — shared test utility, reusable across any test that needs to evaluate prompt output.
 
 **Trade-off:** This adds a second API call per test case and introduces its own non-determinism. However, the judge task is much simpler (binary classification) than the chat task, so it should be reliable. If flakiness occurs, we can run the judge multiple times and majority-vote.
 
@@ -108,10 +122,11 @@ Test flow:
   2. Open Database, set book.current_page = chapter boundary
   3. Create fresh Conversation
   4. Call use_case.execute(conversation_id, spoiler_question)
-  5. Pass response to judge LLM → verdict (YES spoiler / NO safe)
-  6. Assert verdict == NO
+  5. judge_response(provider, actual=response, expected=pre_decided_criteria)
+  6. Assert judge returns True
 ```
 
 **File layout:**
+- `python/tests/helpers/llm_judge.py` — generic `judge_response()` utility, reusable for any prompt evaluation
 - `python/tests/app/test_spoiler_agent.py` — test file with both scenario classes
 - `shared/fixtures/1984_embedded.db` — pre-built SQLite DB in Git LFS (manually built, no generation script)
