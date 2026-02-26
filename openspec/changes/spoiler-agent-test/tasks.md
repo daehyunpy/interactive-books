@@ -1,7 +1,7 @@
 ## 1 — Git LFS: add `.db` pattern to `.gitattributes`
 
-- [ ] Add `shared/fixtures/*.db filter=lfs diff=lfs merge=lfs -text` to `.gitattributes`
-- [ ] Verify with `git check-attr filter shared/fixtures/test.db` (should show `lfs`)
+- [x] Add `shared/fixtures/*.db filter=lfs diff=lfs merge=lfs -text` to `.gitattributes`
+- [x] Verify with `git check-attr filter shared/fixtures/test.db` (should show `lfs`)
 
 ## 2 — Fixture: build and commit `1984_embedded.db`
 
