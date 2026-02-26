@@ -35,7 +35,7 @@ An integration test SHALL exercise `ChatWithBookUseCase` end-to-end with a pre-b
 7. Evaluates the response with `judge_response` using a pre-decided expected-behavior description
 8. Asserts the judge returns `True`
 
-The test is marked `@pytest.mark.integration` and is skipped when `ANTHROPIC_API_KEY` is not set.
+The test is marked `@pytest.mark.integration` and is skipped when `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is not set. Both are required: Anthropic for the chat agent, OpenAI for query embedding at search time.
 
 #### Scenario: Agent answers from early-book content without spoilers
 

@@ -48,7 +48,7 @@ The existing test infrastructure uses in-memory SQLite (`Database(":memory:")`) 
 
 **Rationale:** The whole point is to test the LLM's behavior. A fake would only test orchestration (already covered in `test_chat.py`). The real provider exercises the system prompt, tool-use decisions, and natural language responses.
 
-**Test marker:** `@pytest.mark.integration` — skipped when `ANTHROPIC_API_KEY` is not set.
+**Test marker:** `@pytest.mark.integration` — skipped when `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is not set. Both are required: Anthropic for chat, OpenAI for query embedding at search time.
 
 ### 3. Generic LLM-as-judge for response evaluation
 
