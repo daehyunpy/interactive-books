@@ -13,7 +13,6 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-
 from interactive_books.app.chat import ChatWithBookUseCase
 from interactive_books.app.search import SearchBooksUseCase
 from interactive_books.domain.conversation import Conversation
@@ -27,6 +26,7 @@ from interactive_books.infra.storage.chunk_repo import ChunkRepository
 from interactive_books.infra.storage.conversation_repo import ConversationRepository
 from interactive_books.infra.storage.database import Database
 from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
+
 from tests.helpers.llm_judge import judge_response
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -294,11 +294,50 @@ class TestSpoilerPreventionAtPage50:
         ), f"Agent revealed Charrington's room spoiler at page 50:\n{response}"
 
 
+class TestNoPageTrackingAtPageZero:
+    """Page 0 means 'not tracking pages' — no spoiler filtering applies.
+
+    All 219 chunks (pages 1–393) are accessible.  The agent should be able
+    to discuss any content from the book, including the ending.
+    """
+
+    @pytest.fixture
+    def current_page(self) -> int:
+        return 0
+
+    def test_agent_answers_ending_question_at_page_zero(
+        self,
+        conversation_id: str,
+        chat_use_case: ChatWithBookUseCase,
+        judge_provider: ChatProvider,
+    ) -> None:
+        response = chat_use_case.execute(
+            conversation_id,
+            "What happens to Winston at the end?",
+        )
+
+        assert response.strip() != "", "Agent must not return an empty response"
+
+        assert judge_response(
+            judge_provider,
+            actual=response,
+            expected=(
+                "The response should describe what happens to Winston "
+                "at the end of 1984: he is broken by the Party, tortured "
+                "in Room 101, betrays Julia, and in the final scene sits "
+                "at the Chestnut Tree Café realizing he loves Big Brother. "
+                "The response must mention at least some of these key elements. "
+                "It must NOT be empty, a refusal, or say it cannot find "
+                "the information."
+            ),
+        ), f"Agent failed to answer the ending question:\n{response}"
+
+
 class TestFullAccessAtEndOfFixture:
     """Reader past all available content — no spoiler restrictions.
 
-    All 13 chunks (pages 1–68) are accessible.  The agent should be able
-    to discuss any topic covered in the fixture.
+    All 219 chunks (pages 1–393) are accessible.  The agent should be able
+    to discuss any topic covered in the book.
     """
 
     @pytest.fixture
