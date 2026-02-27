@@ -24,7 +24,7 @@ Users want to see a structural overview of the book before starting a conversati
 
 ### 1. Section grouping strategy
 
-**Decision:** Group chunks by contiguous page ranges. Consecutive chunks whose page ranges overlap or are adjacent form a section. Each section is represented by its combined page range and concatenated content.
+**Decision:** Group chunks by strictly contiguous page ranges. Consecutive chunks whose page ranges overlap or are immediately contiguous (gap = 0) form a section. Specifically, chunk B joins the current section if `B.start_page <= current_section.end_page + 1`. A gap of even 1 page starts a new section. Each section is represented by its combined page range and concatenated content.
 
 **Rationale:** Chunks already carry `start_page` and `end_page`. Consecutive chunks from the same section of a book will have overlapping or adjacent page ranges (e.g., chunk 1 covers pages 1-2, chunk 2 covers pages 2-3 — these form one section). When there's a gap (chunk N ends at page 10, chunk N+1 starts at page 15), that signals a section break. This is a heuristic but works well for structured formats where parsers map headings to page boundaries.
 
@@ -36,7 +36,9 @@ Users want to see a structural overview of the book before starting a conversati
 
 ### 2. Summarization approach
 
-**Decision:** Send each section's concatenated content to the LLM with a structured prompt requesting: (a) a section title/heading, (b) a 2-3 sentence summary, and (c) 1-3 key statements with page numbers. Use `ChatProvider.chat()` (simple completion, no tool use needed).
+**Decision:** Send each section's concatenated content to the LLM with a structured prompt requesting: (a) a section title/heading, (b) a 2-3 sentence summary, and (c) 1-3 key statements with page numbers. Use `ChatProvider.chat()` (simple completion, no tool use needed). Works with any `ChatProvider` implementation (Anthropic, OpenAI, Ollama) — not tied to a specific provider.
+
+**JSON parsing and retry:** Instruct the LLM to return JSON for reliable parsing. If the LLM returns invalid JSON or unexpected fields, retry once by sending the malformed response back with error feedback. If the retry also fails, raise `LLMError`. One retry is cheap and usually sufficient.
 
 **Rationale:** Per-section summarization keeps individual LLM calls manageable in token count. The structured prompt ensures consistent output format. Using the existing `ChatProvider` protocol means no new infrastructure.
 
@@ -56,6 +58,8 @@ Users want to see a structural overview of the book before starting a conversati
 **Decision:** When a new conversation is created (no existing messages), automatically run summarization and display the result before the chat REPL starts. Add `--no-summary` flag to skip this. The summary is also injected as context into the system prompt for the first message.
 
 **Rationale:** The summary orients the user for their conversation. Injecting it into the system prompt means the LLM also has structural awareness, improving response quality. The opt-out flag respects users who want to jump straight into chat.
+
+**Implementation note:** System prompt injection requires modifying `ChatWithBookUseCase` to conditionally prepend summary content to the conversation system prompt when a summary exists for the book. This is a separate task from CLI display.
 
 ### 5. Persistence
 
@@ -86,7 +90,13 @@ A `SummaryRepository` protocol in the domain layer provides `save_all(book_id, s
 - Store as a single JSON blob on the `books` table: loses queryability, schema validation
 - Separate `key_statements` table: over-normalized for read-heavy, write-once data
 
-### 6. Token budget for summarization
+### 6. Progress callback
+
+**Decision:** `SummarizeBookUseCase` accepts an `on_progress: Callable[[int, int], None]` callback where the arguments are `(current_section, total_sections)`. Called after each section is summarized.
+
+**Rationale:** Simple, gives the CLI enough to show "Summarizing section 3 of 12…". Matches the sequential nature of the work without the overhead of a domain event system.
+
+### 7. Token budget for summarization
 
 **Decision:** Cap each section's content at 6000 tokens before sending to the LLM. If a section exceeds this, truncate with a note. Cap total sections at 30 to avoid excessive API calls.
 

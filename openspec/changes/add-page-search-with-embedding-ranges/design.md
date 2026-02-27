@@ -59,9 +59,11 @@ class EmbeddingVector:
 
 ### 3. Search result enrichment
 
-**Decision:** Update `EmbeddingRepository.search()` to return `list[tuple[str, float, int, int]]` — `(chunk_id, distance, start_page, end_page)`. Update `SearchBooksUseCase` to use these page ranges directly instead of looking up chunks.
+**Decision:** Update `EmbeddingRepository.search()` to return `list[tuple[str, float, int, int]]` — `(chunk_id, distance, start_page, end_page)`. Update `SearchBooksUseCase` to use these page ranges directly for page info instead of deriving them from chunk lookup.
 
-**Rationale:** Avoids the chunk lookup step in search, making the search path more efficient. The page data comes directly from the embedding table.
+**Note:** The chunk lookup in `SearchBooksUseCase` remains necessary for `content` (which is not stored in the embedding table). The improvement is that **page ranges** come from embeddings, not that chunk lookup is eliminated entirely.
+
+**Rationale:** Avoids the chunk-to-page-range lookup step in search. The page data comes directly from the embedding table. Content still requires the chunk table.
 
 ### 4. Page-range content retrieval (consolidated)
 
@@ -85,10 +87,10 @@ The previous two methods are subsumed:
 **Decision:** Replace the single `search_fn: Callable[[str], list[SearchResult]]` parameter on `RetrievalStrategy.execute()` with a generic dispatch map:
 
 ```python
-tool_handlers: dict[str, Callable[[dict[str, object]], str]]
+tool_handlers: dict[str, Callable[[dict[str, object]], ToolResult]]
 ```
 
-Each handler takes the tool's `arguments` dict and returns a formatted string result. The strategy dispatches by tool name: `handler = tool_handlers[invocation.tool_name]`.
+Each handler takes the tool's `arguments` dict and returns a `ToolResult` dataclass containing both the formatted text and event metadata (query, result count, raw results). The strategy dispatches by tool name: `handler = tool_handlers[invocation.tool_name]`. This preserves the ability to emit rich `ToolResultEvent` events.
 
 **Rationale:** The current design hardcodes a single tool callback and blindly calls `search_fn(query)` for every invocation, ignoring `invocation.tool_name`. This breaks the moment a second tool (`read_pages`) is added with different argument shapes. A dispatch map:
 
@@ -96,7 +98,9 @@ Each handler takes the tool's `arguments` dict and returns a formatted string re
 - Scales to N tools without protocol changes
 - Makes each handler independently testable
 
-The `AlwaysRetrieveStrategy` (Ollama fallback) doesn't use tool dispatch at all — it reformulates and always searches. It ignores `tool_handlers` the same way it currently ignores the `tools` parameter.
+The `AlwaysRetrieveStrategy` (Ollama fallback) doesn't use tool dispatch at all — it reformulates and always searches. The caller (`ChatWithBookUseCase`) extracts a `search_fn` from `tool_handlers["search_book"]` and passes it separately to `AlwaysRetrieveStrategy`, which keeps its current simple interface. This way, `AlwaysRetrieveStrategy` never sees the dispatch map.
+
+**Unknown tool names:** If the LLM hallucinates a tool name not in the dispatch map, return an error string as the tool result (e.g., `"Unknown tool: {name}"`). This allows the LLM to self-correct in the next iteration rather than crashing the conversation turn.
 
 **Alternatives considered:**
 
@@ -111,6 +115,6 @@ The `AlwaysRetrieveStrategy` (Ollama fallback) doesn't use tool dispatch at all 
 
 ## Risks / Trade-offs
 
-**[Trade-off] Schema change requires re-embedding** - Existing books won't have page ranges in their embeddings until re-embedded. The `search` command still works (falls back to chunk lookup for page info), but the efficiency gain only applies to newly embedded books.
+**[Trade-off] Schema change requires re-embedding** - Existing books won't have page ranges in their embeddings until re-embedded. Since this is a pre-release app with no real users, there is no fallback for old data — users must re-run `embed` to rebuild the table with page range columns. No fallback code is needed.
 
 **[Trade-off] sqlite-vec auxiliary column limitations** - sqlite-vec doesn't support WHERE clauses on auxiliary columns in MATCH queries. Page filtering still happens in Python after the vector search returns. The benefit is eliminating the chunk table lookup, not SQL-level filtering.
