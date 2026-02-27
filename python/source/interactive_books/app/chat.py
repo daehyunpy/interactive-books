@@ -46,6 +46,7 @@ class ChatWithBookUseCase:
         message_repo: ChatMessageRepository,
         prompts_dir: Path,
         on_event: Callable[[ChatEvent], None] | None = None,
+        summary_context: str | None = None,
     ) -> None:
         self._chat = chat_provider
         self._retrieval = retrieval_strategy
@@ -55,6 +56,7 @@ class ChatWithBookUseCase:
         self._message_repo = message_repo
         self._prompts_dir = prompts_dir
         self._on_event = on_event
+        self._summary_context = summary_context
 
     def execute(self, conversation_id: str, user_message: str) -> str:
         conversation = self._conversation_repo.get(conversation_id)
@@ -68,6 +70,13 @@ class ChatWithBookUseCase:
         context_window = self._context.build_context(history)
 
         system_prompt = self._load_template("conversation_system_prompt.md")
+
+        if not history and self._summary_context:
+            system_prompt = (
+                system_prompt
+                + "\n\nBook structure overview:\n"
+                + self._summary_context
+            )
 
         prompt_messages: list[PromptMessage] = [
             PromptMessage(role="system", content=system_prompt),

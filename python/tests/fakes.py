@@ -1,6 +1,7 @@
 from interactive_books.domain.book import Book
 from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.embedding_vector import EmbeddingVector
+from interactive_books.domain.section_summary import SectionSummary
 
 
 class FakeBookRepository:
@@ -118,3 +119,17 @@ class FakeEmbeddingRepository:
     def count_for_book(self, book_id: str, provider_name: str, dimension: int) -> int:
         key = f"{provider_name}_{dimension}"
         return sum(1 for bid, _ in self.embeddings.get(key, []) if bid == book_id)
+
+
+class FakeSummaryRepository:
+    def __init__(self) -> None:
+        self.summaries: dict[str, list[SectionSummary]] = {}
+
+    def save_all(self, book_id: str, summaries: list[SectionSummary]) -> None:
+        self.summaries[book_id] = summaries
+
+    def get_by_book(self, book_id: str) -> list[SectionSummary]:
+        return self.summaries.get(book_id, [])
+
+    def delete_by_book(self, book_id: str) -> None:
+        self.summaries.pop(book_id, None)
