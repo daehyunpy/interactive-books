@@ -49,6 +49,32 @@ SET_PAGE_TOOL = ToolDefinition(
     },
 )
 
+NO_CONTEXT_MESSAGE = "No relevant passages found in the book for this query."
+
+
+def _format_search_results(results: list[SearchResult]) -> str:
+    if not results:
+        return NO_CONTEXT_MESSAGE
+    passages = [
+        f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}" for r in results
+    ]
+    return "\n\n".join(passages)
+
+
+def _parse_page_argument(arguments: dict[str, object]) -> int | None:
+    try:
+        return int(arguments.get("page", 0))  # type: ignore[arg-type]
+    except (ValueError, TypeError):
+        return None
+
+
+def _error_tool_result(message: str) -> ToolResult:
+    return ToolResult(formatted_text=f"Error: {message}", query="", result_count=0)
+
+
+def _info_tool_result(message: str) -> ToolResult:
+    return ToolResult(formatted_text=message, query="", result_count=0)
+
 
 class ChatWithBookUseCase:
     def __init__(
@@ -112,46 +138,26 @@ class ChatWithBookUseCase:
             )
 
         def set_page_handler(arguments: dict[str, object]) -> ToolResult:
-            try:
-                raw_page = arguments.get("page", 0)
-                page = int(raw_page)  # type: ignore[arg-type]
-            except (ValueError, TypeError):
-                return ToolResult(
-                    formatted_text="Error: invalid page number — must be a whole number.",
-                    query="",
-                    result_count=0,
-                )
+            page = _parse_page_argument(arguments)
+            if page is None:
+                return _error_tool_result("invalid page number — must be a whole number")
 
             book = self._book_repo.get(book_id)
             if book is None:
-                return ToolResult(
-                    formatted_text=f"Error: book not found ({book_id}).",
-                    query="",
-                    result_count=0,
-                )
+                return _error_tool_result(f"book not found ({book_id})")
 
             try:
                 book.set_current_page(page)
             except BookError as e:
-                return ToolResult(
-                    formatted_text=f"Error: {e.message}",
-                    query="",
-                    result_count=0,
-                )
+                return _error_tool_result(e.message)
 
             self._book_repo.save(book)
 
             if page == 0:
-                return ToolResult(
-                    formatted_text="Reading position reset. All content is now available.",
-                    query="",
-                    result_count=0,
+                return _info_tool_result(
+                    "Reading position reset. All content is now available."
                 )
-            return ToolResult(
-                formatted_text=f"Reading position set to page {page}.",
-                query="",
-                result_count=0,
-            )
+            return _info_tool_result(f"Reading position set to page {page}.")
 
         tool_handlers = {
             "search_book": search_book_handler,
@@ -201,15 +207,3 @@ class ChatWithBookUseCase:
 
     def _load_template(self, filename: str) -> str:
         return (self._prompts_dir / filename).read_text().strip()
-
-
-NO_CONTEXT_MESSAGE = "No relevant passages found in the book for this query."
-
-
-def _format_search_results(results: list[SearchResult]) -> str:
-    if not results:
-        return NO_CONTEXT_MESSAGE
-    passages = [
-        f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}" for r in results
-    ]
-    return "\n\n".join(passages)
