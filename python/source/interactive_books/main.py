@@ -7,6 +7,7 @@ import typer
 if TYPE_CHECKING:
     from interactive_books.app.conversations import ManageConversationsUseCase
     from interactive_books.domain.conversation import Conversation
+    from interactive_books.domain.section_summary import SectionSummary
 
 app = typer.Typer()
 
@@ -222,6 +223,9 @@ def search(
 @app.command()
 def chat(
     book_id: str = typer.Argument(..., help="ID of the book to chat about"),
+    no_summary: bool = typer.Option(
+        False, "--no-summary", help="Skip automatic summary display on new conversations"
+    ),
 ) -> None:
     """Start a conversation about a book."""
 
@@ -244,6 +248,7 @@ def chat(
     from interactive_books.infra.storage.chunk_repo import ChunkRepository
     from interactive_books.infra.storage.conversation_repo import ConversationRepository
     from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
+    from interactive_books.infra.storage.summary_repo import SummaryRepository
 
     openai_key = _require_env("OPENAI_API_KEY")
     anthropic_key = _require_env("ANTHROPIC_API_KEY")
@@ -264,6 +269,17 @@ def chat(
         )
 
         conversation = _select_or_create_conversation(manage, book_id)
+        is_new_conversation = not message_repo.get_by_conversation(conversation.id)
+
+        summary_context: str | None = None
+        if not no_summary:
+            summary_repo = SummaryRepository(db)
+            summaries = summary_repo.get_by_book(book_id)
+            if summaries:
+                summary_context = _format_summary_context(summaries)
+                if is_new_conversation:
+                    _display_summary(summaries)
+
         typer.echo(f"Conversation: {conversation.title} ({conversation.id[:8]}...)")
         typer.echo("Type your message (or 'quit' to exit).\n")
 
@@ -298,6 +314,7 @@ def chat(
             message_repo=message_repo,
             prompts_dir=PROMPTS_DIR,
             on_event=_on_event if _verbose else None,
+            summary_context=summary_context,
         )
 
         if _verbose:
@@ -324,6 +341,29 @@ def chat(
                 typer.echo(f"Error: {e.message}", err=True)
     finally:
         db.close()
+
+
+def _display_summary(summaries: list["SectionSummary"]) -> None:  # noqa: F821
+    typer.echo(f"Book summary ({len(summaries)} sections):\n")
+    for s in summaries:
+        typer.echo(f"  [{s.section_index + 1}] {s.title} (pp.{s.start_page}-{s.end_page})")
+        typer.echo(f"      {s.summary}")
+        for ks in s.key_statements:
+            typer.echo(f"        • {ks.statement} (p.{ks.page})")
+    typer.echo()
+
+
+def _format_summary_context(summaries: list["SectionSummary"]) -> str:  # noqa: F821
+    parts: list[str] = []
+    for s in summaries:
+        section = f"Section: {s.title} (pages {s.start_page}-{s.end_page})\n{s.summary}"
+        if s.key_statements:
+            statements = "; ".join(
+                f"{ks.statement} (p.{ks.page})" for ks in s.key_statements
+            )
+            section += f"\nKey points: {statements}"
+        parts.append(section)
+    return "\n\n".join(parts)
 
 
 MAX_SELECTION_RETRIES = 3
@@ -554,6 +594,53 @@ def search_page(
             typer.echo(f"    {chunk.content[:CONTENT_PREVIEW_LENGTH].replace(chr(10), ' ')}")
             typer.echo()
     except BookError as e:
+        typer.echo(f"Error: {e.message}", err=True)
+        raise typer.Exit(code=1)
+    finally:
+        db.close()
+
+
+@app.command()
+def summarize(
+    book_id: str = typer.Argument(..., help="ID of the book to summarize"),
+    regenerate: bool = typer.Option(
+        False, "--regenerate", "-r", help="Force re-generation even if cached"
+    ),
+) -> None:
+    """Generate section summaries for a book using an LLM."""
+    from interactive_books.app.summarize import SummarizeBookUseCase
+    from interactive_books.domain.errors import BookError, LLMError
+    from interactive_books.infra.storage.book_repo import BookRepository
+    from interactive_books.infra.storage.chunk_repo import ChunkRepository
+    from interactive_books.infra.storage.summary_repo import SummaryRepository
+
+    anthropic_key = _require_env("ANTHROPIC_API_KEY")
+    db = _open_db()
+
+    try:
+        from interactive_books.infra.llm.anthropic import ChatProvider
+
+        def _on_progress(current: int, total: int) -> None:
+            typer.echo(f"Summarizing section {current}/{total}...")
+
+        use_case = SummarizeBookUseCase(
+            chat_provider=ChatProvider(api_key=anthropic_key),
+            book_repo=BookRepository(db),
+            chunk_repo=ChunkRepository(db),
+            summary_repo=SummaryRepository(db),
+            prompts_dir=PROMPTS_DIR,
+            on_progress=_on_progress,
+        )
+        summaries = use_case.execute(book_id, regenerate=regenerate)
+
+        typer.echo(f"\n{len(summaries)} section(s) summarized:\n")
+        for s in summaries:
+            typer.echo(f"  [{s.section_index + 1}] {s.title} (pp.{s.start_page}-{s.end_page})")
+            typer.echo(f"      {s.summary}")
+            for ks in s.key_statements:
+                typer.echo(f"        • {ks.statement} (p.{ks.page})")
+            typer.echo()
+    except (BookError, LLMError) as e:
         typer.echo(f"Error: {e.message}", err=True)
         raise typer.Exit(code=1)
     finally:
