@@ -4,8 +4,13 @@ Exercises the full pipeline: TxtBookParser → TextChunker → real repos
 (BookRepository, ChunkRepository, EmbeddingRepository) backed by an
 in-memory SQLite database with sqlite-vec. The only fake is the
 EmbeddingProvider (no network calls).
+
+The TestIngestAutoEmbedWithRealProvider class at the bottom uses a real
+OpenAI embedding provider and is marked as an integration test (skipped
+when OPENAI_API_KEY is not set).
 """
 
+import os
 from collections.abc import Generator
 from pathlib import Path
 
@@ -164,6 +169,34 @@ class TestIngestAutoEmbedIntegration:
         # Verify provider was actually called
         assert provider.call_count >= 1
 
+    def test_ingest_with_auto_embed_returns_book_with_embed_metadata(
+        self,
+        tmp_path: Path,
+        book_repo: BookRepository,
+        chunk_repo: ChunkRepository,
+        embedding_repo: EmbeddingRepository,
+    ) -> None:
+        """The returned book object itself must have embedding metadata — not just the DB copy."""
+        provider = FakeEmbeddingProvider()
+        embed_use_case = EmbedBookUseCase(
+            embedding_provider=provider,  # type: ignore[arg-type]
+            book_repo=book_repo,
+            chunk_repo=chunk_repo,
+            embedding_repo=embedding_repo,
+        )
+        use_case = _make_ingest_use_case(
+            book_repo=book_repo,
+            chunk_repo=chunk_repo,
+            embed_use_case=embed_use_case,
+        )
+
+        txt_file = _write_txt(tmp_path, "Chapter 1. " * 100)
+        book, embed_error = use_case.execute(txt_file, "Returned Book Embed Test")
+
+        assert embed_error is None
+        assert book.embedding_provider == FAKE_PROVIDER
+        assert book.embedding_dimension == FAKE_DIMENSION
+
     def test_ingest_without_embed_skips_embeddings(
         self,
         tmp_path: Path,
@@ -258,3 +291,77 @@ class TestIngestAutoEmbedIntegration:
         chunks = chunk_repo.get_by_book(book.id)
         assert len(chunks) > 0
         assert embedding_repo.has_embeddings(book.id, FAKE_PROVIDER, FAKE_DIMENSION)
+
+
+FIXTURES_DIR = Path(__file__).resolve().parents[3] / "shared" / "fixtures"
+OPENAI_PROVIDER = "openai"
+OPENAI_DIMENSION = 1536
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not os.environ.get("OPENAI_API_KEY"),
+    reason="OPENAI_API_KEY not set",
+)
+class TestIngestAutoEmbedWithRealProvider:
+    """Full pipeline with real OpenAI embeddings: ingest .txt → chunk → embed."""
+
+    @pytest.fixture
+    def real_vec_db(self) -> Generator[Database]:
+        database = Database(":memory:", enable_vec=True)
+        database.run_migrations(SCHEMA_DIR)
+        yield database
+        database.close()
+
+    @pytest.fixture
+    def real_book_repo(self, real_vec_db: Database) -> BookRepository:
+        return BookRepository(real_vec_db)
+
+    @pytest.fixture
+    def real_chunk_repo(self, real_vec_db: Database) -> ChunkRepository:
+        return ChunkRepository(real_vec_db)
+
+    @pytest.fixture
+    def real_embedding_repo(self, real_vec_db: Database) -> EmbeddingRepository:
+        return EmbeddingRepository(real_vec_db)
+
+    def test_ingest_with_openai_key_auto_embeds(
+        self,
+        real_book_repo: BookRepository,
+        real_chunk_repo: ChunkRepository,
+        real_embedding_repo: EmbeddingRepository,
+    ) -> None:
+        from interactive_books.infra.embeddings.openai import (
+            EmbeddingProvider,
+        )
+
+        provider = EmbeddingProvider(api_key=os.environ["OPENAI_API_KEY"])
+        embed_use_case = EmbedBookUseCase(
+            embedding_provider=provider,
+            book_repo=real_book_repo,
+            chunk_repo=real_chunk_repo,
+            embedding_repo=real_embedding_repo,
+        )
+        use_case = _make_ingest_use_case(
+            book_repo=real_book_repo,
+            chunk_repo=real_chunk_repo,
+            embed_use_case=embed_use_case,
+        )
+
+        book, embed_error = use_case.execute(
+            FIXTURES_DIR / "sample_book.txt", "Auto-Embed Integration Test"
+        )
+
+        assert embed_error is None
+        assert book.status == BookStatus.READY
+
+        saved_book = real_book_repo.get(book.id)
+        assert saved_book is not None
+        assert saved_book.embedding_provider == OPENAI_PROVIDER
+        assert saved_book.embedding_dimension == OPENAI_DIMENSION
+
+        chunks = real_chunk_repo.get_by_book(book.id)
+        assert len(chunks) > 0
+        assert real_embedding_repo.has_embeddings(
+            book.id, OPENAI_PROVIDER, OPENAI_DIMENSION
+        )
