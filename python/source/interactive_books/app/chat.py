@@ -72,20 +72,13 @@ class ChatWithBookUseCase:
         system_prompt = self._load_template("conversation_system_prompt.md")
 
         if not history and self._summary_context:
-            system_prompt = (
-                system_prompt
-                + "\n\nBook structure overview:\n"
-                + self._summary_context
-            )
+            system_prompt += f"\n\nBook structure overview:\n{self._summary_context}"
 
         prompt_messages: list[PromptMessage] = [
             PromptMessage(role="system", content=system_prompt),
+            *[PromptMessage(role=msg.role.value, content=msg.content) for msg in context_window],
+            PromptMessage(role="user", content=user_message),
         ]
-        for msg in context_window:
-            prompt_messages.append(
-                PromptMessage(role=msg.role.value, content=msg.content)
-            )
-        prompt_messages.append(PromptMessage(role="user", content=user_message))
 
         book_id = conversation.book_id
 

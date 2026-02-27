@@ -74,62 +74,52 @@ class SummarizeBookUseCase:
             if self._on_progress:
                 self._on_progress(i + 1, len(sections))
 
-            content = _truncate_to_token_budget(section.content)
-            prompt = template.replace("{{start_page}}", str(section.start_page))
-            prompt = prompt.replace("{{end_page}}", str(section.end_page))
-            prompt = prompt.replace("{{content}}", content)
-
+            prompt = self._build_prompt(template, section)
             parsed = self._summarize_section(prompt)
-
-            key_statements = [
-                KeyStatement(
-                    statement=ks["statement"],
-                    page=_clamp_page(ks.get("page", section.start_page), section.start_page, section.end_page),
-                )
-                for ks in parsed.get("key_statements", [])[:3]
-            ]
-
             summaries.append(
-                SectionSummary(
-                    id=str(uuid.uuid4()),
-                    book_id=book_id,
-                    title=parsed.get("title", f"Section {i + 1}"),
-                    start_page=section.start_page,
-                    end_page=section.end_page,
-                    summary=parsed.get("summary", "No summary available."),
-                    key_statements=key_statements,
-                    section_index=i,
-                )
+                _build_section_summary(book_id, i, section, parsed)
             )
 
         self._summary_repo.save_all(book_id, summaries)
         return summaries
 
-    def _summarize_section(self, prompt: str) -> dict:  # type: ignore[type-arg]
+    @staticmethod
+    def _build_prompt(template: str, section: Section) -> str:
+        content = _truncate_to_token_budget(section.content)
+        return (
+            template.replace("{{start_page}}", str(section.start_page))
+            .replace("{{end_page}}", str(section.end_page))
+            .replace("{{content}}", content)
+        )
+
+    def _summarize_section(self, prompt: str) -> dict[str, object]:
         messages = [PromptMessage(role="user", content=prompt)]
         response = self._chat.chat(messages)
-        try:
-            return _parse_json_response(response)
-        except ValueError:
-            pass
 
-        retry_prompt = (
-            f"Your previous response was not valid JSON:\n{response}\n\n"
-            "Please respond with ONLY valid JSON matching the requested format."
+        parsed = _try_parse_json(response)
+        if parsed is not None:
+            return parsed
+
+        messages.append(PromptMessage(role="assistant", content=response))
+        messages.append(
+            PromptMessage(
+                role="user",
+                content=(
+                    f"Your previous response was not valid JSON:\n{response}\n\n"
+                    "Please respond with ONLY valid JSON matching the requested format."
+                ),
+            ),
         )
-        retry_messages = [
-            PromptMessage(role="user", content=prompt),
-            PromptMessage(role="assistant", content=response),
-            PromptMessage(role="user", content=retry_prompt),
-        ]
-        retry_response = self._chat.chat(retry_messages)
-        try:
-            return _parse_json_response(retry_response)
-        except ValueError as e:
-            raise LLMError(
-                LLMErrorCode.API_CALL_FAILED,
-                f"Failed to parse LLM response as JSON after retry: {e}",
-            ) from e
+        retry_response = self._chat.chat(messages)
+
+        parsed = _try_parse_json(retry_response)
+        if parsed is not None:
+            return parsed
+
+        raise LLMError(
+            LLMErrorCode.API_CALL_FAILED,
+            f"Failed to parse LLM response as JSON after retry: {retry_response[:200]}",
+        )
 
     def _load_template(self, filename: str) -> str:
         return (self._prompts_dir / filename).read_text().strip()
@@ -171,6 +161,38 @@ def group_chunks_into_sections(chunks: list[Chunk]) -> list[Section]:
     return sections
 
 
+MAX_KEY_STATEMENTS = 3
+
+
+def _build_section_summary(
+    book_id: str,
+    index: int,
+    section: Section,
+    parsed: dict[str, object],
+) -> SectionSummary:
+    key_statements = [
+        KeyStatement(
+            statement=ks["statement"],
+            page=_clamp_page(
+                ks.get("page", section.start_page),
+                section.start_page,
+                section.end_page,
+            ),
+        )
+        for ks in parsed.get("key_statements", [])[:MAX_KEY_STATEMENTS]
+    ]
+    return SectionSummary(
+        id=str(uuid.uuid4()),
+        book_id=book_id,
+        title=parsed.get("title", f"Section {index + 1}"),
+        start_page=section.start_page,
+        end_page=section.end_page,
+        summary=parsed.get("summary", "No summary available."),
+        key_statements=key_statements,
+        section_index=index,
+    )
+
+
 def _truncate_to_token_budget(content: str) -> str:
     max_chars = MAX_SECTION_TOKENS * APPROX_CHARS_PER_TOKEN
     if len(content) <= max_chars:
@@ -178,18 +200,23 @@ def _truncate_to_token_budget(content: str) -> str:
     return content[:max_chars] + "\n\n[Content truncated due to length.]"
 
 
-def _parse_json_response(response: str) -> dict:  # type: ignore[type-arg]
-    text = response.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        text = "\n".join(lines).strip()
+def _strip_code_fences(text: str) -> str:
+    if not text.startswith("```"):
+        return text
+    lines = text.split("\n")[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
 
-    parsed = json.loads(text)
+
+def _try_parse_json(response: str) -> dict[str, object] | None:
+    text = _strip_code_fences(response.strip())
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return None
     if not isinstance(parsed, dict):
-        raise ValueError(f"Expected JSON object, got {type(parsed).__name__}")
+        return None
     return parsed
 
 
