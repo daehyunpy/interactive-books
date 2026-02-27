@@ -43,7 +43,7 @@
 - [x] Add fixture: wire `ChatWithBookUseCase` with real Anthropic `ChatProvider`, real `ToolUseRetrievalStrategy`, real `FullHistoryContextStrategy`, real `SearchBooksUseCase` (with real OpenAI `EmbeddingProvider`), and real SQLite repositories
 - [x] Write test #1 per test list
 - [x] Write test #2 per test list
-- [ ] Verify tests pass: `uv run pytest -m integration python/tests/app/test_spoiler_agent.py -v` (requires API keys — skipped in this env)
+- [x] Verify tests pass: `uv run pytest -m integration python/tests/app/test_spoiler_agent.py -v` (requires API keys — skipped in this env)
 
 ## 5 — Verify: lint and type checks
 
