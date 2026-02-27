@@ -615,6 +615,7 @@ def summarize(
     """Generate section summaries for a book using an LLM."""
     from interactive_books.app.summarize import SummarizeBookUseCase
     from interactive_books.domain.errors import BookError, LLMError
+    from interactive_books.infra.llm.anthropic import ChatProvider
     from interactive_books.infra.storage.book_repo import BookRepository
     from interactive_books.infra.storage.chunk_repo import ChunkRepository
     from interactive_books.infra.storage.summary_repo import SummaryRepository
@@ -623,8 +624,6 @@ def summarize(
     db = _open_db()
 
     try:
-        from interactive_books.infra.llm.anthropic import ChatProvider
-
         def _on_progress(current: int, total: int) -> None:
             typer.echo(f"Summarizing section {current}/{total}...")
 
