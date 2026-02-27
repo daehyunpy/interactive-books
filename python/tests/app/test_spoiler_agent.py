@@ -8,37 +8,25 @@ to evaluate response quality.
 
 import os
 import shutil
-import uuid
 from collections.abc import Generator
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
 from interactive_books.app.chat import ChatWithBookUseCase
 from interactive_books.app.search import SearchBooksUseCase
 from interactive_books.domain.conversation import Conversation
-from interactive_books.infra.context.full_history import (
-    ConversationContextStrategy,
-)
+from interactive_books.infra.context.full_history import ConversationContextStrategy
 from interactive_books.infra.embeddings.openai import EmbeddingProvider
 from interactive_books.infra.llm.anthropic import ChatProvider
 from interactive_books.infra.retrieval.tool_use import RetrievalStrategy
-from interactive_books.infra.storage.book_repo import (
-    BookRepository,
-)
-from interactive_books.infra.storage.chat_message_repo import (
-    ChatMessageRepository,
-)
-from interactive_books.infra.storage.chunk_repo import (
-    ChunkRepository,
-)
-from interactive_books.infra.storage.conversation_repo import (
-    ConversationRepository,
-)
+from interactive_books.infra.storage.book_repo import BookRepository
+from interactive_books.infra.storage.chat_message_repo import ChatMessageRepository
+from interactive_books.infra.storage.chunk_repo import ChunkRepository
+from interactive_books.infra.storage.conversation_repo import ConversationRepository
 from interactive_books.infra.storage.database import Database
-from interactive_books.infra.storage.embedding_repo import (
-    EmbeddingRepository,
-)
+from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
 from tests.helpers.llm_judge import judge_response
 
 FIXTURE_DB = (
@@ -64,19 +52,19 @@ pytestmark = [
 
 
 @pytest.fixture
-def _fixture_db(tmp_path: Path) -> Generator[Database]:
+def fixture_db(tmp_path: Path) -> Generator[Database]:
     """Copy the pre-built fixture DB to tmp_path and open it."""
     db_copy = tmp_path / "1984_embedded.db"
     shutil.copy2(FIXTURE_DB, db_copy)
     db = Database(db_copy, enable_vec=True)
-    yield db  # type: ignore[misc]
+    yield db
     db.close()
 
 
 @pytest.fixture
-def _book_at_page(_fixture_db: Database) -> str:
+def book_id(fixture_db: Database) -> str:
     """Set current_page on the fixture book and return its ID."""
-    book_repo = BookRepository(_fixture_db)
+    book_repo = BookRepository(fixture_db)
     books = book_repo.get_all()
     assert len(books) == 1, "Fixture DB should contain exactly one book"
     book = books[0]
@@ -86,28 +74,28 @@ def _book_at_page(_fixture_db: Database) -> str:
 
 
 @pytest.fixture
-def _conversation(_fixture_db: Database, _book_at_page: str) -> str:
+def conversation_id(fixture_db: Database, book_id: str) -> str:
     """Create a fresh conversation for the fixture book; return its ID."""
     conv = Conversation(
-        id=str(uuid.uuid4()),
-        book_id=_book_at_page,
+        id=str(uuid4()),
+        book_id=book_id,
         title="Spoiler test",
     )
-    ConversationRepository(_fixture_db).save(conv)
+    ConversationRepository(fixture_db).save(conv)
     return conv.id
 
 
 @pytest.fixture
-def _chat_use_case(_fixture_db: Database) -> ChatWithBookUseCase:
+def chat_use_case(fixture_db: Database) -> ChatWithBookUseCase:
     """Wire the full ChatWithBookUseCase with real providers and repos."""
     chat_provider = ChatProvider(api_key=os.environ["ANTHROPIC_API_KEY"])
     embedding_provider = EmbeddingProvider(api_key=os.environ["OPENAI_API_KEY"])
 
-    book_repo = BookRepository(_fixture_db)
-    chunk_repo = ChunkRepository(_fixture_db)
-    embedding_repo = EmbeddingRepository(_fixture_db)
-    conversation_repo = ConversationRepository(_fixture_db)
-    message_repo = ChatMessageRepository(_fixture_db)
+    book_repo = BookRepository(fixture_db)
+    chunk_repo = ChunkRepository(fixture_db)
+    embedding_repo = EmbeddingRepository(fixture_db)
+    conversation_repo = ConversationRepository(fixture_db)
+    message_repo = ChatMessageRepository(fixture_db)
 
     search_use_case = SearchBooksUseCase(
         embedding_provider=embedding_provider,
@@ -128,7 +116,7 @@ def _chat_use_case(_fixture_db: Database) -> ChatWithBookUseCase:
 
 
 @pytest.fixture
-def _judge_provider() -> ChatProvider:
+def judge_provider() -> ChatProvider:
     """Separate ChatProvider instance for the LLM judge."""
     return ChatProvider(api_key=os.environ["ANTHROPIC_API_KEY"])
 
@@ -138,17 +126,17 @@ class TestSpoilerPreventionViaSearch:
 
     def test_agent_answers_from_early_content_without_spoilers(
         self,
-        _conversation: str,
-        _chat_use_case: ChatWithBookUseCase,
-        _judge_provider: ChatProvider,
+        conversation_id: str,
+        chat_use_case: ChatWithBookUseCase,
+        judge_provider: ChatProvider,
     ) -> None:
-        response = _chat_use_case.execute(
-            _conversation,
+        response = chat_use_case.execute(
+            conversation_id,
             "What is the setting of the story?",
         )
 
         assert judge_response(
-            _judge_provider,
+            judge_provider,
             actual=response,
             expected=(
                 "The response should describe the setting of 1984: "
@@ -167,17 +155,17 @@ class TestSpoilerPreventionViaKnowledge:
 
     def test_agent_refuses_to_reveal_ending(
         self,
-        _conversation: str,
-        _chat_use_case: ChatWithBookUseCase,
-        _judge_provider: ChatProvider,
+        conversation_id: str,
+        chat_use_case: ChatWithBookUseCase,
+        judge_provider: ChatProvider,
     ) -> None:
-        response = _chat_use_case.execute(
-            _conversation,
+        response = chat_use_case.execute(
+            conversation_id,
             "How does the book end?",
         )
 
         assert judge_response(
-            _judge_provider,
+            judge_provider,
             actual=response,
             expected=(
                 "The response should refuse to discuss the ending or say "
