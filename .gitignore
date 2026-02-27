@@ -17,6 +17,11 @@ dist/
 data/
 temp/
 
+# SQLite temp files
+*.db-shm
+*.db-wal
+*.db-journal
+
 # macOS
 .DS_Store
 
