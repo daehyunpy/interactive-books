@@ -22,5 +22,8 @@ def judge_response(
     prompt = JUDGE_PROMPT.format(actual=actual, expected=expected)
     messages = [PromptMessage(role="user", content=prompt)]
     verdict = chat_provider.chat(messages)
-    first_word = verdict.strip().split()[0].upper().rstrip(".,!:")
+    words = verdict.strip().split()
+    if not words:
+        return False
+    first_word = words[0].upper().rstrip(".,!:")
     return first_word == "YES"
