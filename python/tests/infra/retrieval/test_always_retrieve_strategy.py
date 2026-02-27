@@ -41,47 +41,37 @@ def prompts_dir(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _make_tool_handlers(
-    results: list[SearchResult] | None = None,
-) -> dict[str, Callable[[dict[str, object]], ToolResult]]:
-    captured: list[str] = []
+class FakeSearchHandler:
+    def __init__(self, results: list[SearchResult] | None = None) -> None:
+        self.captured_queries: list[str] = []
+        self._results = results or []
 
-    def search_handler(arguments: dict[str, object]) -> ToolResult:
+    def __call__(self, arguments: dict[str, object]) -> ToolResult:
         query = str(arguments.get("query", ""))
-        captured.append(query)
-        search_results = results or []
-        if not search_results:
+        self.captured_queries.append(query)
+        if not self._results:
             formatted = NO_CONTEXT_MESSAGE
         else:
             formatted = "\n\n".join(
                 f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}"
-                for r in search_results
+                for r in self._results
             )
         return ToolResult(
             formatted_text=formatted,
             query=query,
-            result_count=len(search_results),
-            results=list(search_results),
+            result_count=len(self._results),
+            results=list(self._results),
         )
 
-    handlers: dict[str, Callable[[dict[str, object]], ToolResult]] = {
-        "search_book": search_handler,
-    }
-    handlers["_captured_queries"] = captured  # type: ignore[assignment]
-    return handlers
-
-
-def _get_captured_queries(
-    handlers: dict[str, Callable[[dict[str, object]], ToolResult]],
-) -> list[str]:
-    return handlers["_captured_queries"]  # type: ignore[return-value]
+    def as_handlers(self) -> dict[str, Callable[[dict[str, object]], ToolResult]]:
+        return {"search_book": self}
 
 
 class TestAlwaysRetrieveSingleTurn:
     def test_single_turn_uses_original_query(self, prompts_dir: Path) -> None:
         provider = FakeChatProvider(["The book says X."])
         strategy = RetrievalStrategy(prompts_dir)
-        results = [
+        search = FakeSearchHandler([
             SearchResult(
                 chunk_id="c1",
                 content="Some content.",
@@ -89,8 +79,7 @@ class TestAlwaysRetrieveSingleTurn:
                 end_page=5,
                 distance=0.1,
             )
-        ]
-        handlers = _make_tool_handlers(results)
+        ])
 
         text, new_messages = strategy.execute(
             provider,
@@ -99,12 +88,12 @@ class TestAlwaysRetrieveSingleTurn:
                 PromptMessage(role="user", content="What is chapter 1 about?"),
             ],
             [],
-            handlers,
+            search.as_handlers(),
         )
 
         assert text == "The book says X."
         assert new_messages == []
-        assert _get_captured_queries(handlers) == ["What is chapter 1 about?"]
+        assert search.captured_queries == ["What is chapter 1 about?"]
 
 
 class TestAlwaysRetrieveMultiTurn:
@@ -113,7 +102,6 @@ class TestAlwaysRetrieveMultiTurn:
             ["reformulated: What is the main theme of chapter 3?", "The theme is Y."]
         )
         strategy = RetrievalStrategy(prompts_dir)
-        handlers = _make_tool_handlers()
 
         text, _ = strategy.execute(
             provider,
@@ -123,7 +111,7 @@ class TestAlwaysRetrieveMultiTurn:
                 PromptMessage(role="user", content="What is its main theme?"),
             ],
             [],
-            handlers,
+            FakeSearchHandler().as_handlers(),
         )
 
         assert text == "The theme is Y."
@@ -134,13 +122,12 @@ class TestAlwaysRetrieveContextFormatting:
     def test_no_results_uses_no_context_message(self, prompts_dir: Path) -> None:
         provider = FakeChatProvider(["I don't know."])
         strategy = RetrievalStrategy(prompts_dir)
-        handlers = _make_tool_handlers([])
 
         text, _ = strategy.execute(
             provider,
             [PromptMessage(role="user", content="Obscure question")],
             [],
-            handlers,
+            FakeSearchHandler([]).as_handlers(),
         )
 
         assert text == "I don't know."
@@ -153,23 +140,21 @@ class TestAlwaysRetrieveEventEmission:
     def test_emits_tool_result_event(self, prompts_dir: Path) -> None:
         provider = FakeChatProvider(["The answer."])
         strategy = RetrievalStrategy(prompts_dir)
-        results = [
-            SearchResult(
-                chunk_id="c1",
-                content="Content.",
-                start_page=1,
-                end_page=3,
-                distance=0.1,
-            )
-        ]
-        handlers = _make_tool_handlers(results)
         events: list[ChatEvent] = []
 
         strategy.execute(
             provider,
             [PromptMessage(role="user", content="Question?")],
             [],
-            handlers,
+            FakeSearchHandler([
+                SearchResult(
+                    chunk_id="c1",
+                    content="Content.",
+                    start_page=1,
+                    end_page=3,
+                    distance=0.1,
+                )
+            ]).as_handlers(),
             on_event=events.append,
         )
 
@@ -187,7 +172,7 @@ class TestAlwaysRetrieveEventEmission:
             provider,
             [PromptMessage(role="user", content="Question?")],
             [],
-            _make_tool_handlers(),
+            FakeSearchHandler().as_handlers(),
         )
 
         assert text == "The answer."
