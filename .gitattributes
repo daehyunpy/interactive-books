@@ -9,6 +9,3 @@ shared/fixtures/*.db filter=lfs diff=lfs merge=lfs -text
 
 # Unit test fixtures — small, stay in regular Git
 shared/fixtures/sample_book.* -filter -diff -merge
-
-# Integration test fixture — stored in regular Git (LFS server unavailable at creation time)
-shared/fixtures/1984_embedded.db -filter -diff -merge
