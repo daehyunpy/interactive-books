@@ -71,12 +71,12 @@ class ChatWithBookUseCase:
 
         prompt_messages: list[PromptMessage] = [
             PromptMessage(role="system", content=system_prompt),
-            *[
-                PromptMessage(role=msg.role.value, content=msg.content)
-                for msg in context_window
-            ],
-            PromptMessage(role="user", content=user_message),
         ]
+        for msg in context_window:
+            prompt_messages.append(
+                PromptMessage(role=msg.role.value, content=msg.content)
+            )
+        prompt_messages.append(PromptMessage(role="user", content=user_message))
 
         book_id = conversation.book_id
 

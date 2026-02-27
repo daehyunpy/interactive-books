@@ -49,58 +49,48 @@ class FakeChatProvider:
         return response
 
 
-def _make_tool_handlers(
-    results: list[SearchResult] | None = None,
-) -> dict[str, Callable[[dict[str, object]], ToolResult]]:
-    captured_queries: list[str] = []
+class FakeSearchHandler:
+    def __init__(self, results: list[SearchResult] | None = None) -> None:
+        self.captured_queries: list[str] = []
+        self._results = results or []
 
-    def search_handler(arguments: dict[str, object]) -> ToolResult:
+    def __call__(self, arguments: dict[str, object]) -> ToolResult:
         query = str(arguments.get("query", ""))
-        captured_queries.append(query)
-        search_results = results or []
-        if not search_results:
+        self.captured_queries.append(query)
+        if not self._results:
             formatted = NO_CONTEXT_MESSAGE
         else:
             formatted = "\n\n".join(
                 f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}"
-                for r in search_results
+                for r in self._results
             )
         return ToolResult(
             formatted_text=formatted,
             query=query,
-            result_count=len(search_results),
-            results=list(search_results),
+            result_count=len(self._results),
+            results=list(self._results),
         )
 
-    handlers: dict[str, Callable[[dict[str, object]], ToolResult]] = {
-        "search_book": search_handler,
-    }
-    handlers["_captured_queries"] = captured_queries  # type: ignore[assignment]
-    return handlers
-
-
-def _get_captured_queries(
-    handlers: dict[str, Callable[[dict[str, object]], ToolResult]],
-) -> list[str]:
-    return handlers["_captured_queries"]  # type: ignore[return-value]
+    def as_handlers(self) -> dict[str, Callable[[dict[str, object]], ToolResult]]:
+        return {"search_book": self}
 
 
 class TestToolUseStrategyDirectReply:
     def test_text_only_response_no_search(self) -> None:
         provider = FakeChatProvider([ChatResponse(text="The answer is clear.")])
         strategy = RetrievalStrategy()
-        handlers = _make_tool_handlers()
+        search = FakeSearchHandler()
 
         text, new_messages = strategy.execute(
             provider,
             [PromptMessage(role="user", content="Hello")],
             [_search_tool()],
-            handlers,
+            search.as_handlers(),
         )
 
         assert text == "The answer is clear."
         assert new_messages == []
-        assert _get_captured_queries(handlers) == []
+        assert search.captured_queries == []
 
 
 class TestToolUseStrategyRetrieveAndReply:
@@ -120,7 +110,7 @@ class TestToolUseStrategyRetrieveAndReply:
             ]
         )
         strategy = RetrievalStrategy()
-        results = [
+        search = FakeSearchHandler([
             SearchResult(
                 chunk_id="c1",
                 content="Chapter 3 content.",
@@ -128,21 +118,20 @@ class TestToolUseStrategyRetrieveAndReply:
                 end_page=35,
                 distance=0.1,
             )
-        ]
-        handlers = _make_tool_handlers(results)
+        ])
 
         text, new_messages = strategy.execute(
             provider,
             [PromptMessage(role="user", content="Tell me about chapter 3")],
             [_search_tool()],
-            handlers,
+            search.as_handlers(),
         )
 
         assert text == "Chapter 3 is about X."
         assert len(new_messages) == 1
         assert new_messages[0].role == MessageRole.TOOL_RESULT
         assert "[Pages 30-35]" in new_messages[0].content
-        assert _get_captured_queries(handlers) == ["chapter 3"]
+        assert search.captured_queries == ["chapter 3"]
 
 
 class TestToolUseStrategyMaxIterations:
@@ -166,7 +155,7 @@ class TestToolUseStrategyMaxIterations:
             provider,
             [PromptMessage(role="user", content="Q")],
             [_search_tool()],
-            _make_tool_handlers(),
+            FakeSearchHandler().as_handlers(),
         )
 
         assert text == "Final answer after max iterations."
@@ -196,7 +185,7 @@ class TestToolUseStrategyMaxIterations:
             provider,
             [PromptMessage(role="user", content="what did I ask?")],
             [_search_tool()],
-            _make_tool_handlers([]),
+            FakeSearchHandler([]).as_handlers(),
         )
 
         assert text != "", "Assistant response must not be empty"
@@ -223,7 +212,7 @@ class TestToolUseStrategyMaxIterations:
             provider,
             [PromptMessage(role="user", content="tell me about julia")],
             [_search_tool()],
-            _make_tool_handlers([]),
+            FakeSearchHandler([]).as_handlers(),
         )
 
         assert text != "", "Assistant response must not be empty"
@@ -268,7 +257,7 @@ class TestToolUseStrategyMaxIterations:
             provider,
             [PromptMessage(role="user", content="What happens to Winston at the end?")],
             [_search_tool()],
-            _make_tool_handlers(irrelevant_results),
+            FakeSearchHandler(irrelevant_results).as_handlers(),
         )
 
         assert text != "", "Assistant response must not be empty"
@@ -296,7 +285,7 @@ class TestToolUseStrategyNoResults:
             provider,
             [PromptMessage(role="user", content="What about obscure topic?")],
             [_search_tool()],
-            _make_tool_handlers([]),
+            FakeSearchHandler([]).as_handlers(),
         )
 
         assert text == "I couldn't find anything."
@@ -319,7 +308,7 @@ class TestToolUseStrategyEventEmission:
             provider,
             [PromptMessage(role="user", content="Hello")],
             [_search_tool()],
-            _make_tool_handlers(),
+            FakeSearchHandler().as_handlers(),
             on_event=on_event,
         )
 
@@ -346,15 +335,6 @@ class TestToolUseStrategyEventEmission:
                 ChatResponse(text="The themes are...", usage=usage2),
             ]
         )
-        results = [
-            SearchResult(
-                chunk_id="c1",
-                content="Theme text.",
-                start_page=10,
-                end_page=12,
-                distance=0.1,
-            )
-        ]
         strategy = RetrievalStrategy()
         events, on_event = _collect_events()
 
@@ -362,7 +342,15 @@ class TestToolUseStrategyEventEmission:
             provider,
             [PromptMessage(role="user", content="What are the themes?")],
             [_search_tool()],
-            _make_tool_handlers(results),
+            FakeSearchHandler([
+                SearchResult(
+                    chunk_id="c1",
+                    content="Theme text.",
+                    start_page=10,
+                    end_page=12,
+                    distance=0.1,
+                )
+            ]).as_handlers(),
             on_event=on_event,
         )
 
@@ -387,7 +375,7 @@ class TestToolUseStrategyEventEmission:
             provider,
             [PromptMessage(role="user", content="Hello")],
             [_search_tool()],
-            _make_tool_handlers(),
+            FakeSearchHandler().as_handlers(),
         )
 
         assert text == "Answer."
@@ -401,7 +389,7 @@ class TestToolUseStrategyEventEmission:
             provider,
             [PromptMessage(role="user", content="Hello")],
             [_search_tool()],
-            _make_tool_handlers(),
+            FakeSearchHandler().as_handlers(),
             on_event=on_event,
         )
 

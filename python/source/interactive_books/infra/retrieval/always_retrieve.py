@@ -97,7 +97,7 @@ class RetrievalStrategy:
 
     @staticmethod
     def _find_last_user_message_index(messages: list[PromptMessage]) -> int:
-        for i, msg in reversed(list(enumerate(messages))):
-            if msg.role == "user":
+        for i in range(len(messages) - 1, -1, -1):
+            if messages[i].role == "user":
                 return i
         return -1
