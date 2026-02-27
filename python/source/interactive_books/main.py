@@ -278,7 +278,10 @@ def chat(
             if summaries:
                 summary_context = _format_summary_context(summaries)
                 if is_new_conversation:
-                    _display_summary(summaries)
+                    _display_summaries(
+                        summaries,
+                        f"Book summary ({len(summaries)} sections):",
+                    )
 
         typer.echo(f"Conversation: {conversation.title} ({conversation.id[:8]}...)")
         typer.echo("Type your message (or 'quit' to exit).\n")
@@ -343,14 +346,16 @@ def chat(
         db.close()
 
 
-def _display_summary(summaries: list["SectionSummary"]) -> None:  # noqa: F821
-    typer.echo(f"Book summary ({len(summaries)} sections):\n")
+def _display_summaries(
+    summaries: list["SectionSummary"], header: str  # noqa: F821
+) -> None:
+    typer.echo(f"{header}\n")
     for s in summaries:
         typer.echo(f"  [{s.section_index + 1}] {s.title} (pp.{s.start_page}-{s.end_page})")
         typer.echo(f"      {s.summary}")
         for ks in s.key_statements:
             typer.echo(f"        • {ks.statement} (p.{ks.page})")
-    typer.echo()
+        typer.echo()
 
 
 def _format_summary_context(summaries: list["SectionSummary"]) -> str:  # noqa: F821
@@ -633,13 +638,11 @@ def summarize(
         )
         summaries = use_case.execute(book_id, regenerate=regenerate)
 
-        typer.echo(f"\n{len(summaries)} section(s) summarized:\n")
-        for s in summaries:
-            typer.echo(f"  [{s.section_index + 1}] {s.title} (pp.{s.start_page}-{s.end_page})")
-            typer.echo(f"      {s.summary}")
-            for ks in s.key_statements:
-                typer.echo(f"        • {ks.statement} (p.{ks.page})")
-            typer.echo()
+        typer.echo()
+        _display_summaries(
+            summaries,
+            f"{len(summaries)} section(s) summarized:",
+        )
     except (BookError, LLMError) as e:
         typer.echo(f"Error: {e.message}", err=True)
         raise typer.Exit(code=1)
