@@ -3,6 +3,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.errors import BookError, BookErrorCode, LLMError, LLMErrorCode
@@ -92,7 +93,7 @@ class SummarizeBookUseCase:
             .replace("{{content}}", content)
         )
 
-    def _summarize_section(self, prompt: str) -> dict[str, object]:
+    def _summarize_section(self, prompt: str) -> dict[str, Any]:
         messages = [PromptMessage(role="user", content=prompt)]
         response = self._chat.chat(messages)
 
@@ -168,7 +169,7 @@ def _build_section_summary(
     book_id: str,
     index: int,
     section: Section,
-    parsed: dict[str, object],
+    parsed: dict[str, Any],
 ) -> SectionSummary:
     key_statements = [
         KeyStatement(
@@ -209,7 +210,7 @@ def _strip_code_fences(text: str) -> str:
     return "\n".join(lines).strip()
 
 
-def _try_parse_json(response: str) -> dict[str, object] | None:
+def _try_parse_json(response: str) -> dict[str, Any] | None:
     text = _strip_code_fences(response.strip())
     try:
         parsed = json.loads(text)
