@@ -110,7 +110,9 @@ class IngestBookUseCase:
         if self._embed_use_case is None:
             return None
         try:
-            self._embed_use_case.execute(book.id)
+            embedded_book = self._embed_use_case.execute(book.id)
+            book.embedding_provider = embedded_book.embedding_provider
+            book.embedding_dimension = embedded_book.embedding_dimension
         except Exception as exc:
             return exc
         return None
