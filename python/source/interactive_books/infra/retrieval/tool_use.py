@@ -63,16 +63,15 @@ class RetrievalStrategy:
                     result = handler(dict(invocation.arguments))
                     tool_result_content = result.formatted_text
 
-                    if on_event:
+                    search_results = [
+                        r for r in result.results if isinstance(r, SearchResult)
+                    ]
+                    if on_event and search_results:
                         on_event(
                             ToolResultEvent(
                                 query=result.query,
                                 result_count=result.result_count,
-                                results=[
-                                    r
-                                    for r in result.results
-                                    if isinstance(r, SearchResult)
-                                ],
+                                results=search_results,
                             )
                         )
 

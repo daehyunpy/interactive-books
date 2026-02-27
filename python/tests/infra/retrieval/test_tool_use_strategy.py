@@ -380,6 +380,79 @@ class TestToolUseStrategyEventEmission:
 
         assert text == "Answer."
 
+    def test_non_search_handler_skips_tool_result_event(self) -> None:
+        """Page tools return ToolResult with empty results — no ToolResultEvent."""
+        provider = FakeChatProvider(
+            [
+                ChatResponse(
+                    tool_invocations=[
+                        ToolInvocation(
+                            tool_name="set_page",
+                            tool_use_id="tu_1",
+                            arguments={"page": 42},
+                        )
+                    ],
+                ),
+                ChatResponse(text="Page set."),
+            ]
+        )
+        strategy = RetrievalStrategy()
+        events, on_event = _collect_events()
+
+        def set_page_handler(_arguments: dict[str, object]) -> ToolResult:
+            return ToolResult(formatted_text="Page set to 42.", query="", result_count=0)
+
+        strategy.execute(
+            provider,
+            [PromptMessage(role="user", content="I'm on page 42")],
+            [_search_tool()],
+            {"search_book": FakeSearchHandler(), "set_page": set_page_handler},
+            on_event=on_event,
+        )
+
+        event_types = [type(e) for e in events]
+        assert ToolInvocationEvent in event_types
+        assert ToolResultEvent not in event_types
+
+    def test_search_handler_emits_tool_result_event(self) -> None:
+        """Search handler with results still emits ToolResultEvent."""
+        provider = FakeChatProvider(
+            [
+                ChatResponse(
+                    tool_invocations=[
+                        ToolInvocation(
+                            tool_name="search_book",
+                            tool_use_id="tu_1",
+                            arguments={"query": "chapter 1"},
+                        )
+                    ],
+                ),
+                ChatResponse(text="Chapter 1 is about..."),
+            ]
+        )
+        strategy = RetrievalStrategy()
+        events, on_event = _collect_events()
+
+        strategy.execute(
+            provider,
+            [PromptMessage(role="user", content="Tell me about chapter 1")],
+            [_search_tool()],
+            FakeSearchHandler([
+                SearchResult(
+                    chunk_id="c1",
+                    content="Chapter 1 text.",
+                    start_page=1,
+                    end_page=5,
+                    distance=0.1,
+                )
+            ]).as_handlers(),
+            on_event=on_event,
+        )
+
+        result_events = [e for e in events if isinstance(e, ToolResultEvent)]
+        assert len(result_events) == 1
+        assert result_events[0].result_count == 1
+
     def test_no_token_event_when_usage_is_none(self) -> None:
         provider = FakeChatProvider([ChatResponse(text="Answer.")])
         strategy = RetrievalStrategy()

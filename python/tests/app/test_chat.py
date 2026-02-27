@@ -1,8 +1,10 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 from interactive_books.app.chat import ChatWithBookUseCase
+from interactive_books.domain.book import Book, BookStatus
 from interactive_books.domain.chat import ChatMessage, MessageRole
 from interactive_books.domain.chat_event import ChatEvent
 from interactive_books.domain.conversation import Conversation
@@ -45,6 +47,23 @@ class FakeChatMessageRepository:
         self._store = [m for m in self._store if m.conversation_id != conversation_id]
 
 
+class FakeBookRepository:
+    def __init__(self) -> None:
+        self._store: dict[str, Book] = {}
+
+    def save(self, book: Book) -> None:
+        self._store[book.id] = book
+
+    def get(self, book_id: str) -> Book | None:
+        return self._store.get(book_id)
+
+    def get_all(self) -> list[Book]:
+        return list(self._store.values())
+
+    def delete(self, book_id: str) -> None:
+        self._store.pop(book_id, None)
+
+
 class FakeSearchBooksUseCase:
     def __init__(self, results: list[SearchResult] | None = None) -> None:
         self._results = results or []
@@ -67,6 +86,9 @@ class FakeRetrievalStrategy:
         self._intermediate = intermediate_messages or []
         self.last_messages: list[PromptMessage] | None = None
         self.last_tools: list[ToolDefinition] | None = None
+        self.last_tool_handlers: dict[str, Callable[[dict[str, object]], ToolResult]] | None = (
+            None
+        )
         self.last_on_event: Callable[[ChatEvent], None] | None = None
 
     def execute(
@@ -79,6 +101,7 @@ class FakeRetrievalStrategy:
     ) -> tuple[str, list[ChatMessage]]:
         self.last_messages = messages
         self.last_tools = tools
+        self.last_tool_handlers = tool_handlers
         self.last_on_event = on_event
         return self._response_text, self._intermediate
 
@@ -143,6 +166,7 @@ def _make_use_case(
     context: FakeContextStrategy | None = None,
     search: FakeSearchBooksUseCase | None = None,
     chat: FakeChatProvider | None = None,
+    book_repo: FakeBookRepository | None = None,
     on_event: Callable[[ChatEvent], None] | None = None,
 ) -> ChatWithBookUseCase:
     return ChatWithBookUseCase(
@@ -152,6 +176,7 @@ def _make_use_case(
         search_use_case=search or FakeSearchBooksUseCase(),  # type: ignore[arg-type]
         conversation_repo=conversation_repo,  # type: ignore[arg-type]
         message_repo=message_repo,  # type: ignore[arg-type]
+        book_repo=book_repo or FakeBookRepository(),  # type: ignore[arg-type]
         prompts_dir=prompts_dir,
         on_event=on_event,
     )
@@ -220,8 +245,8 @@ class TestDirectReply:
         uc.execute("conv-1", "Hello")
 
         assert retrieval.last_tools is not None
-        assert len(retrieval.last_tools) == 1
-        assert retrieval.last_tools[0].name == "search_book"
+        tool_names = [t.name for t in retrieval.last_tools]
+        assert "search_book" in tool_names
 
 
 # ── Tests: Retrieve-then-Reply ───────────────────────────────────
@@ -498,3 +523,259 @@ class TestEventCallbackPassthrough:
         uc.execute("conv-1", "Hello")
 
         assert retrieval.last_on_event is None
+
+
+# ── Helpers for set_page tests ─────────────────────────────────
+
+
+def _seed_book(
+    repo: FakeBookRepository,
+    *,
+    book_id: str = "book-1",
+    current_page: int = 0,
+) -> Book:
+    book = Book(id=book_id, title="Test Book", status=BookStatus.READY, current_page=current_page)
+    repo.save(book)
+    return book
+
+
+def _invoke_set_page(
+    retrieval: FakeRetrievalStrategy,
+    arguments: dict[str, object],
+) -> ToolResult:
+    assert retrieval.last_tool_handlers is not None
+    handler = retrieval.last_tool_handlers["set_page"]
+    return handler(arguments)
+
+
+@dataclass
+class SetPageTestContext:
+    book_repo: FakeBookRepository
+    retrieval: FakeRetrievalStrategy
+    use_case: ChatWithBookUseCase
+
+
+def _setup_set_page_test(
+    *,
+    conversation_repo: FakeConversationRepository,
+    message_repo: FakeChatMessageRepository,
+    prompts_dir: Path,
+    current_page: int = 0,
+    seed_book: bool = True,
+) -> SetPageTestContext:
+    book_repo = FakeBookRepository()
+    if seed_book:
+        _seed_book(book_repo, current_page=current_page)
+    _seed_conversation(conversation_repo)
+    retrieval = FakeRetrievalStrategy()
+    use_case = _make_use_case(
+        conversation_repo=conversation_repo,
+        message_repo=message_repo,
+        prompts_dir=prompts_dir,
+        retrieval=retrieval,
+        book_repo=book_repo,
+    )
+    return SetPageTestContext(
+        book_repo=book_repo, retrieval=retrieval, use_case=use_case
+    )
+
+
+# ── Tests: set_page Tool Registration ──────────────────────────
+
+
+class TestSetPageToolRegistration:
+    def test_set_page_tool_appears_in_tools_list(
+        self,
+        prompts_dir: Path,
+        conversation_repo: FakeConversationRepository,
+        message_repo: FakeChatMessageRepository,
+    ) -> None:
+        ctx = _setup_set_page_test(
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=prompts_dir,
+        )
+
+        ctx.use_case.execute("conv-1", "Hello")
+
+        assert ctx.retrieval.last_tools is not None
+        tool_names = [t.name for t in ctx.retrieval.last_tools]
+        assert "set_page" in tool_names
+
+    def test_set_page_handler_registered(
+        self,
+        prompts_dir: Path,
+        conversation_repo: FakeConversationRepository,
+        message_repo: FakeChatMessageRepository,
+    ) -> None:
+        ctx = _setup_set_page_test(
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=prompts_dir,
+        )
+
+        ctx.use_case.execute("conv-1", "Hello")
+
+        assert ctx.retrieval.last_tool_handlers is not None
+        assert "set_page" in ctx.retrieval.last_tool_handlers
+
+
+# ── Tests: set_page Happy Path ─────────────────────────────────
+
+
+class TestSetPageHappyPath:
+    def test_sets_page_on_book(
+        self,
+        prompts_dir: Path,
+        conversation_repo: FakeConversationRepository,
+        message_repo: FakeChatMessageRepository,
+    ) -> None:
+        ctx = _setup_set_page_test(
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=prompts_dir,
+        )
+
+        ctx.use_case.execute("conv-1", "Set page")
+        result = _invoke_set_page(ctx.retrieval, {"page": 42})
+
+        book = ctx.book_repo.get("book-1")
+        assert book is not None
+        assert book.current_page == 42
+        assert result.result_count == 0
+        assert "42" in result.formatted_text
+
+    def test_resets_page_to_zero(
+        self,
+        prompts_dir: Path,
+        conversation_repo: FakeConversationRepository,
+        message_repo: FakeChatMessageRepository,
+    ) -> None:
+        ctx = _setup_set_page_test(
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=prompts_dir,
+            current_page=50,
+        )
+
+        ctx.use_case.execute("conv-1", "Reset page")
+        result = _invoke_set_page(ctx.retrieval, {"page": 0})
+
+        book = ctx.book_repo.get("book-1")
+        assert book is not None
+        assert book.current_page == 0
+        assert "reset" in result.formatted_text.lower()
+
+
+# ── Tests: set_page Coercion ────────────────────────────────────
+
+
+class TestSetPageCoercion:
+    def test_coerces_float_to_int(
+        self,
+        prompts_dir: Path,
+        conversation_repo: FakeConversationRepository,
+        message_repo: FakeChatMessageRepository,
+    ) -> None:
+        """LLMs send 50.0 for integer params because JSON has no int type."""
+        ctx = _setup_set_page_test(
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=prompts_dir,
+        )
+
+        ctx.use_case.execute("conv-1", "Set page")
+        result = _invoke_set_page(ctx.retrieval, {"page": 50.0})
+
+        book = ctx.book_repo.get("book-1")
+        assert book is not None
+        assert book.current_page == 50
+        assert "50" in result.formatted_text
+
+    def test_coerces_string_to_int(
+        self,
+        prompts_dir: Path,
+        conversation_repo: FakeConversationRepository,
+        message_repo: FakeChatMessageRepository,
+    ) -> None:
+        ctx = _setup_set_page_test(
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=prompts_dir,
+        )
+
+        ctx.use_case.execute("conv-1", "Set page")
+        _invoke_set_page(ctx.retrieval, {"page": "50"})
+
+        book = ctx.book_repo.get("book-1")
+        assert book is not None
+        assert book.current_page == 50
+
+
+# ── Tests: set_page Error Handling ────────────────────────────
+
+
+class TestSetPageErrorHandling:
+    def test_returns_error_for_negative_page(
+        self,
+        prompts_dir: Path,
+        conversation_repo: FakeConversationRepository,
+        message_repo: FakeChatMessageRepository,
+    ) -> None:
+        """Domain error caught and returned in ToolResult, not raised."""
+        ctx = _setup_set_page_test(
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=prompts_dir,
+            current_page=10,
+        )
+
+        ctx.use_case.execute("conv-1", "Set page")
+        result = _invoke_set_page(ctx.retrieval, {"page": -5})
+
+        assert "error" in result.formatted_text.lower()
+        book = ctx.book_repo.get("book-1")
+        assert book is not None
+        assert book.current_page == 10
+
+    def test_returns_error_for_non_numeric_page(
+        self,
+        prompts_dir: Path,
+        conversation_repo: FakeConversationRepository,
+        message_repo: FakeChatMessageRepository,
+    ) -> None:
+        """Non-numeric input caught and returned in ToolResult."""
+        ctx = _setup_set_page_test(
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=prompts_dir,
+        )
+
+        ctx.use_case.execute("conv-1", "Set page")
+        result = _invoke_set_page(ctx.retrieval, {"page": "fifty"})
+
+        assert "error" in result.formatted_text.lower()
+
+
+# ── Tests: set_page Book Not Found ────────────────────────────
+
+
+class TestSetPageBookNotFound:
+    def test_returns_error_when_book_missing(
+        self,
+        prompts_dir: Path,
+        conversation_repo: FakeConversationRepository,
+        message_repo: FakeChatMessageRepository,
+    ) -> None:
+        """Guard against book_repo.get() returning None."""
+        ctx = _setup_set_page_test(
+            conversation_repo=conversation_repo,
+            message_repo=message_repo,
+            prompts_dir=prompts_dir,
+            seed_book=False,
+        )
+
+        ctx.use_case.execute("conv-1", "Set page")
+        result = _invoke_set_page(ctx.retrieval, {"page": 10})
+
+        assert "not found" in result.formatted_text.lower()

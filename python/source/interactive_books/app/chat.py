@@ -9,6 +9,7 @@ from interactive_books.domain.chat_event import ChatEvent
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.protocols import (
+    BookRepository,
     ChatMessageRepository,
     ChatProvider,
     ConversationContextStrategy,
@@ -33,6 +34,47 @@ SEARCH_BOOK_TOOL = ToolDefinition(
     },
 )
 
+SET_PAGE_TOOL = ToolDefinition(
+    name="set_page",
+    description="Update the reader's current page position in the book. Use this when the reader tells you what page they are on. Set to 0 to reset (show all content).",
+    parameters={
+        "type": "object",
+        "properties": {
+            "page": {
+                "type": "integer",
+                "description": "The page number the reader is currently on. Must be 0 or positive. 0 resets the reading position.",
+            }
+        },
+        "required": ["page"],
+    },
+)
+
+NO_CONTEXT_MESSAGE = "No relevant passages found in the book for this query."
+
+
+def _format_search_results(results: list[SearchResult]) -> str:
+    if not results:
+        return NO_CONTEXT_MESSAGE
+    passages = [
+        f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}" for r in results
+    ]
+    return "\n\n".join(passages)
+
+
+def _parse_page_argument(arguments: dict[str, object]) -> int | None:
+    try:
+        return int(arguments.get("page", 0))  # type: ignore[arg-type]
+    except (ValueError, TypeError):
+        return None
+
+
+def _error_tool_result(message: str) -> ToolResult:
+    return ToolResult(formatted_text=f"Error: {message}", query="", result_count=0)
+
+
+def _info_tool_result(message: str) -> ToolResult:
+    return ToolResult(formatted_text=message, query="", result_count=0)
+
 
 class ChatWithBookUseCase:
     def __init__(
@@ -44,6 +86,7 @@ class ChatWithBookUseCase:
         search_use_case: SearchBooksUseCase,
         conversation_repo: ConversationRepository,
         message_repo: ChatMessageRepository,
+        book_repo: BookRepository,
         prompts_dir: Path,
         on_event: Callable[[ChatEvent], None] | None = None,
         summary_context: str | None = None,
@@ -54,6 +97,7 @@ class ChatWithBookUseCase:
         self._search = search_use_case
         self._conversation_repo = conversation_repo
         self._message_repo = message_repo
+        self._book_repo = book_repo
         self._prompts_dir = prompts_dir
         self._on_event = on_event
         self._summary_context = summary_context
@@ -93,12 +137,37 @@ class ChatWithBookUseCase:
                 results=list(results),
             )
 
-        tool_handlers = {"search_book": search_book_handler}
+        def set_page_handler(arguments: dict[str, object]) -> ToolResult:
+            page = _parse_page_argument(arguments)
+            if page is None:
+                return _error_tool_result("invalid page number — must be a whole number")
+
+            book = self._book_repo.get(book_id)
+            if book is None:
+                return _error_tool_result(f"book not found ({book_id})")
+
+            try:
+                book.set_current_page(page)
+            except BookError as e:
+                return _error_tool_result(e.message)
+
+            self._book_repo.save(book)
+
+            if page == 0:
+                return _info_tool_result(
+                    "Reading position reset. All content is now available."
+                )
+            return _info_tool_result(f"Reading position set to page {page}.")
+
+        tool_handlers = {
+            "search_book": search_book_handler,
+            "set_page": set_page_handler,
+        }
 
         response_text, new_messages = self._retrieval.execute(
             self._chat,
             prompt_messages,
-            [SEARCH_BOOK_TOOL],
+            [SEARCH_BOOK_TOOL, SET_PAGE_TOOL],
             tool_handlers,
             on_event=self._on_event,
         )
@@ -138,15 +207,3 @@ class ChatWithBookUseCase:
 
     def _load_template(self, filename: str) -> str:
         return (self._prompts_dir / filename).read_text().strip()
-
-
-NO_CONTEXT_MESSAGE = "No relevant passages found in the book for this query."
-
-
-def _format_search_results(results: list[SearchResult]) -> str:
-    if not results:
-        return NO_CONTEXT_MESSAGE
-    passages = [
-        f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}" for r in results
-    ]
-    return "\n\n".join(passages)
