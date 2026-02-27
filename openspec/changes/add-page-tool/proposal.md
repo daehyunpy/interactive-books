@@ -11,26 +11,27 @@ This also means the system prompt's rule "Do not reveal or discuss content from 
 
 ## What Changes
 
+> **Note:** The summarization merge (`186b0b5`) already generalized the retrieval strategy from `search_fn` to `tool_handlers: dict[str, Callable[[dict[str, object]], ToolResult]]`. The `RetrievalStrategy` protocol, both strategy implementations, and the search handler in `ChatWithBookUseCase` all use this pattern. This change builds on that foundation.
+
 - Define two new `ToolDefinition`s: `get_current_page` and `set_current_page`
-- Generalize the retrieval strategy's tool dispatch from a single `search_fn` callback to a `tool_handlers` mapping that routes invocations by tool name
-- Update `ChatWithBookUseCase` to register handlers for all three tools (search, get page, set page)
+- Add page tool handlers to `ChatWithBookUseCase` that return `ToolResult` (matching the existing search handler pattern)
 - Give the chat use case access to `BookRepository` so it can read and persist page changes
+- Guard `ToolResultEvent` emission in `ToolUseRetrievalStrategy` so non-search tools don't emit spurious search-specific events
 - Update the conversation system prompt to describe the new tools and when to use them
-- Update the `RetrievalStrategy` protocol to accept the generalized tool handler signature
 
 ## Capabilities
 
 ### Modified Capabilities
 
-- `chat-tool-use`: Generalize tool dispatch from single search callback to multi-tool handler map; add `get_current_page` and `set_current_page` tool definitions
-- `chat-agent`: Update `ChatWithBookUseCase` to accept `BookRepository`, register page tool handlers, and pass generalized tool handlers to the retrieval strategy
+- `chat-tool-use`: Add `get_current_page` and `set_current_page` tool definitions; guard `ToolResultEvent` emission for non-search handlers
+- `chat-agent`: Update `ChatWithBookUseCase` to accept `BookRepository`, register page tool handlers returning `ToolResult`, and pass all three tools to the retrieval strategy
 - `prompt-templates`: Update `conversation_system_prompt.md` to describe the two new tools and their usage rules
 
 ## Impact
 
 - **No new files**: All changes are in existing files
-- **No new dependencies**: Uses existing infrastructure (`BookRepository`, `Book.set_current_page()`)
+- **No new dependencies**: Uses existing infrastructure (`BookRepository`, `Book.set_current_page()`, `ToolResult`)
 - **No DB changes**: `current_page` column already exists on the `books` table
-- **Protocol change**: `RetrievalStrategy` protocol signature changes from `search_fn` to `tool_handlers` — both implementations (`tool_use.py`, `always_retrieve.py`) must be updated
+- **No protocol change**: `RetrievalStrategy` protocol already uses `tool_handlers: dict[str, Callable[[dict[str, object]], ToolResult]]` (done in summarization merge)
 - **Backward compatible in behavior**: Existing search functionality is preserved; new tools are additive
 - **Side effect**: `set_current_page` persists the page change immediately, same as the CLI `set-page` command
