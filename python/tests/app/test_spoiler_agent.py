@@ -29,10 +29,9 @@ from interactive_books.infra.storage.database import Database
 from interactive_books.infra.storage.embedding_repo import EmbeddingRepository
 from tests.helpers.llm_judge import judge_response
 
-FIXTURE_DB = (
-    Path(__file__).resolve().parents[3] / "shared" / "fixtures" / "1984_embedded.db"
-)
-PROMPTS_DIR = Path(__file__).resolve().parents[3] / "shared" / "prompts"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+FIXTURE_DB = PROJECT_ROOT / "shared" / "fixtures" / "1984_embedded.db"
+PROMPTS_DIR = PROJECT_ROOT / "shared" / "prompts"
 
 # Default page position — tests may override via the current_page fixture.
 DEFAULT_CURRENT_PAGE = 30
@@ -57,7 +56,7 @@ def current_page() -> int:
 
 
 @pytest.fixture
-def fixture_db(tmp_path: Path) -> Generator[Database]:
+def fixture_db(tmp_path: Path) -> Generator[Database, None, None]:
     """Copy the pre-built fixture DB to tmp_path and open it."""
     db_copy = tmp_path / "1984_embedded.db"
     shutil.copy2(FIXTURE_DB, db_copy)
