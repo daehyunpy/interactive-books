@@ -146,6 +146,107 @@ class TestToolUseStrategyMaxIterations:
         assert text == "Final answer after max iterations."
         assert len(new_messages) == 3
 
+    def test_returns_nonempty_text_when_all_iterations_yield_tool_calls(self) -> None:
+        """Reproduces bug: LLM never produces text, only tool calls on every
+        iteration (including the final call after the loop). The strategy
+        should never return an empty assistant response."""
+        invocation = ToolInvocation(
+            tool_name="search_book",
+            tool_use_id="tu_1",
+            arguments={"query": "what did I ask?"},
+        )
+        # 3 loop iterations + 1 final call — all return tool invocations, no text
+        provider = FakeChatProvider(
+            [
+                ChatResponse(tool_invocations=[invocation]),
+                ChatResponse(tool_invocations=[invocation]),
+                ChatResponse(tool_invocations=[invocation]),
+                ChatResponse(tool_invocations=[invocation]),
+            ]
+        )
+        strategy = RetrievalStrategy()
+
+        text, _ = strategy.execute(
+            provider,
+            [PromptMessage(role="user", content="what did I ask?")],
+            [_search_tool()],
+            _make_search_fn([]),
+        )
+
+        assert text != "", "Assistant response must not be empty"
+
+    def test_returns_nonempty_text_when_final_response_has_no_text(self) -> None:
+        """Reproduces bug: LLM exhausts tool iterations, then the final call
+        returns text=None with no tool invocations (end_turn with empty content)."""
+        invocation = ToolInvocation(
+            tool_name="search_book",
+            tool_use_id="tu_1",
+            arguments={"query": "tell me about julia"},
+        )
+        provider = FakeChatProvider(
+            [
+                ChatResponse(tool_invocations=[invocation]),
+                ChatResponse(tool_invocations=[invocation]),
+                ChatResponse(tool_invocations=[invocation]),
+                ChatResponse(text=None),  # final call returns no text
+            ]
+        )
+        strategy = RetrievalStrategy()
+
+        text, _ = strategy.execute(
+            provider,
+            [PromptMessage(role="user", content="tell me about julia")],
+            [_search_tool()],
+            _make_search_fn([]),
+        )
+
+        assert text != "", "Assistant response must not be empty"
+
+    def test_returns_nonempty_text_when_results_are_irrelevant(self) -> None:
+        """Reproduces bug: search returns results but they're irrelevant
+        (e.g., early-book passages for a question about the ending).
+        The LLM keeps retrying and never produces text."""
+        invocation = ToolInvocation(
+            tool_name="search_book",
+            tool_use_id="tu_1",
+            arguments={"query": "what happens to Winston at the end"},
+        )
+        irrelevant_results = [
+            SearchResult(
+                chunk_id="c1",
+                content="dust swirled in the air and the willow-herb straggled",
+                start_page=6,
+                end_page=8,
+                distance=0.8,
+            ),
+            SearchResult(
+                chunk_id="c2",
+                content="an abstract, undirected emotion which could be switched",
+                start_page=19,
+                end_page=21,
+                distance=0.7,
+            ),
+        ]
+        # 3 loop iterations with irrelevant results + final call with no text
+        provider = FakeChatProvider(
+            [
+                ChatResponse(tool_invocations=[invocation]),
+                ChatResponse(tool_invocations=[invocation]),
+                ChatResponse(tool_invocations=[invocation]),
+                ChatResponse(text=None),
+            ]
+        )
+        strategy = RetrievalStrategy()
+
+        text, _ = strategy.execute(
+            provider,
+            [PromptMessage(role="user", content="What happens to Winston at the end?")],
+            [_search_tool()],
+            _make_search_fn(irrelevant_results),
+        )
+
+        assert text != "", "Assistant response must not be empty"
+
 
 class TestToolUseStrategyNoResults:
     def test_no_search_results_returns_no_passages_message(self) -> None:

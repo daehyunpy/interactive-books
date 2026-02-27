@@ -15,6 +15,9 @@ from interactive_books.domain.tool import ChatResponse, ToolDefinition
 
 MAX_TOOL_ITERATIONS = 3
 NO_CONTEXT_MESSAGE = "No relevant passages found in the book for this query."
+EMPTY_RESPONSE_FALLBACK = (
+    "I'm sorry, I wasn't able to find an answer. Could you try rephrasing your question?"
+)
 _PLACEHOLDER_CONVERSATION_ID = ""
 
 
@@ -35,7 +38,8 @@ class RetrievalStrategy:
             self._emit_token_usage(response, on_event)
 
             if not response.tool_invocations:
-                return response.text or "", new_chat_messages
+                text = response.text or EMPTY_RESPONSE_FALLBACK
+                return text, new_chat_messages
 
             for invocation in response.tool_invocations:
                 if on_event:
@@ -83,9 +87,16 @@ class RetrievalStrategy:
                     )
                 )
 
-        final_response = chat_provider.chat_with_tools(current_messages, tools)
+        current_messages.append(
+            PromptMessage(
+                role="user",
+                content="Please answer based on the passages you have already retrieved.",
+            )
+        )
+        final_response = chat_provider.chat_with_tools(current_messages, tools=[])
         self._emit_token_usage(final_response, on_event)
-        return final_response.text or "", new_chat_messages
+        text = final_response.text or EMPTY_RESPONSE_FALLBACK
+        return text, new_chat_messages
 
     @staticmethod
     def _emit_token_usage(
