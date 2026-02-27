@@ -11,8 +11,8 @@ from interactive_books.domain.conversation import Conversation
 from interactive_books.domain.embedding_vector import EmbeddingVector
 from interactive_books.domain.page_content import PageContent
 from interactive_books.domain.prompt_message import PromptMessage
-from interactive_books.domain.search_result import SearchResult
-from interactive_books.domain.tool import ChatResponse, ToolDefinition
+from interactive_books.domain.section_summary import SectionSummary
+from interactive_books.domain.tool import ChatResponse, ToolDefinition, ToolResult
 
 
 class BookRepository(Protocol):
@@ -25,7 +25,9 @@ class BookRepository(Protocol):
 class ChunkRepository(Protocol):
     def save_chunks(self, book_id: str, chunks: list[Chunk]) -> None: ...
     def get_by_book(self, book_id: str) -> list[Chunk]: ...
-    def get_up_to_page(self, book_id: str, page: int) -> list[Chunk]: ...
+    def get_by_page_range(
+        self, book_id: str, start_page: int, end_page: int
+    ) -> list[Chunk]: ...
     def count_by_book(self, book_id: str) -> int: ...
     def delete_by_book(self, book_id: str) -> None: ...
 
@@ -83,7 +85,7 @@ class EmbeddingRepository(Protocol):
         book_id: str,
         query_vector: list[float],
         top_k: int,
-    ) -> list[tuple[str, float]]: ...
+    ) -> list[tuple[str, float, int, int]]: ...
 
 
 class ConversationRepository(Protocol):
@@ -105,9 +107,15 @@ class RetrievalStrategy(Protocol):
         chat_provider: "ChatProvider",
         messages: list[PromptMessage],
         tools: list[ToolDefinition],
-        search_fn: Callable[[str], list[SearchResult]],
+        tool_handlers: dict[str, Callable[[dict[str, object]], ToolResult]],
         on_event: Callable[[ChatEvent], None] | None = None,
     ) -> tuple[str, list[ChatMessage]]: ...
+
+
+class SummaryRepository(Protocol):
+    def save_all(self, book_id: str, summaries: list[SectionSummary]) -> None: ...
+    def get_by_book(self, book_id: str) -> list[SectionSummary]: ...
+    def delete_by_book(self, book_id: str) -> None: ...
 
 
 class ConversationContextStrategy(Protocol):

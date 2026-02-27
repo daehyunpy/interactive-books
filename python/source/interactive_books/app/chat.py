@@ -16,7 +16,7 @@ from interactive_books.domain.protocols import (
     RetrievalStrategy,
 )
 from interactive_books.domain.search_result import SearchResult
-from interactive_books.domain.tool import ToolDefinition
+from interactive_books.domain.tool import ToolDefinition, ToolResult
 
 SEARCH_BOOK_TOOL = ToolDefinition(
     name="search_book",
@@ -46,6 +46,7 @@ class ChatWithBookUseCase:
         message_repo: ChatMessageRepository,
         prompts_dir: Path,
         on_event: Callable[[ChatEvent], None] | None = None,
+        summary_context: str | None = None,
     ) -> None:
         self._chat = chat_provider
         self._retrieval = retrieval_strategy
@@ -55,6 +56,7 @@ class ChatWithBookUseCase:
         self._message_repo = message_repo
         self._prompts_dir = prompts_dir
         self._on_event = on_event
+        self._summary_context = summary_context
 
     def execute(self, conversation_id: str, user_message: str) -> str:
         conversation = self._conversation_repo.get(conversation_id)
@@ -69,25 +71,35 @@ class ChatWithBookUseCase:
 
         system_prompt = self._load_template("conversation_system_prompt.md")
 
+        if not history and self._summary_context:
+            system_prompt += f"\n\nBook structure overview:\n{self._summary_context}"
+
         prompt_messages: list[PromptMessage] = [
             PromptMessage(role="system", content=system_prompt),
-            *[
-                PromptMessage(role=msg.role.value, content=msg.content)
-                for msg in context_window
-            ],
+            *[PromptMessage(role=msg.role.value, content=msg.content) for msg in context_window],
             PromptMessage(role="user", content=user_message),
         ]
 
         book_id = conversation.book_id
 
-        def search_fn(query: str) -> list[SearchResult]:
-            return self._search.execute(book_id, query)
+        def search_book_handler(arguments: dict[str, object]) -> ToolResult:
+            query = str(arguments.get("query", ""))
+            results = self._search.execute(book_id, query)
+            formatted = _format_search_results(results)
+            return ToolResult(
+                formatted_text=formatted,
+                query=query,
+                result_count=len(results),
+                results=list(results),
+            )
+
+        tool_handlers = {"search_book": search_book_handler}
 
         response_text, new_messages = self._retrieval.execute(
             self._chat,
             prompt_messages,
             [SEARCH_BOOK_TOOL],
-            search_fn,
+            tool_handlers,
             on_event=self._on_event,
         )
 
@@ -126,3 +138,15 @@ class ChatWithBookUseCase:
 
     def _load_template(self, filename: str) -> str:
         return (self._prompts_dir / filename).read_text().strip()
+
+
+NO_CONTEXT_MESSAGE = "No relevant passages found in the book for this query."
+
+
+def _format_search_results(results: list[SearchResult]) -> str:
+    if not results:
+        return NO_CONTEXT_MESSAGE
+    passages = [
+        f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}" for r in results
+    ]
+    return "\n\n".join(passages)

@@ -9,7 +9,7 @@ from interactive_books.domain.conversation import Conversation
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.search_result import SearchResult
-from interactive_books.domain.tool import ChatResponse, ToolDefinition
+from interactive_books.domain.tool import ChatResponse, ToolDefinition, ToolResult
 
 # ── Fakes ────────────────────────────────────────────────────────
 
@@ -74,7 +74,7 @@ class FakeRetrievalStrategy:
         chat_provider: object,
         messages: list[PromptMessage],
         tools: list[ToolDefinition],
-        search_fn: object,
+        tool_handlers: dict[str, Callable[[dict[str, object]], ToolResult]],
         on_event: Callable[[ChatEvent], None] | None = None,
     ) -> tuple[str, list[ChatMessage]]:
         self.last_messages = messages
