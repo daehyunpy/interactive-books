@@ -542,7 +542,7 @@ def search_page(
             raise BookError(BookErrorCode.NOT_FOUND, f"Book not found: {book_id}")
 
         chunk_repo = ChunkRepository(db)
-        chunks = chunk_repo.get_by_page(book_id, page)
+        chunks = chunk_repo.get_by_page_range(book_id, page, page)
 
         if not chunks:
             typer.echo(f"No content found on page {page}.")

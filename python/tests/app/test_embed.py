@@ -2,63 +2,13 @@ import pytest
 from interactive_books.app.embed import EmbedBookUseCase
 from interactive_books.domain.book import Book, BookStatus
 from interactive_books.domain.chunk import Chunk
-from interactive_books.domain.embedding_vector import EmbeddingVector
 from interactive_books.domain.errors import BookError, BookErrorCode
-
-
-class FakeBookRepository:
-    def __init__(self) -> None:
-        self.books: dict[str, Book] = {}
-
-    def save(self, book: Book) -> None:
-        self.books[book.id] = book
-
-    def get(self, book_id: str) -> Book | None:
-        return self.books.get(book_id)
-
-    def get_all(self) -> list[Book]:
-        return list(self.books.values())
-
-    def delete(self, book_id: str) -> None:
-        self.books.pop(book_id, None)
-
-
-class FakeChunkRepository:
-    def __init__(self) -> None:
-        self.chunks: dict[str, list[Chunk]] = {}
-
-    def save_chunks(self, book_id: str, chunks: list[Chunk]) -> None:
-        self.chunks[book_id] = chunks
-
-    def get_by_book(self, book_id: str) -> list[Chunk]:
-        return self.chunks.get(book_id, [])
-
-    def get_up_to_page(self, book_id: str, page: int) -> list[Chunk]:
-        return [c for c in self.get_by_book(book_id) if c.start_page <= page]
-
-    def count_by_book(self, book_id: str) -> int:
-        return len(self.chunks.get(book_id, []))
-
-    def delete_by_book(self, book_id: str) -> None:
-        self.chunks.pop(book_id, None)
-
-
-class FakeEmbeddingProvider:
-    def __init__(self, dimension: int = 4) -> None:
-        self._dimension = dimension
-        self.call_count = 0
-
-    @property
-    def provider_name(self) -> str:
-        return "fake"
-
-    @property
-    def dimension(self) -> int:
-        return self._dimension
-
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        self.call_count += 1
-        return [[0.1] * self._dimension for _ in texts]
+from tests.fakes import (
+    FakeBookRepository,
+    FakeChunkRepository,
+    FakeEmbeddingProvider,
+    FakeEmbeddingRepository,
+)
 
 
 class FailingEmbeddingProvider:
@@ -74,52 +24,6 @@ class FailingEmbeddingProvider:
         raise BookError(BookErrorCode.EMBEDDING_FAILED, "API exploded")
 
 
-class FakeEmbeddingRepository:
-    def __init__(self) -> None:
-        self.tables: set[str] = set()
-        self.embeddings: dict[str, list[tuple[str, EmbeddingVector]]] = {}
-
-    def ensure_table(self, provider_name: str, dimension: int) -> None:
-        self.tables.add(f"{provider_name}_{dimension}")
-
-    def save_embeddings(
-        self,
-        provider_name: str,
-        dimension: int,
-        book_id: str,
-        embeddings: list[EmbeddingVector],
-    ) -> None:
-        key = f"{provider_name}_{dimension}"
-        if key not in self.embeddings:
-            self.embeddings[key] = []
-        self.embeddings[key].extend((book_id, ev) for ev in embeddings)
-
-    def delete_by_book(self, provider_name: str, dimension: int, book_id: str) -> None:
-        key = f"{provider_name}_{dimension}"
-        if key in self.embeddings:
-            self.embeddings[key] = [
-                (bid, ev) for bid, ev in self.embeddings[key] if bid != book_id
-            ]
-
-    def has_embeddings(self, book_id: str, provider_name: str, dimension: int) -> bool:
-        key = f"{provider_name}_{dimension}"
-        return any(bid == book_id for bid, _ in self.embeddings.get(key, []))
-
-    def search(
-        self,
-        provider_name: str,
-        dimension: int,
-        book_id: str,
-        query_vector: list[float],
-        top_k: int,
-    ) -> list[tuple[str, float, int, int]]:
-        return []
-
-    def count_for_book(self, book_id: str, provider_name: str, dimension: int) -> int:
-        key = f"{provider_name}_{dimension}"
-        return sum(1 for bid, _ in self.embeddings.get(key, []) if bid == book_id)
-
-
 def _ready_book(book_id: str = "book-1", title: str = "Test Book") -> Book:
     book = Book(id=book_id, title=title)
     book.start_ingestion()
@@ -133,8 +37,8 @@ def _chunks(book_id: str = "book-1", count: int = 3) -> list[Chunk]:
             id=f"chunk-{i}",
             book_id=book_id,
             content=f"Content of chunk {i}.",
-            start_page=1,
-            end_page=1,
+            start_page=i + 1,
+            end_page=i + 1,
             chunk_index=i,
         )
         for i in range(count)
@@ -282,3 +186,40 @@ class TestEmbedFailureCleanup:
         assert saved_book.embedding_provider is None
         assert saved_book.embedding_dimension is None
         assert not embedding_repo.has_embeddings("book-1", "failing", 4)
+
+
+class TestEmbedPageRangePropagation:
+    def test_page_ranges_propagated_from_chunks_to_embedding_vectors(self) -> None:
+        use_case, book_repo, chunk_repo, embedding_repo = _make_use_case()
+        book = _ready_book()
+        book_repo.save(book)
+        chunks = [
+            Chunk(
+                id="chunk-0",
+                book_id="book-1",
+                content="First section.",
+                start_page=1,
+                end_page=3,
+                chunk_index=0,
+            ),
+            Chunk(
+                id="chunk-1",
+                book_id="book-1",
+                content="Second section.",
+                start_page=4,
+                end_page=7,
+                chunk_index=1,
+            ),
+        ]
+        chunk_repo.save_chunks("book-1", chunks)
+
+        use_case.execute("book-1")
+
+        stored = embedding_repo.embeddings["fake_4"]
+        assert len(stored) == 2
+        _, ev0 = stored[0]
+        _, ev1 = stored[1]
+        assert ev0.start_page == 1
+        assert ev0.end_page == 3
+        assert ev1.start_page == 4
+        assert ev1.end_page == 7

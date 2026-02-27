@@ -3,11 +3,11 @@ from pathlib import Path
 import pytest
 from interactive_books.app.ingest import IngestBookUseCase
 from interactive_books.domain.book import Book, BookStatus
-from interactive_books.domain.chunk import Chunk
 from interactive_books.domain.chunk_data import ChunkData
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.domain.page_content import PageContent
 from interactive_books.domain.protocols import BookParser, TextChunker, UrlParser
+from tests.fakes import FakeBookRepository, FakeChunkRepository
 
 
 class FakeEmbedBookUseCase:
@@ -20,43 +20,6 @@ class FakeEmbedBookUseCase:
         if self._error is not None:
             raise self._error
         return Book(id=book_id, title="embedded")
-
-
-class FakeBookRepository:
-    def __init__(self) -> None:
-        self.books: dict[str, Book] = {}
-
-    def save(self, book: Book) -> None:
-        self.books[book.id] = book
-
-    def get(self, book_id: str) -> Book | None:
-        return self.books.get(book_id)
-
-    def get_all(self) -> list[Book]:
-        return list(self.books.values())
-
-    def delete(self, book_id: str) -> None:
-        self.books.pop(book_id, None)
-
-
-class FakeChunkRepository:
-    def __init__(self) -> None:
-        self.chunks: dict[str, list[Chunk]] = {}
-
-    def save_chunks(self, book_id: str, chunks: list[Chunk]) -> None:
-        self.chunks[book_id] = chunks
-
-    def get_by_book(self, book_id: str) -> list[Chunk]:
-        return self.chunks.get(book_id, [])
-
-    def get_up_to_page(self, book_id: str, page: int) -> list[Chunk]:
-        return [c for c in self.get_by_book(book_id) if c.start_page <= page]
-
-    def count_by_book(self, book_id: str) -> int:
-        return len(self.chunks.get(book_id, []))
-
-    def delete_by_book(self, book_id: str) -> None:
-        self.chunks.pop(book_id, None)
 
 
 class FakeParser:

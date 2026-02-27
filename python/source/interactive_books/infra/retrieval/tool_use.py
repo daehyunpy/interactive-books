@@ -11,10 +11,9 @@ from interactive_books.domain.chat_event import (
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.protocols import ChatProvider
 from interactive_books.domain.search_result import SearchResult
-from interactive_books.domain.tool import ChatResponse, ToolDefinition
+from interactive_books.domain.tool import ChatResponse, ToolDefinition, ToolResult
 
 MAX_TOOL_ITERATIONS = 3
-NO_CONTEXT_MESSAGE = "No relevant passages found in the book for this query."
 EMPTY_RESPONSE_FALLBACK = (
     "I'm sorry, I wasn't able to find an answer. Could you try rephrasing your question?"
 )
@@ -27,7 +26,7 @@ class RetrievalStrategy:
         chat_provider: ChatProvider,
         messages: list[PromptMessage],
         tools: list[ToolDefinition],
-        search_fn: Callable[[str], list[SearchResult]],
+        tool_handlers: dict[str, Callable[[dict[str, object]], ToolResult]],
         on_event: Callable[[ChatEvent], None] | None = None,
     ) -> tuple[str, list[ChatMessage]]:
         current_messages = list(messages)
@@ -57,19 +56,25 @@ class RetrievalStrategy:
                 )
                 current_messages.append(assistant_msg)
 
-                query = str(invocation.arguments.get("query", ""))
-                results = search_fn(query)
+                handler = tool_handlers.get(invocation.tool_name)
+                if handler is None:
+                    tool_result_content = f"Unknown tool: {invocation.tool_name}"
+                else:
+                    result = handler(dict(invocation.arguments))
+                    tool_result_content = result.formatted_text
 
-                if on_event:
-                    on_event(
-                        ToolResultEvent(
-                            query=query,
-                            result_count=len(results),
-                            results=results,
+                    if on_event:
+                        on_event(
+                            ToolResultEvent(
+                                query=result.query,
+                                result_count=result.result_count,
+                                results=[
+                                    r
+                                    for r in result.results
+                                    if isinstance(r, SearchResult)
+                                ],
+                            )
                         )
-                    )
-
-                tool_result_content = self._format_results(results)
 
                 tool_result_msg = PromptMessage(
                     role="tool_result",
@@ -110,12 +115,3 @@ class RetrievalStrategy:
                     output_tokens=response.usage.output_tokens,
                 )
             )
-
-    @staticmethod
-    def _format_results(results: list[SearchResult]) -> str:
-        if not results:
-            return NO_CONTEXT_MESSAGE
-        passages = [
-            f"[Pages {r.start_page}-{r.end_page}]:\n{r.content}" for r in results
-        ]
-        return "\n\n".join(passages)
