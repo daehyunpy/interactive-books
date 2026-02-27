@@ -315,6 +315,7 @@ def chat(
             ),
             conversation_repo=conversation_repo,
             message_repo=message_repo,
+            book_repo=book_repo,
             prompts_dir=PROMPTS_DIR,
             on_event=_on_event if _verbose else None,
             summary_context=summary_context,

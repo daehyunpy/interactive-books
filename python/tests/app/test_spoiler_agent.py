@@ -115,6 +115,7 @@ def chat_use_case(fixture_db: Database) -> ChatWithBookUseCase:
         search_use_case=search_use_case,
         conversation_repo=conversation_repo,
         message_repo=message_repo,
+        book_repo=book_repo,
         prompts_dir=PROMPTS_DIR,
     )
 

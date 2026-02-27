@@ -9,6 +9,7 @@ from interactive_books.domain.chat_event import ChatEvent
 from interactive_books.domain.errors import BookError, BookErrorCode
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.protocols import (
+    BookRepository,
     ChatMessageRepository,
     ChatProvider,
     ConversationContextStrategy,
@@ -33,6 +34,21 @@ SEARCH_BOOK_TOOL = ToolDefinition(
     },
 )
 
+SET_PAGE_TOOL = ToolDefinition(
+    name="set_page",
+    description="Update the reader's current page position in the book. Use this when the reader tells you what page they are on. Set to 0 to reset (show all content).",
+    parameters={
+        "type": "object",
+        "properties": {
+            "page": {
+                "type": "integer",
+                "description": "The page number the reader is currently on. Must be 0 or positive. 0 resets the reading position.",
+            }
+        },
+        "required": ["page"],
+    },
+)
+
 
 class ChatWithBookUseCase:
     def __init__(
@@ -44,6 +60,7 @@ class ChatWithBookUseCase:
         search_use_case: SearchBooksUseCase,
         conversation_repo: ConversationRepository,
         message_repo: ChatMessageRepository,
+        book_repo: BookRepository,
         prompts_dir: Path,
         on_event: Callable[[ChatEvent], None] | None = None,
         summary_context: str | None = None,
@@ -54,6 +71,7 @@ class ChatWithBookUseCase:
         self._search = search_use_case
         self._conversation_repo = conversation_repo
         self._message_repo = message_repo
+        self._book_repo = book_repo
         self._prompts_dir = prompts_dir
         self._on_event = on_event
         self._summary_context = summary_context
@@ -93,12 +111,57 @@ class ChatWithBookUseCase:
                 results=list(results),
             )
 
-        tool_handlers = {"search_book": search_book_handler}
+        def set_page_handler(arguments: dict[str, object]) -> ToolResult:
+            try:
+                raw_page = arguments.get("page", 0)
+                page = int(raw_page)  # type: ignore[arg-type]
+            except (ValueError, TypeError):
+                return ToolResult(
+                    formatted_text="Error: invalid page number — must be a whole number.",
+                    query="",
+                    result_count=0,
+                )
+
+            book = self._book_repo.get(book_id)
+            if book is None:
+                return ToolResult(
+                    formatted_text=f"Error: book not found ({book_id}).",
+                    query="",
+                    result_count=0,
+                )
+
+            try:
+                book.set_current_page(page)
+            except BookError as e:
+                return ToolResult(
+                    formatted_text=f"Error: {e.message}",
+                    query="",
+                    result_count=0,
+                )
+
+            self._book_repo.save(book)
+
+            if page == 0:
+                return ToolResult(
+                    formatted_text="Reading position reset. All content is now available.",
+                    query="",
+                    result_count=0,
+                )
+            return ToolResult(
+                formatted_text=f"Reading position set to page {page}.",
+                query="",
+                result_count=0,
+            )
+
+        tool_handlers = {
+            "search_book": search_book_handler,
+            "set_page": set_page_handler,
+        }
 
         response_text, new_messages = self._retrieval.execute(
             self._chat,
             prompt_messages,
-            [SEARCH_BOOK_TOOL],
+            [SEARCH_BOOK_TOOL, SET_PAGE_TOOL],
             tool_handlers,
             on_event=self._on_event,
         )
