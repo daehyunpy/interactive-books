@@ -6,7 +6,7 @@ from interactive_books.domain.chat_event import ChatEvent, ToolResultEvent
 from interactive_books.domain.prompt_message import PromptMessage
 from interactive_books.domain.protocols import ChatProvider
 from interactive_books.domain.search_result import SearchResult
-from interactive_books.domain.tool import ToolDefinition
+from interactive_books.domain.tool import ToolDefinition, ToolResult
 
 NO_CONTEXT_MESSAGE = "No relevant passages found in the book for this query."
 
@@ -20,9 +20,17 @@ class RetrievalStrategy:
         chat_provider: ChatProvider,
         messages: list[PromptMessage],
         tools: list[ToolDefinition],
-        search_fn: Callable[[str], list[SearchResult]],
+        tool_handlers: dict[str, Callable[[dict[str, object]], ToolResult]],
         on_event: Callable[[ChatEvent], None] | None = None,
     ) -> tuple[str, list[ChatMessage]]:
+        search_handler = tool_handlers.get("search_book")
+
+        def search_fn(query: str) -> list[SearchResult]:
+            if search_handler is None:
+                return []
+            result = search_handler({"query": query})
+            return [r for r in result.results if isinstance(r, SearchResult)]
+
         query = self._reformulate_query(chat_provider, messages)
         results = search_fn(query)
 

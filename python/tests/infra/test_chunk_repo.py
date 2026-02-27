@@ -72,7 +72,46 @@ class TestChunkRepository:
         repo = ChunkRepository(db)
         assert repo.get_by_book("b1") == []
 
-    def test_get_up_to_page(self, db: Database) -> None:
+
+class TestGetByPageRange:
+    def test_single_page_returns_overlapping_chunks(self, db: Database) -> None:
+        _make_book(db)
+        repo = ChunkRepository(db)
+        chunks = [
+            Chunk(
+                id="c1",
+                book_id="b1",
+                content="Pages 1-3",
+                start_page=1,
+                end_page=3,
+                chunk_index=0,
+            ),
+            Chunk(
+                id="c2",
+                book_id="b1",
+                content="Pages 3-5",
+                start_page=3,
+                end_page=5,
+                chunk_index=1,
+            ),
+            Chunk(
+                id="c3",
+                book_id="b1",
+                content="Pages 7-9",
+                start_page=7,
+                end_page=9,
+                chunk_index=2,
+            ),
+        ]
+        repo.save_chunks("b1", chunks)
+
+        result = repo.get_by_page_range("b1", 3, 3)
+        assert len(result) == 2
+        assert {c.id for c in result} == {"c1", "c2"}
+
+    def test_range_from_page_one_equivalent_to_get_up_to_page(
+        self, db: Database
+    ) -> None:
         _make_book(db)
         repo = ChunkRepository(db)
         chunks = [
@@ -103,11 +142,64 @@ class TestChunkRepository:
         ]
         repo.save_chunks("b1", chunks)
 
-        result = repo.get_up_to_page("b1", 3)
+        result = repo.get_by_page_range("b1", 1, 3)
         assert len(result) == 2
         assert {c.id for c in result} == {"c1", "c2"}
 
-    def test_get_up_to_page_returns_all_when_page_is_high(self, db: Database) -> None:
+    def test_multi_page_range(self, db: Database) -> None:
+        _make_book(db)
+        repo = ChunkRepository(db)
+        chunks = [
+            Chunk(
+                id="c1",
+                book_id="b1",
+                content="Pages 1-3",
+                start_page=1,
+                end_page=3,
+                chunk_index=0,
+            ),
+            Chunk(
+                id="c2",
+                book_id="b1",
+                content="Pages 5-7",
+                start_page=5,
+                end_page=7,
+                chunk_index=1,
+            ),
+            Chunk(
+                id="c3",
+                book_id="b1",
+                content="Pages 9-11",
+                start_page=9,
+                end_page=11,
+                chunk_index=2,
+            ),
+        ]
+        repo.save_chunks("b1", chunks)
+
+        result = repo.get_by_page_range("b1", 4, 8)
+        assert len(result) == 1
+        assert result[0].id == "c2"
+
+    def test_empty_result_for_non_overlapping_range(self, db: Database) -> None:
+        _make_book(db)
+        repo = ChunkRepository(db)
+        chunks = [
+            Chunk(
+                id="c1",
+                book_id="b1",
+                content="Pages 1-3",
+                start_page=1,
+                end_page=3,
+                chunk_index=0,
+            ),
+        ]
+        repo.save_chunks("b1", chunks)
+
+        result = repo.get_by_page_range("b1", 5, 10)
+        assert result == []
+
+    def test_returns_all_when_range_is_wide(self, db: Database) -> None:
         _make_book(db)
         repo = ChunkRepository(db)
         chunks = [
@@ -130,10 +222,10 @@ class TestChunkRepository:
         ]
         repo.save_chunks("b1", chunks)
 
-        result = repo.get_up_to_page("b1", 100)
+        result = repo.get_by_page_range("b1", 1, 100)
         assert len(result) == 2
 
-    def test_get_up_to_page_ordered_by_chunk_index(self, db: Database) -> None:
+    def test_ordered_by_chunk_index(self, db: Database) -> None:
         _make_book(db)
         repo = ChunkRepository(db)
         chunks = [
@@ -156,10 +248,12 @@ class TestChunkRepository:
         ]
         repo.save_chunks("b1", chunks)
 
-        result = repo.get_up_to_page("b1", 5)
+        result = repo.get_by_page_range("b1", 1, 5)
         assert result[0].chunk_index == 0
         assert result[1].chunk_index == 1
 
+
+class TestDeleteByBook:
     def test_delete_by_book(self, db: Database) -> None:
         _make_book(db)
         repo = ChunkRepository(db)
@@ -177,6 +271,8 @@ class TestChunkRepository:
         repo.delete_by_book("b1")
         assert repo.get_by_book("b1") == []
 
+
+class TestCountByBook:
     def test_count_by_book_with_chunks(self, db: Database) -> None:
         _make_book(db)
         repo = ChunkRepository(db)
@@ -218,59 +314,8 @@ class TestChunkRepository:
 
         assert repo.count_by_book("b1") == 0
 
-    def test_get_by_page_returns_overlapping_chunks(self, db: Database) -> None:
-        _make_book(db)
-        repo = ChunkRepository(db)
-        chunks = [
-            Chunk(
-                id="c1",
-                book_id="b1",
-                content="Pages 1-3",
-                start_page=1,
-                end_page=3,
-                chunk_index=0,
-            ),
-            Chunk(
-                id="c2",
-                book_id="b1",
-                content="Pages 3-5",
-                start_page=3,
-                end_page=5,
-                chunk_index=1,
-            ),
-            Chunk(
-                id="c3",
-                book_id="b1",
-                content="Pages 7-9",
-                start_page=7,
-                end_page=9,
-                chunk_index=2,
-            ),
-        ]
-        repo.save_chunks("b1", chunks)
 
-        result = repo.get_by_page("b1", 3)
-        assert len(result) == 2
-        assert {c.id for c in result} == {"c1", "c2"}
-
-    def test_get_by_page_returns_empty_for_no_overlap(self, db: Database) -> None:
-        _make_book(db)
-        repo = ChunkRepository(db)
-        chunks = [
-            Chunk(
-                id="c1",
-                book_id="b1",
-                content="Pages 1-3",
-                start_page=1,
-                end_page=3,
-                chunk_index=0,
-            ),
-        ]
-        repo.save_chunks("b1", chunks)
-
-        result = repo.get_by_page("b1", 5)
-        assert result == []
-
+class TestChunkScoping:
     def test_chunks_scoped_to_book(self, db: Database) -> None:
         _make_book(db, "b1")
         _make_book(db, "b2")

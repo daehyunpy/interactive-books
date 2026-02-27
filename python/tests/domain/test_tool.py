@@ -4,6 +4,7 @@ from interactive_books.domain.tool import (
     TokenUsage,
     ToolDefinition,
     ToolInvocation,
+    ToolResult,
 )
 
 
@@ -86,3 +87,26 @@ class TestTokenUsage:
         usage = TokenUsage(input_tokens=100, output_tokens=50)
         with pytest.raises(AttributeError):
             usage.input_tokens = 200  # type: ignore[misc]
+
+
+class TestToolResult:
+    def test_create_tool_result(self) -> None:
+        tr = ToolResult(
+            formatted_text="[Pages 1-5]: Content here",
+            query="chapter 3",
+            result_count=1,
+            results=["fake_result"],
+        )
+        assert tr.formatted_text == "[Pages 1-5]: Content here"
+        assert tr.query == "chapter 3"
+        assert tr.result_count == 1
+        assert len(tr.results) == 1
+
+    def test_tool_result_defaults(self) -> None:
+        tr = ToolResult(formatted_text="text", query="q", result_count=0)
+        assert tr.results == []
+
+    def test_tool_result_is_immutable(self) -> None:
+        tr = ToolResult(formatted_text="text", query="q", result_count=0)
+        with pytest.raises(AttributeError):
+            tr.query = "other"  # type: ignore[misc]
