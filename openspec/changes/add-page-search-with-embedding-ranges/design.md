@@ -98,7 +98,7 @@ Each handler takes the tool's `arguments` dict and returns a `ToolResult` datacl
 - Scales to N tools without protocol changes
 - Makes each handler independently testable
 
-The `AlwaysRetrieveStrategy` (Ollama fallback) doesn't use tool dispatch at all — it reformulates and always searches. The caller (`ChatWithBookUseCase`) extracts a `search_fn` from `tool_handlers["search_book"]` and passes it separately to `AlwaysRetrieveStrategy`, which keeps its current simple interface. This way, `AlwaysRetrieveStrategy` never sees the dispatch map.
+The `AlwaysRetrieveStrategy` (Ollama fallback) doesn't use tool dispatch at all — it reformulates and always searches. It receives the same `tool_handlers` dict as `ToolUseRetrievalStrategy` (keeping a uniform protocol signature), but internally extracts `tool_handlers["search_book"]` and adapts it to a simple `search_fn(query) -> list[SearchResult]` interface. This keeps both strategies behind the same `RetrievalStrategy` protocol without special-casing in the caller.
 
 **Unknown tool names:** If the LLM hallucinates a tool name not in the dispatch map, return an error string as the tool result (e.g., `"Unknown tool: {name}"`). This allows the LLM to self-correct in the next iteration rather than crashing the conversation turn.
 
