@@ -4,6 +4,15 @@ import Foundation
 enum StorageTestHelper {
     static func createTestDatabase() throws -> Database {
         let db = try Database(path: ":memory:")
+        try createBooksTable(db)
+        try createChunksTable(db)
+        try createConversationsTable(db)
+        try createChatMessagesTable(db)
+        try createSectionSummariesTable(db)
+        return db
+    }
+
+    private static func createBooksTable(_ db: Database) throws {
         try db.execute(sql: """
             CREATE TABLE books (
                 id                  TEXT PRIMARY KEY,
@@ -17,6 +26,9 @@ enum StorageTestHelper {
                 updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
             )
             """)
+    }
+
+    private static func createChunksTable(_ db: Database) throws {
         try db.execute(sql: """
             CREATE TABLE chunks (
                 id          TEXT PRIMARY KEY,
@@ -30,6 +42,9 @@ enum StorageTestHelper {
             """)
         try db.execute(sql: "CREATE INDEX idx_chunks_book_id ON chunks(book_id)")
         try db.execute(sql: "CREATE INDEX idx_chunks_book_page_range ON chunks(book_id, start_page, end_page)")
+    }
+
+    private static func createConversationsTable(_ db: Database) throws {
         try db.execute(sql: """
             CREATE TABLE conversations (
                 id         TEXT PRIMARY KEY,
@@ -39,6 +54,9 @@ enum StorageTestHelper {
             )
             """)
         try db.execute(sql: "CREATE INDEX idx_conversations_book_id ON conversations(book_id)")
+    }
+
+    private static func createChatMessagesTable(_ db: Database) throws {
         try db.execute(sql: """
             CREATE TABLE chat_messages (
                 id              TEXT PRIMARY KEY,
@@ -49,6 +67,9 @@ enum StorageTestHelper {
             )
             """)
         try db.execute(sql: "CREATE INDEX idx_chat_messages_conversation_id ON chat_messages(conversation_id)")
+    }
+
+    private static func createSectionSummariesTable(_ db: Database) throws {
         try db.execute(sql: """
             CREATE TABLE IF NOT EXISTS section_summaries (
                 id TEXT PRIMARY KEY NOT NULL,
@@ -63,7 +84,6 @@ enum StorageTestHelper {
             )
             """)
         try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_section_summaries_book_id ON section_summaries(book_id)")
-        return db
     }
 
     nonisolated(unsafe) static let iso8601Formatter: ISO8601DateFormatter = {
@@ -72,11 +92,9 @@ enum StorageTestHelper {
         return formatter
     }()
 
-    static let fixedDate: Date = {
-        iso8601Formatter.date(from: "2025-01-15T10:30:00Z")!
-    }()
+    // swiftlint:disable:next force_unwrapping
+    static let fixedDate: Date = iso8601Formatter.date(from: "2025-01-15T10:30:00Z")!
 
-    static let fixedDate2: Date = {
-        iso8601Formatter.date(from: "2025-01-16T12:00:00Z")!
-    }()
+    // swiftlint:disable:next force_unwrapping
+    static let fixedDate2: Date = iso8601Formatter.date(from: "2025-01-16T12:00:00Z")!
 }

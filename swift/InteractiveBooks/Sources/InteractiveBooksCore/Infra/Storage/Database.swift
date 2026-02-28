@@ -8,12 +8,12 @@ public enum SQLiteValue: Sendable, Equatable {
     case null
 
     var textValue: String? {
-        if case let .text(s) = self { return s }
+        if case let .text(string) = self { return string }
         return nil
     }
 
     var integerValue: Int? {
-        if case let .integer(i) = self { return i }
+        if case let .integer(value) = self { return value }
         return nil
     }
 }
@@ -21,9 +21,12 @@ public enum SQLiteValue: Sendable, Equatable {
 public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
 
-    private nonisolated(unsafe) static let migrationPattern = try! NSRegularExpression(
-        pattern: #"^(\d{3,})_.+\.sql$"#
-    )
+    private nonisolated(unsafe) static let migrationPattern: NSRegularExpression = {
+        guard let regex = try? NSRegularExpression(pattern: #"^(\d{3,})_.+\.sql$"#) else {
+            fatalError("Invalid migration pattern regex")
+        }
+        return regex
+    }()
 
     public init(path: String) throws {
         guard sqlite3_open(path, &db) == SQLITE_OK else {
@@ -49,45 +52,36 @@ public final class Database: @unchecked Sendable {
 
     @discardableResult
     public func execute(sql: String) throws -> [[SQLiteValue]] {
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw storageError(message: "Failed to prepare: \(sql)")
-        }
-        defer { sqlite3_finalize(stmt) }
+        let prepared = try prepare(sql: sql)
+        defer { sqlite3_finalize(prepared) }
 
         var rows: [[SQLiteValue]] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            rows.append(extractRow(stmt: stmt!))
+        while sqlite3_step(prepared) == SQLITE_ROW {
+            rows.append(extractRow(stmt: prepared))
         }
         return rows
     }
 
     public func query(sql: String, bind: [SQLiteValue] = []) throws -> [[SQLiteValue]] {
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw storageError(message: "Failed to prepare: \(sql)")
-        }
-        defer { sqlite3_finalize(stmt) }
+        let prepared = try prepare(sql: sql)
+        defer { sqlite3_finalize(prepared) }
 
-        try bindParameters(stmt: stmt!, values: bind)
+        try bindParameters(stmt: prepared, values: bind)
 
         var rows: [[SQLiteValue]] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            rows.append(extractRow(stmt: stmt!))
+        while sqlite3_step(prepared) == SQLITE_ROW {
+            rows.append(extractRow(stmt: prepared))
         }
         return rows
     }
 
     public func run(sql: String, bind: [SQLiteValue] = []) throws {
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw storageError(message: "Failed to prepare: \(sql)")
-        }
-        defer { sqlite3_finalize(stmt) }
+        let prepared = try prepare(sql: sql)
+        defer { sqlite3_finalize(prepared) }
 
-        try bindParameters(stmt: stmt!, values: bind)
+        try bindParameters(stmt: prepared, values: bind)
 
-        let result = sqlite3_step(stmt)
+        let result = sqlite3_step(prepared)
         guard result == SQLITE_DONE || result == SQLITE_ROW else {
             throw storageError(message: "Failed to execute: \(sql)")
         }
@@ -113,10 +107,8 @@ public final class Database: @unchecked Sendable {
         try ensureMigrationTable()
         let applied = try getAppliedVersions()
 
-        for (path, version) in try sortedMigrationFiles(in: schemaDir) {
-            if !applied.contains(version) {
-                try applyMigration(path: path, version: version)
-            }
+        for (path, version) in try sortedMigrationFiles(in: schemaDir) where !applied.contains(version) {
+            try applyMigration(path: path, version: version)
         }
     }
 
@@ -175,20 +167,30 @@ public final class Database: @unchecked Sendable {
 
     // MARK: - Helpers
 
+    private func prepare(sql: String) throws -> OpaquePointer {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK,
+              let prepared = stmt
+        else {
+            throw storageError(message: "Failed to prepare: \(sql)")
+        }
+        return prepared
+    }
+
     private func bindParameters(stmt: OpaquePointer, values: [SQLiteValue]) throws {
         for (index, value) in values.enumerated() {
             let position = Int32(index + 1)
             let result: Int32
             switch value {
-            case let .text(s):
+            case let .text(string):
                 result = sqlite3_bind_text(
-                    stmt, position, s, -1,
+                    stmt, position, string, -1,
                     unsafeBitCast(-1, to: sqlite3_destructor_type.self)
                 )
-            case let .integer(i):
-                result = sqlite3_bind_int64(stmt, position, Int64(i))
-            case let .real(d):
-                result = sqlite3_bind_double(stmt, position, d)
+            case let .integer(int):
+                result = sqlite3_bind_int64(stmt, position, Int64(int))
+            case let .real(double):
+                result = sqlite3_bind_double(stmt, position, double)
             case .null:
                 result = sqlite3_bind_null(stmt, position)
             }
@@ -202,14 +204,14 @@ public final class Database: @unchecked Sendable {
         let count = Int(sqlite3_column_count(stmt))
         var row: [SQLiteValue] = []
         row.reserveCapacity(count)
-        for i in 0..<Int32(count) {
-            switch sqlite3_column_type(stmt, i) {
+        for col in 0..<Int32(count) {
+            switch sqlite3_column_type(stmt, col) {
             case SQLITE_TEXT:
-                row.append(.text(String(cString: sqlite3_column_text(stmt, i))))
+                row.append(.text(String(cString: sqlite3_column_text(stmt, col))))
             case SQLITE_INTEGER:
-                row.append(.integer(Int(sqlite3_column_int64(stmt, i))))
+                row.append(.integer(Int(sqlite3_column_int64(stmt, col))))
             case SQLITE_FLOAT:
-                row.append(.real(sqlite3_column_double(stmt, i)))
+                row.append(.real(sqlite3_column_double(stmt, col)))
             default:
                 row.append(.null)
             }
