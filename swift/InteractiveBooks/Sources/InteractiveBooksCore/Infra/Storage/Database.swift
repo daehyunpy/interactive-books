@@ -21,7 +21,7 @@ public enum SQLiteValue: Sendable, Equatable {
 public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
 
-    private static let migrationPattern = try! NSRegularExpression(
+    private nonisolated(unsafe) static let migrationPattern = try! NSRegularExpression(
         pattern: #"^(\d{3,})_.+\.sql$"#
     )
 
