@@ -38,7 +38,9 @@ struct BooksCommand: ParsableCommand {
         return database
     }
 
-    private func printBookTable(books: [Book], chunkRepo: SQLiteChunkRepository) throws {
+    private static let maxTitleDisplayWidth = 30
+
+    private func printBookTable(books: [Book], chunkRepo: some ChunkRepository) throws {
         let header = String(
             format: "%-36s  %-30s  %-10s  %6s  %4s",
             "ID", "Title", "Status", "Chunks", "Page",
@@ -48,8 +50,8 @@ struct BooksCommand: ParsableCommand {
 
         for book in books {
             let chunkCount = try chunkRepo.countByBook(book.id)
-            let titleDisplay = book.title.count > 30
-                ? String(book.title.prefix(27)) + "..."
+            let titleDisplay = book.title.count > Self.maxTitleDisplayWidth
+                ? String(book.title.prefix(Self.maxTitleDisplayWidth - 3)) + "..."
                 : book.title
             print(String(
                 format: "%-36s  %-30s  %-10s  %6d  %4d",
