@@ -1,4 +1,4 @@
-public struct PromptMessage: @unchecked Sendable, Equatable {
+public struct PromptMessage: Sendable, Equatable {
     public let role: String
     public let content: String
     public let toolUseId: String?

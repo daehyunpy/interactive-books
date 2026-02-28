@@ -1,4 +1,4 @@
-public struct ChatResponse: @unchecked Sendable {
+public struct ChatResponse: Sendable {
     public let text: String?
     public let toolInvocations: [ToolInvocation]
     public let usage: TokenUsage?
