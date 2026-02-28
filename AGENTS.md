@@ -129,6 +129,7 @@ uv run pytest -x              # verify everything works
 | `OLLAMA_BASE_URL`   | No       | Local LLM endpoint (default: `http://localhost:11434`) |
 | `MILVUS_ADDRESS`    | No       | Milvus vector DB address for claude-context MCP        |
 | `MILVUS_TOKEN`      | No       | Milvus authentication token                            |
+| `GITHUB_PERSONAL_ACCESS_TOKEN` | No | GitHub PAT for GitHub MCP server                |
 
 ### Supported Book Formats
 
