@@ -30,6 +30,18 @@ public final class Conversation: @unchecked Sendable, Equatable {
         }
     }
 
+    package init(
+        fromRow id: String,
+        bookId: String,
+        title: String,
+        createdAt: Date,
+    ) {
+        self.id = id
+        self.bookId = bookId
+        self.title = title
+        self.createdAt = createdAt
+    }
+
     public static func == (lhs: Conversation, rhs: Conversation) -> Bool {
         lhs.id == rhs.id
     }

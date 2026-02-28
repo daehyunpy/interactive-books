@@ -7,6 +7,6 @@ struct InteractiveBooksCLI: ParsableCommand {
         commandName: "interactive-books",
         abstract: "Interactive Books — chat with your books using AI",
         version: InteractiveBooksCore.version,
-        subcommands: [],
+        subcommands: [BooksCommand.self],
     )
 }
