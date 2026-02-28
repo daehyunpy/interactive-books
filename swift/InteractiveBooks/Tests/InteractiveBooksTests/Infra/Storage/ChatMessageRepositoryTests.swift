@@ -12,21 +12,21 @@ struct ChatMessageRepositorySaveTests {
         let convRepo = SQLiteConversationRepository(database: db)
         let msgRepo = SQLiteChatMessageRepository(database: db)
 
-        try bookRepo.save(try Book(id: "b1", title: "Test Book"))
-        try convRepo.save(try Conversation(id: "conv1", bookId: "b1", title: "Chat"))
+        try bookRepo.save(Book(id: "b1", title: "Test Book"))
+        try convRepo.save(Conversation(id: "conv1", bookId: "b1", title: "Chat"))
 
         let msg1 = ChatMessage(
             id: "m1", conversationId: "conv1", role: .user, content: "Hello",
-            createdAt: StorageTestHelper.fixedDate
+            createdAt: StorageTestHelper.fixedDate,
         )
         let msg2 = ChatMessage(
             id: "m2", conversationId: "conv1", role: .assistant, content: "Hi there!",
-            createdAt: StorageTestHelper.fixedDate2
+            createdAt: StorageTestHelper.fixedDate2,
         )
-        let msg3 = ChatMessage(
+        let msg3 = try ChatMessage(
             id: "m3", conversationId: "conv1", role: .toolResult, content: "{\"result\": \"data\"}",
             // swiftlint:disable:next force_unwrapping
-            createdAt: StorageTestHelper.iso8601Formatter.date(from: "2025-01-17T08:00:00Z")!
+            createdAt: #require(StorageTestHelper.iso8601Formatter.date(from: "2025-01-17T08:00:00Z")),
         )
         try msgRepo.save(msg1)
         try msgRepo.save(msg2)
@@ -65,9 +65,9 @@ struct ChatMessageRepositoryDeleteTests {
         let convRepo = SQLiteConversationRepository(database: db)
         let msgRepo = SQLiteChatMessageRepository(database: db)
 
-        try bookRepo.save(try Book(id: "b1", title: "Test Book"))
-        try convRepo.save(try Conversation(id: "conv1", bookId: "b1", title: "Chat 1"))
-        try convRepo.save(try Conversation(id: "conv2", bookId: "b1", title: "Chat 2"))
+        try bookRepo.save(Book(id: "b1", title: "Test Book"))
+        try convRepo.save(Conversation(id: "conv1", bookId: "b1", title: "Chat 1"))
+        try convRepo.save(Conversation(id: "conv2", bookId: "b1", title: "Chat 2"))
 
         try msgRepo.save(ChatMessage(id: "m1", conversationId: "conv1", role: .user, content: "A"))
         try msgRepo.save(ChatMessage(id: "m2", conversationId: "conv2", role: .user, content: "B"))

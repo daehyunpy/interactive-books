@@ -13,22 +13,22 @@ public final class SQLiteConversationRepository: ConversationRepository, @unchec
     public func save(_ conversation: Conversation) throws {
         try database.run(
             sql: """
-                INSERT OR REPLACE INTO conversations (\(Self.selectColumns))
-                VALUES (?, ?, ?, ?)
-                """,
+            INSERT OR REPLACE INTO conversations (\(Self.selectColumns))
+            VALUES (?, ?, ?, ?)
+            """,
             bind: [
                 .text(conversation.id),
                 .text(conversation.bookId),
                 .text(conversation.title),
                 .text(DateFormatting.iso8601String(from: conversation.createdAt)),
-            ]
+            ],
         )
     }
 
     public func get(_ conversationId: String) throws -> Conversation? {
         let rows = try database.query(
             sql: "SELECT \(Self.selectColumns) FROM conversations WHERE id = ?",
-            bind: [.text(conversationId)]
+            bind: [.text(conversationId)],
         )
         guard let row = rows.first else { return nil }
         return try fromRow(row)
@@ -37,7 +37,7 @@ public final class SQLiteConversationRepository: ConversationRepository, @unchec
     public func getByBook(_ bookId: String) throws -> [Conversation] {
         let rows = try database.query(
             sql: "SELECT \(Self.selectColumns) FROM conversations WHERE book_id = ? ORDER BY created_at DESC",
-            bind: [.text(bookId)]
+            bind: [.text(bookId)],
         )
         return try rows.map { try fromRow($0) }
     }
@@ -45,7 +45,7 @@ public final class SQLiteConversationRepository: ConversationRepository, @unchec
     public func delete(_ conversationId: String) throws {
         try database.run(
             sql: "DELETE FROM conversations WHERE id = ?",
-            bind: [.text(conversationId)]
+            bind: [.text(conversationId)],
         )
     }
 
@@ -63,7 +63,7 @@ public final class SQLiteConversationRepository: ConversationRepository, @unchec
             fromRow: id,
             bookId: bookId,
             title: title,
-            createdAt: createdAt
+            createdAt: createdAt,
         )
     }
 }
