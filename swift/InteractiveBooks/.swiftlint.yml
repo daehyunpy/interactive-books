@@ -1,6 +1,8 @@
 disabled_rules:
   - trailing_comma
   - opening_brace
+  - switch_case_alignment
+  - superfluous_disable_command
 
 opt_in_rules:
   - empty_count
