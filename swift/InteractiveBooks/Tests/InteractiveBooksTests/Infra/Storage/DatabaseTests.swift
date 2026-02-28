@@ -6,7 +6,13 @@ import Testing
 struct DatabaseInitTests {
     @Test("opens connection and enables WAL mode")
     func walModeEnabled() throws {
-        let db = try Database(path: ":memory:")
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let dbPath = tempDir.appendingPathComponent("test.db").path
+        let db = try Database(path: dbPath)
         defer { db.close() }
 
         let rows = try db.query(sql: "PRAGMA journal_mode")
