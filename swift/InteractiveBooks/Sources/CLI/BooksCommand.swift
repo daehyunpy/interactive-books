@@ -9,24 +9,11 @@ struct BooksCommand: ParsableCommand {
     )
 
     func run() throws {
-        let projectRoot = resolveProjectRoot()
-        let dbPath = "\(projectRoot)/data/books.db"
-        let schemaDir = "\(projectRoot)/shared/schema"
-
-        let dataDir = "\(projectRoot)/data"
-        if !FileManager.default.fileExists(atPath: dataDir) {
-            try FileManager.default.createDirectory(
-                atPath: dataDir, withIntermediateDirectories: true
-            )
-        }
-
-        let database = try Database(path: dbPath)
+        let database = try openDatabase()
         defer { database.close() }
-        try database.runMigrations(schemaDir: schemaDir)
 
         let bookRepo = SQLiteBookRepository(database: database)
         let chunkRepo = SQLiteChunkRepository(database: database)
-
         let books = try bookRepo.getAll()
 
         guard !books.isEmpty else {
@@ -34,6 +21,24 @@ struct BooksCommand: ParsableCommand {
             return
         }
 
+        try printBookTable(books: books, chunkRepo: chunkRepo)
+    }
+
+    private func openDatabase() throws -> Database {
+        let projectRoot = resolveProjectRoot()
+        let dataDir = "\(projectRoot)/data"
+        if !FileManager.default.fileExists(atPath: dataDir) {
+            try FileManager.default.createDirectory(
+                atPath: dataDir, withIntermediateDirectories: true
+            )
+        }
+
+        let database = try Database(path: "\(dataDir)/books.db")
+        try database.runMigrations(schemaDir: "\(projectRoot)/shared/schema")
+        return database
+    }
+
+    private func printBookTable(books: [Book], chunkRepo: SQLiteChunkRepository) throws {
         let header = String(
             format: "%-36s  %-30s  %-10s  %6s  %4s",
             "ID", "Title", "Status", "Chunks", "Page"
