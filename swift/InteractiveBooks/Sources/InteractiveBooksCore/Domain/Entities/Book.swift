@@ -86,6 +86,26 @@ public final class Book: @unchecked Sendable, Equatable {
         resetToPending()
     }
 
+    package init(
+        fromRow id: String,
+        title: String,
+        status: BookStatus,
+        currentPage: Int,
+        embeddingProvider: String?,
+        embeddingDimension: Int?,
+        createdAt: Date,
+        updatedAt: Date,
+    ) {
+        self.id = id
+        self.title = title
+        self.status = status
+        self.currentPage = currentPage
+        self.embeddingProvider = embeddingProvider
+        self.embeddingDimension = embeddingDimension
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
     public static func == (lhs: Book, rhs: Book) -> Bool {
         lhs.id == rhs.id
     }
