@@ -51,23 +51,7 @@ jobs:
           swift-version: "6.1"
 
       - name: Build
-        id: build
-        run: swift build 2>&1 | tee build-output.log
-        continue-on-error: true
-
-      - name: Upload build log
-        if: steps.build.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: swift-build-log
-          path: swift/InteractiveBooks/build-output.log
-
-      - name: Fail if build failed
-        if: steps.build.outcome == 'failure'
-        run: |
-          echo "=== LAST 50 LINES OF BUILD OUTPUT ==="
-          tail -50 build-output.log
-          exit 1
+        run: swift build
 
       - name: Test
         run: swift test
