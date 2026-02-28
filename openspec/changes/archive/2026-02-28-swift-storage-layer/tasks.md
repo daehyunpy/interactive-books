@@ -76,6 +76,6 @@
 ## 7. Verification
 
 - [x] 7.1 Verify all Infra/Storage files import only from `InteractiveBooksCore/Domain/` and system frameworks (Foundation, SQLite3) — no imports from App/ or UI/
-- [ ] 7.2 Verify `swift build` succeeds
-- [ ] 7.3 Verify `swift test` passes — all integration tests green
+- [x] 7.2 Verify `swift build` succeeds
+- [x] 7.3 Verify `swift test` passes — all integration tests green
 - [x] 7.4 Verify shared schema migrations (`shared/schema/001_initial.sql`, `002_add_embeddings.sql`, `003_add_section_summaries.sql`) are applied correctly by the migration runner

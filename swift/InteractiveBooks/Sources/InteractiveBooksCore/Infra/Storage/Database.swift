@@ -21,7 +21,7 @@ public enum SQLiteValue: Sendable, Equatable {
 public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
 
-    private nonisolated(unsafe) static let migrationPattern: NSRegularExpression = {
+    private static let migrationPattern: NSRegularExpression = {
         guard let regex = try? NSRegularExpression(pattern: #"^(\d{3,})_.+\.sql$"#) else {
             fatalError("Invalid migration pattern regex")
         }
@@ -52,14 +52,7 @@ public final class Database: @unchecked Sendable {
 
     @discardableResult
     public func execute(sql: String) throws -> [[SQLiteValue]] {
-        let prepared = try prepare(sql: sql)
-        defer { sqlite3_finalize(prepared) }
-
-        var rows: [[SQLiteValue]] = []
-        while sqlite3_step(prepared) == SQLITE_ROW {
-            rows.append(extractRow(stmt: prepared))
-        }
-        return rows
+        try query(sql: sql)
     }
 
     public func query(sql: String, bind: [SQLiteValue] = []) throws -> [[SQLiteValue]] {
@@ -96,7 +89,7 @@ public final class Database: @unchecked Sendable {
             try execute(sql: "COMMIT")
             return result
         } catch {
-            try? execute(sql: "ROLLBACK")
+            _ = try? execute(sql: "ROLLBACK")
             throw error
         }
     }

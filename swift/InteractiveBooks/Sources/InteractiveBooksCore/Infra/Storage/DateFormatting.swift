@@ -7,7 +7,7 @@ enum DateFormatting {
         return formatter
     }()
 
-    private nonisolated(unsafe) static let sqliteDateFormatter: DateFormatter = {
+    private static let sqliteDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         formatter.timeZone = TimeZone(identifier: "UTC")
