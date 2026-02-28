@@ -3,6 +3,9 @@ import Foundation
 public final class SQLiteChunkRepository: ChunkRepository, @unchecked Sendable {
     private let database: Database
 
+    private static let selectColumns =
+        "id, book_id, content, start_page, end_page, chunk_index, created_at"
+
     public init(database: Database) {
         self.database = database
     }
@@ -12,7 +15,7 @@ public final class SQLiteChunkRepository: ChunkRepository, @unchecked Sendable {
             for chunk in chunks {
                 try database.run(
                     sql: """
-                        INSERT INTO chunks (id, book_id, content, start_page, end_page, chunk_index, created_at)
+                        INSERT INTO chunks (\(Self.selectColumns))
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                         """,
                     bind: [
@@ -31,7 +34,7 @@ public final class SQLiteChunkRepository: ChunkRepository, @unchecked Sendable {
 
     public func getByBook(_ bookId: String) throws -> [Chunk] {
         let rows = try database.query(
-            sql: "SELECT id, book_id, content, start_page, end_page, chunk_index, created_at FROM chunks WHERE book_id = ? ORDER BY chunk_index",
+            sql: "SELECT \(Self.selectColumns) FROM chunks WHERE book_id = ? ORDER BY chunk_index",
             bind: [.text(bookId)]
         )
         return try rows.map { try fromRow($0) }
@@ -39,7 +42,7 @@ public final class SQLiteChunkRepository: ChunkRepository, @unchecked Sendable {
 
     public func getUpToPage(bookId: String, page: Int) throws -> [Chunk] {
         let rows = try database.query(
-            sql: "SELECT id, book_id, content, start_page, end_page, chunk_index, created_at FROM chunks WHERE book_id = ? AND start_page <= ? ORDER BY chunk_index",
+            sql: "SELECT \(Self.selectColumns) FROM chunks WHERE book_id = ? AND start_page <= ? ORDER BY chunk_index",
             bind: [.text(bookId), .integer(page)]
         )
         return try rows.map { try fromRow($0) }
