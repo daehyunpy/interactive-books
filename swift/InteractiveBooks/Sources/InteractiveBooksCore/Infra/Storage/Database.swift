@@ -6,6 +6,16 @@ public enum SQLiteValue: Sendable, Equatable {
     case integer(Int)
     case real(Double)
     case null
+
+    var textValue: String? {
+        if case let .text(s) = self { return s }
+        return nil
+    }
+
+    var integerValue: Int? {
+        if case let .integer(i) = self { return i }
+        return nil
+    }
 }
 
 public final class Database: @unchecked Sendable {
