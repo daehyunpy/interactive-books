@@ -51,10 +51,10 @@ jobs:
           swift-version: "6.1"
 
       - name: Build
-        run: swift build -v 2>&1 | tail -100
+        run: swift build
 
       - name: Test
-        run: swift test
+        run: swift test --verbose 2>&1 | tail -200
 
       - name: Lint (SwiftLint)
         run: |
