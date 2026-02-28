@@ -11,11 +11,11 @@ struct ConversationRepositorySaveTests {
         let bookRepo = SQLiteBookRepository(database: db)
         let convRepo = SQLiteConversationRepository(database: db)
 
-        try bookRepo.save(try Book(id: "b1", title: "Test Book"))
+        try bookRepo.save(Book(id: "b1", title: "Test Book"))
 
         let conv = try Conversation(
             id: "conv1", bookId: "b1", title: "My Chat",
-            createdAt: StorageTestHelper.fixedDate
+            createdAt: StorageTestHelper.fixedDate,
         )
         try convRepo.save(conv)
 
@@ -36,7 +36,7 @@ struct ConversationRepositoryUpsertTests {
         let bookRepo = SQLiteBookRepository(database: db)
         let convRepo = SQLiteConversationRepository(database: db)
 
-        try bookRepo.save(try Book(id: "b1", title: "Test Book"))
+        try bookRepo.save(Book(id: "b1", title: "Test Book"))
 
         let conv = try Conversation(id: "conv1", bookId: "b1", title: "Original Title")
         try convRepo.save(conv)
@@ -71,15 +71,15 @@ struct ConversationRepositoryGetByBookTests {
         let bookRepo = SQLiteBookRepository(database: db)
         let convRepo = SQLiteConversationRepository(database: db)
 
-        try bookRepo.save(try Book(id: "b1", title: "Test Book"))
+        try bookRepo.save(Book(id: "b1", title: "Test Book"))
 
         let older = try Conversation(
             id: "conv1", bookId: "b1", title: "Older",
-            createdAt: StorageTestHelper.fixedDate
+            createdAt: StorageTestHelper.fixedDate,
         )
         let newer = try Conversation(
             id: "conv2", bookId: "b1", title: "Newer",
-            createdAt: StorageTestHelper.fixedDate2
+            createdAt: StorageTestHelper.fixedDate2,
         )
         try convRepo.save(older)
         try convRepo.save(newer)
@@ -111,7 +111,7 @@ struct ConversationRepositoryDeleteTests {
         let convRepo = SQLiteConversationRepository(database: db)
         let msgRepo = SQLiteChatMessageRepository(database: db)
 
-        try bookRepo.save(try Book(id: "b1", title: "Test Book"))
+        try bookRepo.save(Book(id: "b1", title: "Test Book"))
         let conv = try Conversation(id: "conv1", bookId: "b1", title: "Chat")
         try convRepo.save(conv)
 

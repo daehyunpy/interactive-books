@@ -13,7 +13,7 @@ struct BookRepositorySaveTests {
         let book = try Book(
             id: "b1", title: "Test Book", status: .ready,
             currentPage: 5, embeddingProvider: "openai", embeddingDimension: 1536,
-            createdAt: StorageTestHelper.fixedDate, updatedAt: StorageTestHelper.fixedDate2
+            createdAt: StorageTestHelper.fixedDate, updatedAt: StorageTestHelper.fixedDate2,
         )
         try repo.save(book)
 
@@ -38,7 +38,7 @@ struct BookRepositoryUpsertTests {
 
         let book = try Book(
             id: "b1", title: "Original",
-            createdAt: StorageTestHelper.fixedDate, updatedAt: StorageTestHelper.fixedDate
+            createdAt: StorageTestHelper.fixedDate, updatedAt: StorageTestHelper.fixedDate,
         )
         try repo.save(book)
 
@@ -114,7 +114,7 @@ struct BookRepositoryCascadeTests {
 
         let chunk = try Chunk(
             id: "c1", bookId: "b1", content: "text",
-            startPage: 1, endPage: 1, chunkIndex: 0
+            startPage: 1, endPage: 1, chunkIndex: 0,
         )
         try chunkRepo.saveChunks(bookId: "b1", chunks: [chunk])
 
@@ -122,7 +122,7 @@ struct BookRepositoryCascadeTests {
         try convRepo.save(conv)
 
         let msg = ChatMessage(
-            id: "m1", conversationId: "conv1", role: .user, content: "Hello"
+            id: "m1", conversationId: "conv1", role: .user, content: "Hello",
         )
         try msgRepo.save(msg)
 

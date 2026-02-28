@@ -48,7 +48,7 @@ struct DatabaseMigrationTests {
 
         // Both tables should exist
         let tables = try db.query(
-            sql: "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('first','second') ORDER BY name"
+            sql: "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('first','second') ORDER BY name",
         )
         #expect(tables.count == 2)
         #expect(tables[0][0] == .text("first"))
@@ -148,7 +148,7 @@ struct DatabaseMigrationPatternTests {
 
         // Only the 'valid' table should exist (besides schema_migrations)
         let tables = try db.query(
-            sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'schema_%'"
+            sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'schema_%'",
         )
         #expect(tables.count == 1)
         #expect(tables[0][0] == .text("valid"))

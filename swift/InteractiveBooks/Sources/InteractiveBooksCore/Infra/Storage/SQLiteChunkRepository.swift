@@ -15,9 +15,9 @@ public final class SQLiteChunkRepository: ChunkRepository, @unchecked Sendable {
             for chunk in chunks {
                 try database.run(
                     sql: """
-                        INSERT INTO chunks (\(Self.selectColumns))
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                        """,
+                    INSERT INTO chunks (\(Self.selectColumns))
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
                     bind: [
                         .text(chunk.id),
                         .text(chunk.bookId),
@@ -26,7 +26,7 @@ public final class SQLiteChunkRepository: ChunkRepository, @unchecked Sendable {
                         .integer(chunk.endPage),
                         .integer(chunk.chunkIndex),
                         .text(DateFormatting.iso8601String(from: chunk.createdAt)),
-                    ]
+                    ],
                 )
             }
         }
@@ -35,7 +35,7 @@ public final class SQLiteChunkRepository: ChunkRepository, @unchecked Sendable {
     public func getByBook(_ bookId: String) throws -> [Chunk] {
         let rows = try database.query(
             sql: "SELECT \(Self.selectColumns) FROM chunks WHERE book_id = ? ORDER BY chunk_index",
-            bind: [.text(bookId)]
+            bind: [.text(bookId)],
         )
         return try rows.map { try fromRow($0) }
     }
@@ -43,7 +43,7 @@ public final class SQLiteChunkRepository: ChunkRepository, @unchecked Sendable {
     public func getUpToPage(bookId: String, page: Int) throws -> [Chunk] {
         let rows = try database.query(
             sql: "SELECT \(Self.selectColumns) FROM chunks WHERE book_id = ? AND start_page <= ? ORDER BY chunk_index",
-            bind: [.text(bookId), .integer(page)]
+            bind: [.text(bookId), .integer(page)],
         )
         return try rows.map { try fromRow($0) }
     }
@@ -51,7 +51,7 @@ public final class SQLiteChunkRepository: ChunkRepository, @unchecked Sendable {
     public func countByBook(_ bookId: String) throws -> Int {
         let rows = try database.query(
             sql: "SELECT COUNT(*) FROM chunks WHERE book_id = ?",
-            bind: [.text(bookId)]
+            bind: [.text(bookId)],
         )
         guard let row = rows.first, case let .integer(count) = row[0] else {
             return 0
@@ -83,7 +83,7 @@ public final class SQLiteChunkRepository: ChunkRepository, @unchecked Sendable {
             startPage: startPage,
             endPage: endPage,
             chunkIndex: chunkIndex,
-            createdAt: createdAt
+            createdAt: createdAt,
         )
     }
 }

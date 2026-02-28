@@ -11,11 +11,11 @@ struct ChunkRepositorySaveTests {
         let bookRepo = SQLiteBookRepository(database: db)
         let chunkRepo = SQLiteChunkRepository(database: db)
 
-        try bookRepo.save(try Book(id: "b1", title: "Test Book"))
+        try bookRepo.save(Book(id: "b1", title: "Test Book"))
 
-        let chunks = [
-            try Chunk(id: "c2", bookId: "b1", content: "Second", startPage: 2, endPage: 2, chunkIndex: 1),
-            try Chunk(id: "c1", bookId: "b1", content: "First", startPage: 1, endPage: 1, chunkIndex: 0),
+        let chunks = try [
+            Chunk(id: "c2", bookId: "b1", content: "Second", startPage: 2, endPage: 2, chunkIndex: 1),
+            Chunk(id: "c1", bookId: "b1", content: "First", startPage: 1, endPage: 1, chunkIndex: 0),
         ]
         try chunkRepo.saveChunks(bookId: "b1", chunks: chunks)
 
@@ -37,12 +37,12 @@ struct ChunkRepositoryGetUpToPageTests {
         let bookRepo = SQLiteBookRepository(database: db)
         let chunkRepo = SQLiteChunkRepository(database: db)
 
-        try bookRepo.save(try Book(id: "b1", title: "Test Book"))
+        try bookRepo.save(Book(id: "b1", title: "Test Book"))
 
-        let chunks = [
-            try Chunk(id: "c1", bookId: "b1", content: "Page 1", startPage: 1, endPage: 1, chunkIndex: 0),
-            try Chunk(id: "c2", bookId: "b1", content: "Page 2", startPage: 2, endPage: 3, chunkIndex: 1),
-            try Chunk(id: "c3", bookId: "b1", content: "Page 5", startPage: 5, endPage: 6, chunkIndex: 2),
+        let chunks = try [
+            Chunk(id: "c1", bookId: "b1", content: "Page 1", startPage: 1, endPage: 1, chunkIndex: 0),
+            Chunk(id: "c2", bookId: "b1", content: "Page 2", startPage: 2, endPage: 3, chunkIndex: 1),
+            Chunk(id: "c3", bookId: "b1", content: "Page 5", startPage: 5, endPage: 6, chunkIndex: 2),
         ]
         try chunkRepo.saveChunks(bookId: "b1", chunks: chunks)
 
@@ -66,11 +66,11 @@ struct ChunkRepositoryCountTests {
         let bookRepo = SQLiteBookRepository(database: db)
         let chunkRepo = SQLiteChunkRepository(database: db)
 
-        try bookRepo.save(try Book(id: "b1", title: "Test Book"))
+        try bookRepo.save(Book(id: "b1", title: "Test Book"))
 
-        let chunks = [
-            try Chunk(id: "c1", bookId: "b1", content: "A", startPage: 1, endPage: 1, chunkIndex: 0),
-            try Chunk(id: "c2", bookId: "b1", content: "B", startPage: 2, endPage: 2, chunkIndex: 1),
+        let chunks = try [
+            Chunk(id: "c1", bookId: "b1", content: "A", startPage: 1, endPage: 1, chunkIndex: 0),
+            Chunk(id: "c2", bookId: "b1", content: "B", startPage: 2, endPage: 2, chunkIndex: 1),
         ]
         try chunkRepo.saveChunks(bookId: "b1", chunks: chunks)
 
@@ -96,14 +96,14 @@ struct ChunkRepositoryDeleteTests {
         let bookRepo = SQLiteBookRepository(database: db)
         let chunkRepo = SQLiteChunkRepository(database: db)
 
-        try bookRepo.save(try Book(id: "b1", title: "Book 1"))
-        try bookRepo.save(try Book(id: "b2", title: "Book 2"))
+        try bookRepo.save(Book(id: "b1", title: "Book 1"))
+        try bookRepo.save(Book(id: "b2", title: "Book 2"))
 
         try chunkRepo.saveChunks(bookId: "b1", chunks: [
-            try Chunk(id: "c1", bookId: "b1", content: "A", startPage: 1, endPage: 1, chunkIndex: 0),
+            Chunk(id: "c1", bookId: "b1", content: "A", startPage: 1, endPage: 1, chunkIndex: 0),
         ])
         try chunkRepo.saveChunks(bookId: "b2", chunks: [
-            try Chunk(id: "c2", bookId: "b2", content: "B", startPage: 1, endPage: 1, chunkIndex: 0),
+            Chunk(id: "c2", bookId: "b2", content: "B", startPage: 1, endPage: 1, chunkIndex: 0),
         ])
 
         try chunkRepo.deleteByBook("b1")

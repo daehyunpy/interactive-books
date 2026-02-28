@@ -114,12 +114,12 @@ public final class Database: @unchecked Sendable {
 
     private func ensureMigrationTable() throws {
         try execute(sql: """
-            CREATE TABLE IF NOT EXISTS schema_migrations (
-                version    INTEGER PRIMARY KEY,
-                name       TEXT NOT NULL,
-                applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-            )
-            """)
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version    INTEGER PRIMARY KEY,
+            name       TEXT NOT NULL,
+            applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """)
     }
 
     private func getAppliedVersions() throws -> Set<Int> {
@@ -155,13 +155,13 @@ public final class Database: @unchecked Sendable {
 
         guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
             throw StorageError.migrationFailed(
-                "Migration '\(name)' failed: \(errorMessage)"
+                "Migration '\(name)' failed: \(errorMessage)",
             )
         }
 
         try run(
             sql: "INSERT INTO schema_migrations (version, name) VALUES (?, ?)",
-            bind: [.integer(version), .text(name)]
+            bind: [.integer(version), .text(name)],
         )
     }
 
@@ -180,19 +180,18 @@ public final class Database: @unchecked Sendable {
     private func bindParameters(stmt: OpaquePointer, values: [SQLiteValue]) throws {
         for (index, value) in values.enumerated() {
             let position = Int32(index + 1)
-            let result: Int32
-            switch value {
-            case let .text(string):
-                result = sqlite3_bind_text(
-                    stmt, position, string, -1,
-                    unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-                )
-            case let .integer(int):
-                result = sqlite3_bind_int64(stmt, position, Int64(int))
-            case let .real(double):
-                result = sqlite3_bind_double(stmt, position, double)
-            case .null:
-                result = sqlite3_bind_null(stmt, position)
+            let result: Int32 = switch value {
+                case let .text(string):
+                    sqlite3_bind_text(
+                        stmt, position, string, -1,
+                        unsafeBitCast(-1, to: sqlite3_destructor_type.self),
+                    )
+                case let .integer(int):
+                    sqlite3_bind_int64(stmt, position, Int64(int))
+                case let .real(double):
+                    sqlite3_bind_double(stmt, position, double)
+                case .null:
+                    sqlite3_bind_null(stmt, position)
             }
             guard result == SQLITE_OK else {
                 throw storageError(message: "Failed to bind parameter at index \(index)")
@@ -204,16 +203,16 @@ public final class Database: @unchecked Sendable {
         let count = Int(sqlite3_column_count(stmt))
         var row: [SQLiteValue] = []
         row.reserveCapacity(count)
-        for col in 0..<Int32(count) {
+        for col in 0 ..< Int32(count) {
             switch sqlite3_column_type(stmt, col) {
-            case SQLITE_TEXT:
-                row.append(.text(String(cString: sqlite3_column_text(stmt, col))))
-            case SQLITE_INTEGER:
-                row.append(.integer(Int(sqlite3_column_int64(stmt, col))))
-            case SQLITE_FLOAT:
-                row.append(.real(sqlite3_column_double(stmt, col)))
-            default:
-                row.append(.null)
+                case SQLITE_TEXT:
+                    row.append(.text(String(cString: sqlite3_column_text(stmt, col))))
+                case SQLITE_INTEGER:
+                    row.append(.integer(Int(sqlite3_column_int64(stmt, col))))
+                case SQLITE_FLOAT:
+                    row.append(.real(sqlite3_column_double(stmt, col)))
+                default:
+                    row.append(.null)
             }
         }
         return row
