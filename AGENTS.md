@@ -21,23 +21,34 @@ Read all four before making changes to the Swift app.
 
 The Python CLI can ingest books (PDF, TXT, EPUB, DOCX, HTML, Markdown, and URLs), generate embeddings, run vector search, and have multi-turn agentic conversations about books. The agent decides when to retrieve via tool-use, maintains conversation history, and persists sessions.
 
-**Next up:** iOS/macOS/visionOS app.
+**Phase 10 in progress:** iOS/macOS/visionOS app — Phases A–C done, Phase D next.
 
 Build order: CLI first, bottom-up, one feature at a time.
 
-| Phase | What                      | Status   |
-| ----- | ------------------------- | -------- |
-| 1     | Project scaffold          | Done     |
-| 2     | DB schema                 | Done     |
-| 3     | Book ingestion            | Done     |
-| 4     | Embeddings                | Done     |
-| 5     | Retrieval                 | Done     |
-| 6     | Q&A (Agentic Chat)        | Done     |
-| 7     | CLI polish                | Done     |
-| 8     | Structured format parsers | Done     |
-| 9     | Text format parsers       | Done     |
-| 10    | iOS/macOS/visionOS app    | **Next** |
+| Phase | What                      | Status         |
+| ----- | ------------------------- | -------------- |
+| 1     | Project scaffold          | Done           |
+| 2     | DB schema                 | Done           |
+| 3     | Book ingestion            | Done           |
+| 4     | Embeddings                | Done           |
+| 5     | Retrieval                 | Done           |
+| 6     | Q&A (Agentic Chat)        | Done           |
+| 7     | CLI polish                | Done           |
+| 8     | Structured format parsers | Done           |
+| 9     | Text format parsers       | Done           |
+| 10    | iOS/macOS/visionOS app    | **In Progress** |
 
+### Phase 10 Sub-Phases
+
+| Sub-Phase | What                  | Status   |
+| --------- | --------------------- | -------- |
+| A         | Project scaffold      | Done     |
+| B         | Domain layer          | Done     |
+| C         | Storage layer         | Done     |
+| D         | sqlite-vec integration | **Next** |
+| E–N       | Remaining phases      | Pending  |
+
+See `docs/app_build_plan.md` for the full Phase A–N breakdown.
 See `docs/technical_design.md` → "Build Order" for details on each phase. See "Directory Layout" for the full project tree.
 
 ### Agentic Chat Architecture (Phase 6 — completed)
@@ -74,6 +85,22 @@ The conversation system uses tool-use to let the LLM decide when retrieval is ne
 | Tool results visibility  | Hidden in production. Visible with `--verbose` (CLI) / debug toggle (app).                                |
 | CLI command              | `cli chat <book>` — interactive REPL with conversation selection.                                         |
 | Feature naming           | "Book Conversations" — ubiquitous language is "conversation", not "question" or "ask".                    |
+
+### Swift App Architecture (Phase 10 — in progress)
+
+The Swift app replicates the Python CLI's full pipeline in native Swift. It shares the SQL schema (`shared/schema/`), prompt templates (`shared/prompts/`), and test fixtures (`shared/fixtures/`) with the Python codebase.
+
+#### Key Decisions (already resolved — do not re-ask)
+
+| Decision              | Choice                                                                                                                       |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Persistence           | Raw SQLite via system C library. No ORM, no SwiftData. Shared SQL migrations are the source of truth.                        |
+| Adapter naming        | Swift infra adapters use prefixed names (`SQLiteBookRepository`) unlike Python (which relies on module paths for disambiguation). This is because Swift's single-target SPM layout lacks Python's implicit namespace separation. |
+| Sendability           | Repository classes are `final class` + `@unchecked Sendable`. The underlying SQLite connection is thread-safe via WAL mode.  |
+| Test helpers          | `StorageTestHelper` provides in-memory DB setup and entity factory methods for storage integration tests.                    |
+| SQL column constants  | Repository classes use a `private static let selectColumns` constant to avoid repeating column lists across queries.         |
+| SQLiteValue helpers   | `SQLiteValue` enum has `textValue` / `integerValue` computed properties for concise optional extraction.                     |
+| Platform versions     | `Package.swift` uses the highest available SPM platform enums. Will update to `.v26` when Xcode 26 GM ships.                |
 
 ## First-Time Setup
 
@@ -138,11 +165,22 @@ uv run interactive-books chat <book_id>                    # interactive convers
 
 ### Swift App (Phase 10)
 
-Setup instructions will be added when the Swift app is scaffolded.
+```bash
+cd swift/InteractiveBooks/
+swift build                    # build all targets
+swift test                     # run tests
+swift run interactive-books books   # list books from DB
+```
+
+The Swift package has two targets:
+- `InteractiveBooksCore` (library) — Domain, Infra layers. All business logic.
+- `CLI` (executable `interactive-books`) — ArgumentParser commands wired to Core.
+
+Platform targets in `Package.swift` use the highest versions available in the current toolchain (`.iOS(.v18)`, `.macOS(.v15)`, `.visionOS(.v2)`). These will be updated to `.v26` when Xcode 26 GM ships with the corresponding SPM platform enum cases.
 
 ## Quick Commands
 
-All Python commands run from `python/`. All Swift commands run from `swift/` (Phase 10).
+All Python commands run from `python/`. All Swift commands run from `swift/InteractiveBooks/`.
 
 | Task                  | Command                              |
 | --------------------- | ------------------------------------ |
@@ -152,10 +190,12 @@ All Python commands run from `python/`. All Swift commands run from `swift/` (Ph
 | Lint Python           | `uv run ruff check .`                |
 | Format Python         | `uv run ruff format .`               |
 | Type check Python     | `uv run pyright`                     |
-| Run CLI               | `uv run interactive-books <command>` |
-| Run Swift tests       | `swift test` _(Phase 10)_            |
-| Lint Swift            | `swiftlint` _(Phase 10)_             |
-| Format Swift          | `swiftformat .` _(Phase 10)_         |
+| Run Python CLI        | `uv run interactive-books <command>` |
+| Build Swift           | `swift build`                        |
+| Run Swift tests       | `swift test`                         |
+| Run Swift CLI         | `swift run interactive-books <cmd>`  |
+| Lint Swift            | `swiftlint` _(not yet configured)_   |
+| Format Swift          | `swiftformat .` _(not yet configured)_ |
 
 ### CLI Commands (current)
 
@@ -195,7 +235,8 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 ### Clean Code
 
 - **Port naming** — domain Protocol classes keep clean names (`BookRepository`, not `BookRepositoryPort`). Infra adapters alias at import: `from ...protocols import BookRepository as BookRepositoryPort`. Never rename the protocol definition itself.
-- **Adapter naming** — infra adapter classes use the same name as their domain protocol. The module path provides disambiguation (e.g., `infra.parsers.pdf.BookParser` implements `domain.protocols.BookParser`). Don't encode implementation details in the class name — use the module path instead (`parsers.pdf`, not `PyMuPdfParser`). When two implementations coexist at a call site, use import aliases (`from ...pdf import BookParser as PdfBookParser`).
+- **Adapter naming (Python)** — infra adapter classes use the same name as their domain protocol. The module path provides disambiguation (e.g., `infra.parsers.pdf.BookParser` implements `domain.protocols.BookParser`). Don't encode implementation details in the class name — use the module path instead (`parsers.pdf`, not `PyMuPdfParser`). When two implementations coexist at a call site, use import aliases (`from ...pdf import BookParser as PdfBookParser`).
+- **Adapter naming (Swift)** — infra adapter classes use a prefixed name (`SQLiteBookRepository`, not `BookRepository`) because Swift's single-target SPM layout lacks Python's implicit namespace packages. The prefix indicates the infrastructure technology.
 - **Naming** — names reveal intent. `chunks_up_to_page(page)` not `get_filtered(p)`. Booleans read as assertions: `is_ingested`, `has_embeddings`.
 - **Functions** — do one thing. If it has "and" in its description, split it. Aim for < 20 lines.
 - **No empty `__init__.py`** — don't create empty `__init__.py` files. The project uses implicit namespace packages; they're unnecessary.
@@ -211,7 +252,7 @@ This project follows three disciplines: **DDD**, **TDD**, and **Clean Code**. Th
 
 - Don't add a backend server, remote database, or web interface
 - Don't target below iOS 26 / macOS 26 / visionOS 26
-- Don't use Core Data — we use SwiftData
+- Don't use Core Data or SwiftData — we use raw SQLite for schema fidelity with the shared SQL migrations
 - Don't hardcode a single LLM provider — always go through the protocol abstraction
 - Don't write code without a failing test first
 - Don't put domain logic in `infra/` or UI layers
