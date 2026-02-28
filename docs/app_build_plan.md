@@ -773,29 +773,43 @@ Phase A: Scaffold
     ↓
 Phase B: Domain Layer
     ↓
-    ├── Phase C: Storage Layer
-    │       ↓
-    │   Phase D: sqlite-vec Integration
-    │
+    ├── Phase C: Storage Layer → Phase D: sqlite-vec → Phase F: Embeddings
     ├── Phase E: Book Parsing + Chunking ──────────────────────┐
-    │                                                          │
-    ├── Phase F: Embeddings (needs C + D)                      │
-    │                                                          │
-    └── Phase G: LLM Chat Providers                            │
-            ↓                                                  │
-        Phase H: Retrieval & Context                           │
-            ↓                                                  │
-        Phase I: Application Layer & CLI Chat ◄────────────────┘
-            ↓
-            ├── Phase J: SwiftUI — Book Library
-            ├── Phase K: SwiftUI — Chat Interface
-            ├── Phase L: SwiftUI — Settings & Platform
-            └── Phase M: Extended Format Parsers
-                    ↓
-                Phase N: Integration & Polish
+    └── Phase G: LLM Chat Providers → Phase H: Retrieval       │
+                                          ↓                    │
+                                     Phase I: App Layer ◄──────┘
+                                          ↓
+                              ┌──── ┬──── ┬──── ┐
+                              J     K     L     M
+                              └──── ┴──── ┴──── ┘
+                                          ↓
+                                     Phase N: Polish
 ```
 
-Phases C–G can proceed in parallel after Domain (B) is complete. Phases J–M can proceed in parallel after Application (I) is complete.
+### Parallel Execution
+
+There are two parallelization windows where independent tracks can run simultaneously.
+
+#### After Phase B (Domain Layer) — 3 parallel tracks
+
+| Track | Phases | Bottleneck |
+|-------|--------|------------|
+| Storage | C → D → F | D (sqlite-vec) is highest-risk; F (Embeddings) blocked until D completes |
+| Parsing | E | Independent — no infra dependencies |
+| LLM | G → H | H (Retrieval) needs G but nothing else |
+
+Phases **C, E, and G** can all start at the same time. D waits for C. F waits for C + D. H waits for G. Phase I (Application Layer) is the convergence point — it needs E, F, and H all complete before it can wire everything together.
+
+#### After Phase I (Application Layer) — 4 parallel tracks
+
+| Track | Phase | What |
+|-------|-------|------|
+| Library UI | J | Book Library screen |
+| Chat UI | K | Chat Interface screen |
+| Settings UI | L | Settings & platform adaptations |
+| Parsers | M | EPUB, DOCX, HTML, Markdown, URL |
+
+All four are fully independent — different screens and different parsers with no shared work. Phase N (Integration & Polish) starts after all four complete.
 
 ---
 
