@@ -25,6 +25,7 @@ struct ChatMessageRepositorySaveTests {
         )
         let msg3 = ChatMessage(
             id: "m3", conversationId: "conv1", role: .toolResult, content: "{\"result\": \"data\"}",
+            // swiftlint:disable:next force_unwrapping
             createdAt: StorageTestHelper.iso8601Formatter.date(from: "2025-01-17T08:00:00Z")!
         )
         try msgRepo.save(msg1)
