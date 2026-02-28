@@ -3,6 +3,9 @@ import Foundation
 public final class SQLiteConversationRepository: ConversationRepository, @unchecked Sendable {
     private let database: Database
 
+    private static let selectColumns =
+        "id, book_id, title, created_at"
+
     public init(database: Database) {
         self.database = database
     }
@@ -10,7 +13,7 @@ public final class SQLiteConversationRepository: ConversationRepository, @unchec
     public func save(_ conversation: Conversation) throws {
         try database.run(
             sql: """
-                INSERT OR REPLACE INTO conversations (id, book_id, title, created_at)
+                INSERT OR REPLACE INTO conversations (\(Self.selectColumns))
                 VALUES (?, ?, ?, ?)
                 """,
             bind: [
@@ -24,7 +27,7 @@ public final class SQLiteConversationRepository: ConversationRepository, @unchec
 
     public func get(_ conversationId: String) throws -> Conversation? {
         let rows = try database.query(
-            sql: "SELECT id, book_id, title, created_at FROM conversations WHERE id = ?",
+            sql: "SELECT \(Self.selectColumns) FROM conversations WHERE id = ?",
             bind: [.text(conversationId)]
         )
         guard let row = rows.first else { return nil }
@@ -33,7 +36,7 @@ public final class SQLiteConversationRepository: ConversationRepository, @unchec
 
     public func getByBook(_ bookId: String) throws -> [Conversation] {
         let rows = try database.query(
-            sql: "SELECT id, book_id, title, created_at FROM conversations WHERE book_id = ? ORDER BY created_at DESC",
+            sql: "SELECT \(Self.selectColumns) FROM conversations WHERE book_id = ? ORDER BY created_at DESC",
             bind: [.text(bookId)]
         )
         return try rows.map { try fromRow($0) }

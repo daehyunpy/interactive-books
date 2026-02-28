@@ -132,13 +132,7 @@ public final class Database: @unchecked Sendable {
 
     private func getAppliedVersions() throws -> Set<Int> {
         let rows = try query(sql: "SELECT version FROM schema_migrations")
-        var versions = Set<Int>()
-        for row in rows {
-            if case let .integer(v) = row[0] {
-                versions.insert(v)
-            }
-        }
-        return versions
+        return Set(rows.compactMap(\.first?.integerValue))
     }
 
     private func sortedMigrationFiles(in dir: String) throws -> [(String, Int)] {
@@ -205,13 +199,13 @@ public final class Database: @unchecked Sendable {
     }
 
     private func extractRow(stmt: OpaquePointer) -> [SQLiteValue] {
-        let count = sqlite3_column_count(stmt)
+        let count = Int(sqlite3_column_count(stmt))
         var row: [SQLiteValue] = []
-        for i in 0..<count {
+        row.reserveCapacity(count)
+        for i in 0..<Int32(count) {
             switch sqlite3_column_type(stmt, i) {
             case SQLITE_TEXT:
-                let text = String(cString: sqlite3_column_text(stmt, i))
-                row.append(.text(text))
+                row.append(.text(String(cString: sqlite3_column_text(stmt, i))))
             case SQLITE_INTEGER:
                 row.append(.integer(Int(sqlite3_column_int64(stmt, i))))
             case SQLITE_FLOAT:

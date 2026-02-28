@@ -3,6 +3,9 @@ import Foundation
 public final class SQLiteChatMessageRepository: ChatMessageRepository, @unchecked Sendable {
     private let database: Database
 
+    private static let selectColumns =
+        "id, conversation_id, role, content, created_at"
+
     public init(database: Database) {
         self.database = database
     }
@@ -10,7 +13,7 @@ public final class SQLiteChatMessageRepository: ChatMessageRepository, @unchecke
     public func save(_ message: ChatMessage) throws {
         try database.run(
             sql: """
-                INSERT INTO chat_messages (id, conversation_id, role, content, created_at)
+                INSERT INTO chat_messages (\(Self.selectColumns))
                 VALUES (?, ?, ?, ?, ?)
                 """,
             bind: [
@@ -25,7 +28,7 @@ public final class SQLiteChatMessageRepository: ChatMessageRepository, @unchecke
 
     public func getByConversation(_ conversationId: String) throws -> [ChatMessage] {
         let rows = try database.query(
-            sql: "SELECT id, conversation_id, role, content, created_at FROM chat_messages WHERE conversation_id = ? ORDER BY created_at ASC",
+            sql: "SELECT \(Self.selectColumns) FROM chat_messages WHERE conversation_id = ? ORDER BY created_at ASC",
             bind: [.text(conversationId)]
         )
         return try rows.map { try fromRow($0) }
