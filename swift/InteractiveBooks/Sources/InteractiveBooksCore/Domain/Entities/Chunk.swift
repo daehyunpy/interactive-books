@@ -36,4 +36,22 @@ public struct Chunk: Sendable, Equatable {
         self.chunkIndex = chunkIndex
         self.createdAt = createdAt
     }
+
+    package init(
+        fromRow id: String,
+        bookId: String,
+        content: String,
+        startPage: Int,
+        endPage: Int,
+        chunkIndex: Int,
+        createdAt: Date,
+    ) {
+        self.id = id
+        self.bookId = bookId
+        self.content = content
+        self.startPage = startPage
+        self.endPage = endPage
+        self.chunkIndex = chunkIndex
+        self.createdAt = createdAt
+    }
 }
