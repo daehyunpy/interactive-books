@@ -95,8 +95,8 @@ public final class Database: @unchecked Sendable {
         try ensureMigrationTable()
         let applied = try getAppliedVersions()
 
-        for (path, name, version) in try sortedMigrationFiles(in: schemaDir) where !applied.contains(version) {
-            try applyMigration(path: path, name: name, version: version)
+        for (path, version) in try sortedMigrationFiles(in: schemaDir) where !applied.contains(version) {
+            try applyMigration(path: path, version: version)
         }
     }
 
@@ -115,23 +115,24 @@ public final class Database: @unchecked Sendable {
         return Set(rows.compactMap(\.first?.integerValue))
     }
 
-    private func sortedMigrationFiles(in dir: String) throws -> [(path: String, name: String, version: Int)] {
+    private func sortedMigrationFiles(in dir: String) throws -> [(path: String, version: Int)] {
         let fileManager = FileManager.default
         guard let entries = try? fileManager.contentsOfDirectory(atPath: dir) else {
             return []
         }
 
-        return entries.compactMap { name -> (String, String, Int)? in
+        return entries.compactMap { name -> (String, Int)? in
             guard let match = name.wholeMatch(of: Self.migrationPattern),
                   let version = Int(match.1)
             else {
                 return nil
             }
-            return ("\(dir)/\(name)", name, version)
+            return ("\(dir)/\(name)", version)
         }.sorted { $0.version < $1.version }
     }
 
-    private func applyMigration(path: String, name: String, version: Int) throws {
+    private func applyMigration(path: String, version: Int) throws {
+        let name = (path as NSString).lastPathComponent
         guard let sql = try? String(contentsOfFile: path, encoding: .utf8) else {
             throw StorageError.migrationFailed("Cannot read migration file: \(name)")
         }
