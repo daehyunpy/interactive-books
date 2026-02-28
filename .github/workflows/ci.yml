@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build
-        run: swift build --product interactive-books
+        run: swift build
 
       - name: Test
         run: swift test
