@@ -178,6 +178,15 @@ The Swift package has two targets:
 
 Platform targets in `Package.swift` use the highest versions available in the current toolchain (`.iOS(.v18)`, `.macOS(.v15)`, `.visionOS(.v2)`). These will be updated to `.v26` when Xcode 26 GM ships with the corresponding SPM platform enum cases.
 
+**CI:** `macos-15` runners include Xcode 16.4 + Swift 6.1.2. Don't add `setup-swift` — it's unnecessary and can cause toolchain conflicts.
+
+### Swift Gotchas
+
+- **SPM basename collisions** — SPM uses file basenames for `.o` files. Two files named `BookRepository.swift` in different directories of the same target cause "multiple producers" build error. Infra files must be named after their class (`SQLiteBookRepository.swift`).
+- **SQLite WAL + in-memory DBs** — `:memory:` databases silently ignore `PRAGMA journal_mode=WAL` (returns `"memory"`). Tests asserting WAL mode need a file-based temp database.
+- **`nonisolated(unsafe)`** — only needed for non-`Sendable` static properties accessed across isolation domains. Don't apply it to `private` properties or types that are already safe (e.g., `NSRegularExpression` in a `let`).
+- **SwiftLint vs SwiftFormat** — SwiftFormat is authoritative for formatting. When rules conflict, disable the SwiftLint rule (e.g., `switch_case_alignment` disabled because SwiftFormat indents `case`).
+
 ## Quick Commands
 
 All Python commands run from `python/`. All Swift commands run from `swift/InteractiveBooks/`.
@@ -194,8 +203,8 @@ All Python commands run from `python/`. All Swift commands run from `swift/Inter
 | Build Swift           | `swift build`                        |
 | Run Swift tests       | `swift test`                         |
 | Run Swift CLI         | `swift run interactive-books <cmd>`  |
-| Lint Swift            | `swiftlint` _(not yet configured)_   |
-| Format Swift          | `swiftformat .` _(not yet configured)_ |
+| Lint Swift            | `swiftlint lint --strict`            |
+| Format Swift          | `swiftformat .`                      |
 
 ### CLI Commands (current)
 
@@ -286,6 +295,7 @@ This project uses OpenSpec for spec-driven development. All non-trivial changes 
 | 1    | `/opsx:new <name>` | Create a new change with a kebab-case name (e.g., `/opsx:new add-pdf-parser`) |
 | 2    | `/opsx:ff`         | Generate all spec artifacts (requirements, design, tasks) in one pass         |
 | 3    | `/opsx:apply`      | Implement the tasks from the generated spec                                   |
+| 3.5  | _code simplifier_  | Simplify and refine code before verification                                  |
 | 4    | `/opsx:verify`     | Verify implementation matches the spec artifacts                              |
 | 5    | `/opsx:archive`    | Archive the completed change                                                  |
 
