@@ -51,7 +51,7 @@ jobs:
           swift-version: "6.1"
 
       - name: Build
-        run: swift build
+        run: swift build -v 2>&1 | tail -100
 
       - name: Test
         run: swift test
