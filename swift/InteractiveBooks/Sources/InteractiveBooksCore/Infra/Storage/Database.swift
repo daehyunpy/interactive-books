@@ -21,12 +21,7 @@ public enum SQLiteValue: Sendable, Equatable {
 public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
 
-    private static let migrationPattern: NSRegularExpression = {
-        guard let regex = try? NSRegularExpression(pattern: #"^(\d{3,})_.+\.sql$"#) else {
-            fatalError("Invalid migration pattern regex")
-        }
-        return regex
-    }()
+    private nonisolated(unsafe) static let migrationPattern = /^(\d{3,})_.+\.sql$/
 
     public init(path: String) throws {
         guard sqlite3_open(path, &db) == SQLITE_OK else {
@@ -100,8 +95,8 @@ public final class Database: @unchecked Sendable {
         try ensureMigrationTable()
         let applied = try getAppliedVersions()
 
-        for (path, version) in try sortedMigrationFiles(in: schemaDir) where !applied.contains(version) {
-            try applyMigration(path: path, version: version)
+        for (path, name, version) in try sortedMigrationFiles(in: schemaDir) where !applied.contains(version) {
+            try applyMigration(path: path, name: name, version: version)
         }
     }
 
@@ -120,28 +115,23 @@ public final class Database: @unchecked Sendable {
         return Set(rows.compactMap(\.first?.integerValue))
     }
 
-    private func sortedMigrationFiles(in dir: String) throws -> [(String, Int)] {
+    private func sortedMigrationFiles(in dir: String) throws -> [(path: String, name: String, version: Int)] {
         let fileManager = FileManager.default
         guard let entries = try? fileManager.contentsOfDirectory(atPath: dir) else {
             return []
         }
 
-        var results: [(String, Int)] = []
-        for name in entries {
-            let range = NSRange(name.startIndex..., in: name)
-            guard let match = Self.migrationPattern.firstMatch(in: name, range: range),
-                  let versionRange = Range(match.range(at: 1), in: name),
-                  let version = Int(name[versionRange])
+        return entries.compactMap { name -> (String, String, Int)? in
+            guard let match = name.wholeMatch(of: Self.migrationPattern),
+                  let version = Int(match.1)
             else {
-                continue
+                return nil
             }
-            results.append(("\(dir)/\(name)", version))
-        }
-        return results.sorted { $0.1 < $1.1 }
+            return ("\(dir)/\(name)", name, version)
+        }.sorted { $0.version < $1.version }
     }
 
-    private func applyMigration(path: String, version: Int) throws {
-        let name = (path as NSString).lastPathComponent
+    private func applyMigration(path: String, name: String, version: Int) throws {
         guard let sql = try? String(contentsOfFile: path, encoding: .utf8) else {
             throw StorageError.migrationFailed("Cannot read migration file: \(name)")
         }
