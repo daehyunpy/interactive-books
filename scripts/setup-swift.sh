@@ -45,13 +45,7 @@ fi
 # ---------------------------------------------------------------------------
 if ! command -v swiftlint &>/dev/null; then
   echo "Installing SwiftLint (latest)..."
-  # Note: unauthenticated GitHub API is limited to 60 requests/hour.
-  # Set GITHUB_TOKEN in the environment to raise the limit.
-  GITHUB_AUTH_HEADER=""
-  if [ -n "${GITHUB_TOKEN:-}" ]; then
-    GITHUB_AUTH_HEADER="-H \"Authorization: token $GITHUB_TOKEN\""
-  fi
-  SWIFTLINT_URL=$(curl -fsSL $GITHUB_AUTH_HEADER "https://api.github.com/repos/realm/SwiftLint/releases/latest" \
+  SWIFTLINT_URL=$(curl -fsSL "https://api.github.com/repos/realm/SwiftLint/releases/latest" \
     | grep -o '"browser_download_url": *"[^"]*linux[^"]*"' \
     | head -1 \
     | cut -d'"' -f4)
@@ -77,7 +71,7 @@ fi
 # ---------------------------------------------------------------------------
 if ! command -v swiftformat &>/dev/null; then
   echo "Installing SwiftFormat (latest)..."
-  SWIFTFORMAT_URL=$(curl -fsSL $GITHUB_AUTH_HEADER "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/latest" \
+  SWIFTFORMAT_URL=$(curl -fsSL "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/latest" \
     | grep -o '"browser_download_url": *"[^"]*linux[^"]*"' \
     | head -1 \
     | cut -d'"' -f4)
