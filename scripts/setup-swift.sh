@@ -94,4 +94,3 @@ if ! command -v swiftformat &>/dev/null; then
   fi
 fi
 echo "Swift development environment ready."
-echo "PATH=$PATH"
