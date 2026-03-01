@@ -4,14 +4,56 @@ set -euo pipefail
 # Installs the Swift toolchain, SwiftLint, SwiftFormat, gh, and git-lfs.
 #
 # Environment variables:
-#   SWIFT_VERSION  Swift toolchain version to install (default: 6.0.3)
+#   SWIFT_VERSION  Swift toolchain version to install (default: 6.1.2)
+
+# ---------------------------------------------------------------------------
+# Helper: install a tool from its GitHub release (latest Linux zip)
+# Usage: install_github_release <cmd_name> <repo> <version_flag>
+# ---------------------------------------------------------------------------
+install_github_release() {
+  local cmd="$1"
+  local repo="$2"
+  local version_flag="$3"
+
+  if command -v "$cmd" &>/dev/null; then
+    return
+  fi
+
+  echo "Installing ${cmd} (latest)..."
+  local url
+  url=$(curl -fsSL "https://api.github.com/repos/${repo}/releases/latest" \
+    | grep -o '"browser_download_url": *"[^"]*linux[^"]*"' \
+    | head -1 \
+    | cut -d'"' -f4)
+
+  if [ -z "$url" ]; then
+    echo "WARNING: Could not determine ${cmd} download URL — skipping."
+    return
+  fi
+
+  curl -fsSL "$url" -o "/tmp/${cmd}.zip"
+  unzip -oq "/tmp/${cmd}.zip" -d "/tmp/${cmd}"
+  local bin
+  bin=$(find "/tmp/${cmd}" -type f -name "$cmd" | head -1)
+
+  if [ -z "$bin" ]; then
+    echo "WARNING: Could not locate ${cmd} binary in archive — skipping."
+  else
+    sudo install -m 755 "$bin" "/usr/local/bin/${cmd}"
+    echo "Installed ${cmd} $(${cmd} ${version_flag})"
+  fi
+
+  rm -rf "/tmp/${cmd}.zip" "/tmp/${cmd}"
+}
 
 # ---------------------------------------------------------------------------
 # 1. Install apt packages (gh, git-lfs)
 # ---------------------------------------------------------------------------
-sudo apt-get update -qq
-DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
-  gh git-lfs > /dev/null 2>&1
+if ! command -v gh &>/dev/null || ! command -v git-lfs &>/dev/null; then
+  sudo apt-get update -qq || true
+  DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
+    gh git-lfs > /dev/null 2>&1 || echo "WARNING: apt-get install failed — gh/git-lfs may be unavailable."
+fi
 
 # ---------------------------------------------------------------------------
 # 2. Install Swift toolchain via official tarball
@@ -29,7 +71,7 @@ if ! command -v swift &>/dev/null; then
       SWIFT_OS="ubuntu24.04"
       ;;
   esac
-  SWIFT_VERSION="${SWIFT_VERSION:-6.0.3}"
+  SWIFT_VERSION="${SWIFT_VERSION:-6.1.2}"
   SWIFT_URL="https://download.swift.org/swift-${SWIFT_VERSION}-release/${SWIFT_PLATFORM}/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-${SWIFT_OS}.tar.gz"
   echo "Downloading Swift ${SWIFT_VERSION} for ${SWIFT_OS}..."
   curl -fsSL "$SWIFT_URL" -o /tmp/swift.tar.gz
@@ -43,54 +85,11 @@ if ! command -v swift &>/dev/null; then
     exit 1
   fi
 fi
+
 # ---------------------------------------------------------------------------
-# 3. Install SwiftLint (latest from GitHub releases)
+# 3. Install SwiftLint & SwiftFormat (latest from GitHub releases)
 # ---------------------------------------------------------------------------
-if ! command -v swiftlint &>/dev/null; then
-  echo "Installing SwiftLint (latest)..."
-  SWIFTLINT_URL=$(curl -fsSL "https://api.github.com/repos/realm/SwiftLint/releases/latest" \
-    | grep -o '"browser_download_url": *"[^"]*linux[^"]*"' \
-    | head -1 \
-    | cut -d'"' -f4)
-  if [ -n "$SWIFTLINT_URL" ]; then
-    curl -fsSL "$SWIFTLINT_URL" -o /tmp/swiftlint.zip
-    unzip -oq /tmp/swiftlint.zip -d /tmp/swiftlint
-    SWIFTLINT_BIN=$(find /tmp/swiftlint -type f -name 'swiftlint' | head -1)
-    if [ -z "$SWIFTLINT_BIN" ]; then
-      echo "WARNING: Could not locate swiftlint binary in archive — skipping."
-    else
-      chmod +x "$SWIFTLINT_BIN"
-      sudo install -m 755 "$SWIFTLINT_BIN" /usr/local/bin/swiftlint
-      echo "Installed SwiftLint $(swiftlint version)"
-    fi
-    rm -rf /tmp/swiftlint.zip /tmp/swiftlint
-  else
-    echo "WARNING: Could not determine SwiftLint download URL — skipping."
-  fi
-fi
-# ---------------------------------------------------------------------------
-# 4. Install SwiftFormat (latest from GitHub releases)
-# ---------------------------------------------------------------------------
-if ! command -v swiftformat &>/dev/null; then
-  echo "Installing SwiftFormat (latest)..."
-  SWIFTFORMAT_URL=$(curl -fsSL "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/latest" \
-    | grep -o '"browser_download_url": *"[^"]*linux[^"]*"' \
-    | head -1 \
-    | cut -d'"' -f4)
-  if [ -n "$SWIFTFORMAT_URL" ]; then
-    curl -fsSL "$SWIFTFORMAT_URL" -o /tmp/swiftformat.zip
-    unzip -oq /tmp/swiftformat.zip -d /tmp/swiftformat
-    SWIFTFORMAT_BIN=$(find /tmp/swiftformat -type f -name 'swiftformat' | head -1)
-    if [ -z "$SWIFTFORMAT_BIN" ]; then
-      echo "WARNING: Could not locate swiftformat binary in archive — skipping."
-    else
-      chmod +x "$SWIFTFORMAT_BIN"
-      sudo install -m 755 "$SWIFTFORMAT_BIN" /usr/local/bin/swiftformat
-      echo "Installed SwiftFormat $(swiftformat --version)"
-    fi
-    rm -rf /tmp/swiftformat.zip /tmp/swiftformat
-  else
-    echo "WARNING: Could not determine SwiftFormat download URL — skipping."
-  fi
-fi
+install_github_release swiftlint realm/SwiftLint version
+install_github_release swiftformat nicklockwood/SwiftFormat --version
+
 echo "Swift development environment ready."
