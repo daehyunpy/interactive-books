@@ -101,11 +101,6 @@ esac
 # ---------------------------------------------------------------------------
 sudo apt-get update -qq || true
 
-# Resolve the default GCC version from the gcc meta-package (e.g. gcc -> gcc-13).
-GCC_VERSION=$(apt-cache depends gcc 2>/dev/null \
-  | grep -oP 'gcc-\K[0-9]+' | head -1 || true)
-GCC_VERSION="${GCC_VERSION:-13}"
-
 # gh and git-lfs
 if ! command -v gh &>/dev/null || ! command -v git-lfs &>/dev/null; then
   DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
@@ -113,16 +108,16 @@ if ! command -v gh &>/dev/null || ! command -v git-lfs &>/dev/null; then
 fi
 
 # Swift system dependencies (required for the toolchain and SPM builds).
+# build-essential provides the default GCC/G++ toolchain, which transitively
+# pulls in libgcc-*-dev and libstdc++-*-dev for the distro's default version.
 DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
   binutils \
+  build-essential \
   gnupg2 \
-  libc6-dev \
   libcurl4-openssl-dev \
   libedit2 \
-  "libgcc-${GCC_VERSION}-dev" \
   libpython3-dev \
   libsqlite3-dev \
-  "libstdc++-${GCC_VERSION}-dev" \
   libxml2-dev \
   libz3-dev \
   pkg-config \
