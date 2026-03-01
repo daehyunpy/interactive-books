@@ -11,7 +11,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-  curl gnupg2 unzip gh git-lfs > /dev/null 2>&1
+  gh git-lfs > /dev/null 2>&1
 
 # ---------------------------------------------------------------------------
 # 2. Install Swift toolchain via official tarball
