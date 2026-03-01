@@ -5,7 +5,7 @@ import InteractiveBooksCore
 struct BooksCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "books",
-        abstract: "List all books in the library",
+        abstract: "List all books in the library"
     )
 
     func run() throws {
@@ -29,7 +29,7 @@ struct BooksCommand: ParsableCommand {
         let dataDir = "\(projectRoot)/data"
         if !FileManager.default.fileExists(atPath: dataDir) {
             try FileManager.default.createDirectory(
-                atPath: dataDir, withIntermediateDirectories: true,
+                atPath: dataDir, withIntermediateDirectories: true
             )
         }
 
@@ -43,7 +43,7 @@ struct BooksCommand: ParsableCommand {
     private func printBookTable(books: [Book], chunkRepo: some ChunkRepository) throws {
         let header = String(
             format: "%-36s  %-30s  %-10s  %6s  %4s",
-            "ID", "Title", "Status", "Chunks", "Page",
+            "ID", "Title", "Status", "Chunks", "Page"
         )
         print(header)
         print(String(repeating: "─", count: header.count))
@@ -59,7 +59,7 @@ struct BooksCommand: ParsableCommand {
                 titleDisplay,
                 book.status.rawValue,
                 chunkCount,
-                book.currentPage,
+                book.currentPage
             ))
         }
     }

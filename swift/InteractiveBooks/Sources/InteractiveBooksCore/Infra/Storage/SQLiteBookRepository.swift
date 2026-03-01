@@ -26,14 +26,14 @@ public final class SQLiteBookRepository: BookRepository, @unchecked Sendable {
                 book.embeddingDimension.map { .integer($0) } ?? .null,
                 .text(DateFormatting.iso8601String(from: book.createdAt)),
                 .text(DateFormatting.iso8601String(from: book.updatedAt)),
-            ],
+            ]
         )
     }
 
     public func get(_ bookId: String) throws -> Book? {
         let rows = try database.query(
             sql: "SELECT \(Self.selectColumns) FROM books WHERE id = ?",
-            bind: [.text(bookId)],
+            bind: [.text(bookId)]
         )
         guard let row = rows.first else { return nil }
         return try fromRow(row)
@@ -41,7 +41,7 @@ public final class SQLiteBookRepository: BookRepository, @unchecked Sendable {
 
     public func getAll() throws -> [Book] {
         let rows = try database.query(
-            sql: "SELECT \(Self.selectColumns) FROM books",
+            sql: "SELECT \(Self.selectColumns) FROM books"
         )
         return try rows.map { try fromRow($0) }
     }
@@ -72,7 +72,7 @@ public final class SQLiteBookRepository: BookRepository, @unchecked Sendable {
             embeddingProvider: row[4].textValue,
             embeddingDimension: row[5].integerValue,
             createdAt: createdAt,
-            updatedAt: updatedAt,
+            updatedAt: updatedAt
         )
     }
 }

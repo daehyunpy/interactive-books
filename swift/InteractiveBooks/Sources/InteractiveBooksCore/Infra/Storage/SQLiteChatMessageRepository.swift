@@ -22,14 +22,14 @@ public final class SQLiteChatMessageRepository: ChatMessageRepository, @unchecke
                 .text(message.role.rawValue),
                 .text(message.content),
                 .text(DateFormatting.iso8601String(from: message.createdAt)),
-            ],
+            ]
         )
     }
 
     public func getByConversation(_ conversationId: String) throws -> [ChatMessage] {
         let rows = try database.query(
             sql: "SELECT \(Self.selectColumns) FROM chat_messages WHERE conversation_id = ? ORDER BY created_at ASC",
-            bind: [.text(conversationId)],
+            bind: [.text(conversationId)]
         )
         return try rows.map { try fromRow($0) }
     }
@@ -37,7 +37,7 @@ public final class SQLiteChatMessageRepository: ChatMessageRepository, @unchecke
     public func deleteByConversation(_ conversationId: String) throws {
         try database.run(
             sql: "DELETE FROM chat_messages WHERE conversation_id = ?",
-            bind: [.text(conversationId)],
+            bind: [.text(conversationId)]
         )
     }
 
@@ -58,7 +58,7 @@ public final class SQLiteChatMessageRepository: ChatMessageRepository, @unchecke
             conversationId: conversationId,
             role: role,
             content: content,
-            createdAt: createdAt,
+            createdAt: createdAt
         )
     }
 }

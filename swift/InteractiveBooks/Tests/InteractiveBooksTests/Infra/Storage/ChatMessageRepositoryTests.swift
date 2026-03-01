@@ -16,15 +16,15 @@ struct ChatMessageRepositorySaveTests {
 
         try msgRepo.save(ChatMessage(
             id: "m1", conversationId: "conv1", role: .user, content: "Hello",
-            createdAt: StorageTestHelper.fixedDate,
+            createdAt: StorageTestHelper.fixedDate
         ))
         try msgRepo.save(ChatMessage(
             id: "m2", conversationId: "conv1", role: .assistant, content: "Hi there!",
-            createdAt: StorageTestHelper.fixedDate2,
+            createdAt: StorageTestHelper.fixedDate2
         ))
         try msgRepo.save(ChatMessage(
             id: "m3", conversationId: "conv1", role: .toolResult, content: "{\"result\": \"data\"}",
-            createdAt: StorageTestHelper.fixedDate3,
+            createdAt: StorageTestHelper.fixedDate3
         ))
 
         let messages = try msgRepo.getByConversation("conv1")

@@ -10,7 +10,7 @@ public final class Conversation: @unchecked Sendable, Equatable {
         id: String,
         bookId: String,
         title: String,
-        createdAt: Date = .now,
+        createdAt: Date = .now
     ) throws {
         try Self.validateTitle(title)
         self.id = id
@@ -34,7 +34,7 @@ public final class Conversation: @unchecked Sendable, Equatable {
         fromRow id: String,
         bookId: String,
         title: String,
-        createdAt: Date,
+        createdAt: Date
     ) {
         self.id = id
         self.bookId = bookId

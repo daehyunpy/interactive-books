@@ -9,7 +9,7 @@ struct ChunkDataTests {
             content: "Some text",
             startPage: 1,
             endPage: 2,
-            chunkIndex: 0,
+            chunkIndex: 0
         )
         #expect(data.content == "Some text")
         #expect(data.startPage == 1)

@@ -15,7 +15,7 @@ struct ConversationRepositorySaveTests {
 
         let conv = try Conversation(
             id: "conv1", bookId: "b1", title: "My Chat",
-            createdAt: StorageTestHelper.fixedDate,
+            createdAt: StorageTestHelper.fixedDate
         )
         try convRepo.save(conv)
 
@@ -75,11 +75,11 @@ struct ConversationRepositoryGetByBookTests {
 
         let older = try Conversation(
             id: "conv1", bookId: "b1", title: "Older",
-            createdAt: StorageTestHelper.fixedDate,
+            createdAt: StorageTestHelper.fixedDate
         )
         let newer = try Conversation(
             id: "conv2", bookId: "b1", title: "Newer",
-            createdAt: StorageTestHelper.fixedDate2,
+            createdAt: StorageTestHelper.fixedDate2
         )
         try convRepo.save(older)
         try convRepo.save(newer)
