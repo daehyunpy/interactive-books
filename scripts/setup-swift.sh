@@ -6,16 +6,6 @@ set -euo pipefail
 # Environment variables:
 #   SWIFT_VERSION  Swift toolchain version to install (default: 6.0.3)
 
-SUDO=""
-if [ "$(id -u)" -ne 0 ]; then
-  if command -v sudo &>/dev/null; then
-    SUDO="sudo"
-  else
-    echo "ERROR: This script requires root privileges or sudo."
-    exit 1
-  fi
-fi
-
 # ---------------------------------------------------------------------------
 # 1. Install Swift toolchain via official tarball
 # ---------------------------------------------------------------------------
@@ -33,15 +23,15 @@ if ! command -v swift &>/dev/null; then
       ;;
   esac
   # Install prerequisites
-  $SUDO apt-get update -qq
-  DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y -qq \
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     curl gnupg2 unzip > /dev/null 2>&1
   SWIFT_VERSION="${SWIFT_VERSION:-6.0.3}"
   SWIFT_URL="https://download.swift.org/swift-${SWIFT_VERSION}-release/${SWIFT_PLATFORM}/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-${SWIFT_OS}.tar.gz"
   echo "Downloading Swift ${SWIFT_VERSION} for ${SWIFT_OS}..."
   curl -fsSL "$SWIFT_URL" -o /tmp/swift.tar.gz
   echo "Extracting..."
-  $SUDO tar -xzf /tmp/swift.tar.gz -C /usr/local --strip-components=2
+  tar -xzf /tmp/swift.tar.gz -C /usr/local --strip-components=2
   rm /tmp/swift.tar.gz
   if command -v swift &>/dev/null; then
     echo "Installed $(swift --version 2>&1 | head -1)"
@@ -74,7 +64,7 @@ if ! command -v swiftlint &>/dev/null; then
       echo "WARNING: Could not locate swiftlint binary in archive — skipping."
     else
       chmod +x "$SWIFTLINT_BIN"
-      $SUDO install -m 755 "$SWIFTLINT_BIN" /usr/local/bin/swiftlint
+      install -m 755 "$SWIFTLINT_BIN" /usr/local/bin/swiftlint
       echo "Installed SwiftLint $(swiftlint version)"
     fi
     rm -rf /tmp/swiftlint.zip /tmp/swiftlint
@@ -100,7 +90,7 @@ if ! command -v swiftformat &>/dev/null; then
       echo "WARNING: Could not locate swiftformat binary in archive — skipping."
     else
       chmod +x "$SWIFTFORMAT_BIN"
-      $SUDO install -m 755 "$SWIFTFORMAT_BIN" /usr/local/bin/swiftformat
+      install -m 755 "$SWIFTFORMAT_BIN" /usr/local/bin/swiftformat
       echo "Installed SwiftFormat $(swiftformat --version)"
     fi
     rm -rf /tmp/swiftformat.zip /tmp/swiftformat
