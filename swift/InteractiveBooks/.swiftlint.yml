@@ -1,6 +1,7 @@
 disabled_rules:
   - trailing_comma
   - opening_brace
+  - modifier_order
 
 opt_in_rules:
   # Correctness
@@ -24,7 +25,6 @@ opt_in_rules:
   # Style
   - closure_spacing
   - closure_end_indentation
-  - modifier_order
   - redundant_nil_coalescing
   - redundant_type_annotation
 

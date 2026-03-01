@@ -97,4 +97,7 @@ enum StorageTestHelper {
 
     // swiftlint:disable:next force_unwrapping
     static let fixedDate2: Date = iso8601Formatter.date(from: "2025-01-16T12:00:00Z")!
+
+    // swiftlint:disable:next force_unwrapping
+    static let fixedDate3: Date = iso8601Formatter.date(from: "2025-01-17T08:00:00Z")!
 }

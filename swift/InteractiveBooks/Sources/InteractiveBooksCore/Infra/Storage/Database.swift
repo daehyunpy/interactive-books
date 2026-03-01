@@ -1,5 +1,10 @@
 import Foundation
-import SQLite3
+
+#if canImport(SQLite3)
+    import SQLite3
+#else
+    import CSQLite
+#endif
 
 public enum SQLiteValue: Sendable, Equatable {
     case text(String)
