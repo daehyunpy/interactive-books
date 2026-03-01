@@ -13,6 +13,9 @@ dist/
 .env
 .envrc
 
+# Node
+node_modules/
+
 # Devbox
 .devbox/
 
