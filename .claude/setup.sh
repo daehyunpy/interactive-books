@@ -5,42 +5,26 @@ set -euo pipefail
 # Paste into the "Setup script" field in Claude Code cloud environment settings.
 # Runs once on new sessions (skipped on resume). Uses "Trusted" network access.
 
-SWIFT_VERSION="6.1.2"
-SWIFT_TAG="swift-${SWIFT_VERSION}-RELEASE"
-SWIFT_PLATFORM="ubuntu24.04"
-
 # ---------------------------------------------------------------------------
-# 1. Install Swift toolchain
+# 1. Install Swift toolchain via official apt repository
 # ---------------------------------------------------------------------------
 if ! command -v swift &>/dev/null; then
-  echo "Installing Swift ${SWIFT_VERSION}..."
+  echo "Installing Swift toolchain via apt..."
+
+  # Add the Swift signing key and apt repository
+  curl -fsSL https://download.swift.org/swift-signing-key-4.asc \
+    | gpg --dearmor -o /usr/share/keyrings/swift-archive-keyring.gpg
+  echo "deb [signed-by=/usr/share/keyrings/swift-archive-keyring.gpg] https://download.swift.org/apt/ubuntu2404 noble main" \
+    > /etc/apt/sources.list.d/swift.list
 
   apt-get update -qq
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-    binutils \
-    libc6-dev \
-    libcurl4-openssl-dev \
-    libstdc++-13-dev \
-    > /dev/null 2>&1
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq swiftlang > /dev/null 2>&1
 
-  SWIFT_BRANCH="${SWIFT_TAG,,}"
-  SWIFT_PLATFORM_SLUG="${SWIFT_PLATFORM//./}"
-  SWIFT_URL="https://download.swift.org/${SWIFT_BRANCH}/${SWIFT_PLATFORM_SLUG}/${SWIFT_TAG}/${SWIFT_TAG}-${SWIFT_PLATFORM}.tar.gz"
-
-  if ! curl -fsSL "$SWIFT_URL" | tar xz -C /opt; then
-    echo "ERROR: Failed to download Swift toolchain from ${SWIFT_URL}"
-    echo "The domain download.swift.org may be blocked by the network proxy."
-    echo "Swift build and test commands will not be available."
-  else
-    for bin in /opt/${SWIFT_TAG}-${SWIFT_PLATFORM}/usr/bin/*; do
-      ln -sf "$bin" /usr/local/bin/
-    done
-    echo "Installed $(swift --version 2>&1 | head -1)"
-  fi
+  echo "Installed $(swift --version 2>&1 | head -1)"
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Install SwiftLint (from GitHub releases — Linux amd64 binary)
+# 2. Install SwiftLint (from GitHub releases — Linux amd64 static binary)
 # ---------------------------------------------------------------------------
 if ! command -v swiftlint &>/dev/null; then
   echo "Installing SwiftLint..."
@@ -49,7 +33,6 @@ if ! command -v swiftlint &>/dev/null; then
 
   curl -fsSL "$SWIFTLINT_URL" -o /tmp/swiftlint.zip
   unzip -oq /tmp/swiftlint.zip -d /tmp/swiftlint
-  # Use static binary — does not require Swift toolchain's libsourcekitdInProc.so
   install -m 755 /tmp/swiftlint/swiftlint-static /usr/local/bin/swiftlint
   rm -rf /tmp/swiftlint.zip /tmp/swiftlint
 
@@ -73,7 +56,7 @@ if ! command -v swiftformat &>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Resolve Swift package dependencies (only if Swift is available)
+# 4. Resolve Swift package dependencies
 # ---------------------------------------------------------------------------
 if command -v swift &>/dev/null; then
   echo "Resolving Swift package dependencies..."
