@@ -5,14 +5,15 @@
       "platforms": ["aarch64-linux", "x86_64-linux"]
     },
     "swiftformat@latest": {},
-    "uv@latest": {},
-    "direnv@latest": {}
+    "uv@latest":          {},
+    "direnv@latest":      {},
+    "bun":                "latest"
   },
   "shell": {
     "init_hook": ["echo 'Welcome to devbox!' > /dev/null"],
     "scripts": {
-      "test-python": "cd python && uv run pytest -x",
-      "test-swift": "cd swift/InteractiveBooks && swift test",
+      "test-python":  "cd python && uv run pytest -x",
+      "test-swift":   "cd swift/InteractiveBooks && swift test",
       "format-swift": "cd swift/InteractiveBooks && swiftformat ."
     }
   }

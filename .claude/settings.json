@@ -35,6 +35,31 @@
       }
     }
   },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./scripts/setup-devbox.sh"
+          },
+          {
+            "type": "command",
+            "command": "devbox install"
+          },
+          {
+            "type": "command",
+            "command": "./scripts/check-swift.sh"
+          },
+          {
+            "type": "command",
+            "command": "cd python && uv sync"
+          }
+        ]
+      }
+    ]
+  },
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   }
