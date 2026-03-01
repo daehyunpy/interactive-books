@@ -203,8 +203,8 @@ Key SwiftLint settings (`.swiftlint.yml`) — **strict mode**:
 - `--strict` in CI (warnings become errors)
 - Correctness rules: `first_where`, `last_where`, `sorted_first_last`, `array_init`, `toggle_bool`, `yoda_condition`, `legacy_multiple`
 - Safety rules: `force_unwrapping`, `implicitly_unwrapped_optional`, `fatal_error_message`, `unavailable_function`
-- Style rules: `modifier_order`, `closure_end_indentation`, `redundant_nil_coalescing`, `redundant_type_annotation`
-- Disabled rules: `trailing_comma`, `opening_brace` (owned by SwiftFormat)
+- Style rules: `closure_end_indentation`, `redundant_nil_coalescing`, `redundant_type_annotation`
+- Disabled rules: `trailing_comma`, `opening_brace`, `modifier_order` (owned by SwiftFormat)
 - Limits: function body 25 lines (warn) / 40 (error), file 500/1000, type 300/500
 
 **Workflow: always format before linting.**
@@ -226,7 +226,7 @@ SwiftFormat uses `--lint` mode in CI (check-only, no rewrites). Locally, run `sw
 - **SPM basename collisions** — SPM uses file basenames for `.o` files. Two files named `BookRepository.swift` in different directories of the same target cause "multiple producers" build error. Infra files must be named after their class (`SQLiteBookRepository.swift`).
 - **SQLite WAL + in-memory DBs** — `:memory:` databases silently ignore `PRAGMA journal_mode=WAL` (returns `"memory"`). Tests asserting WAL mode need a file-based temp database.
 - **`nonisolated(unsafe)`** — only needed for non-`Sendable` static properties accessed across isolation domains. Don't apply it to `private` properties or types that are already safe (e.g., `NSRegularExpression` in a `let`).
-- **SwiftLint vs SwiftFormat** — SwiftFormat is authoritative for formatting. When rules conflict, disable the SwiftLint rule (e.g., `trailing_comma` and `opening_brace` are disabled because SwiftFormat owns them).
+- **SwiftLint vs SwiftFormat** — SwiftFormat is authoritative for formatting. When rules conflict, disable the SwiftLint rule (e.g., `trailing_comma`, `opening_brace`, and `modifier_order` are disabled because SwiftFormat owns them).
 - **SQLite3 on Linux** — `import SQLite3` only works on Apple platforms (system framework). On Linux, the `CSQLite` system library target bridges to `libsqlite3-dev`. Use `#if canImport(SQLite3)` / `#else import CSQLite` in any file that calls sqlite3 C functions. The dependency is conditional: `.target(name: "CSQLite", condition: .when(platforms: [.linux]))` so Apple builds are unaffected.
 
 ## Quick Commands

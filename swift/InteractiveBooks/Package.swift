@@ -32,7 +32,7 @@ let package = Package(
             pkgConfig: "sqlite3",
             providers: [
                 .apt(["libsqlite3-dev"]),
-            ]
+            ],
         ),
         .target(
             name: "InteractiveBooksCore",
