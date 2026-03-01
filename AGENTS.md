@@ -215,11 +215,21 @@ swiftlint lint --strict    # Step 2: catch real issues
 
 #### CI
 
-CI runs on `macos-15` (Xcode 16.4 + Swift 6.1.2). Don't add `setup-swift` — it's unnecessary and can cause toolchain conflicts.
+**Both environments must pass** — Swift code must build and test successfully on macOS (GitHub Actions) AND Linux (local dev / CI). Don't merge if either environment fails.
 
-CI steps: `swift build` → `swift test` → `swiftlint lint --strict` → `swiftformat --lint .`
+| Environment | Runner | What runs |
+|-------------|--------|-----------|
+| **macOS** | GitHub Actions (`macos-15`, Xcode 16.4, Swift 6.1.2) | `swift build` → `swift test` → `swiftlint lint --strict` → `swiftformat --lint .` |
+| **Linux** | Local dev / CI (`ubuntu`, Swift 6.1.2) | `swift build` → `swift test` → `swiftlint lint --strict` → `swiftformat --lint .` |
+
+Don't add `setup-swift` on macOS — it's unnecessary and can cause toolchain conflicts.
 
 SwiftFormat uses `--lint` mode in CI (check-only, no rewrites). Locally, run `swiftformat .` to auto-fix.
+
+**Common cross-platform pitfalls:**
+- Use `#if canImport(SQLite3)` / `#else import CSQLite` for SQLite — `import SQLite3` only works on Apple platforms.
+- Avoid Apple-only APIs (`Foundation` extensions like `UUID().uuidString` are fine; platform-specific UI or framework APIs are not).
+- Always verify on both platforms before marking work complete.
 
 ### Swift Gotchas
 
