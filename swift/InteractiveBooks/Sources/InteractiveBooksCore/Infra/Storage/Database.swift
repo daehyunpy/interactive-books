@@ -26,7 +26,7 @@ public enum SQLiteValue: Sendable, Equatable {
 public final class Database: @unchecked Sendable {
     private var db: OpaquePointer?
 
-    private nonisolated(unsafe) static let migrationPattern = /^(\d{3,})_.+\.sql$/
+    private nonisolated(unsafe) static let migrationPattern = #/^(\d{3,})_.+\.sql$/#
 
     public init(path: String) throws {
         guard sqlite3_open(path, &db) == SQLITE_OK else {
@@ -144,13 +144,13 @@ public final class Database: @unchecked Sendable {
 
         guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
             throw StorageError.migrationFailed(
-                "Migration '\(name)' failed: \(errorMessage)",
+                "Migration '\(name)' failed: \(errorMessage)"
             )
         }
 
         try run(
             sql: "INSERT INTO schema_migrations (version, name) VALUES (?, ?)",
-            bind: [.integer(version), .text(name)],
+            bind: [.integer(version), .text(name)]
         )
     }
 
@@ -173,7 +173,7 @@ public final class Database: @unchecked Sendable {
             case let .text(string):
                 sqlite3_bind_text(
                     stmt, position, string, -1,
-                    unsafeBitCast(-1, to: sqlite3_destructor_type.self),
+                    unsafeBitCast(-1, to: sqlite3_destructor_type.self)
                 )
             case let .integer(int):
                 sqlite3_bind_int64(stmt, position, Int64(int))

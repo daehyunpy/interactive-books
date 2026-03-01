@@ -25,28 +25,28 @@ The Python CLI can ingest books (PDF, TXT, EPUB, DOCX, HTML, Markdown, and URLs)
 
 Build order: CLI first, bottom-up, one feature at a time.
 
-| Phase | What                      | Status         |
-| ----- | ------------------------- | -------------- |
-| 1     | Project scaffold          | Done           |
-| 2     | DB schema                 | Done           |
-| 3     | Book ingestion            | Done           |
-| 4     | Embeddings                | Done           |
-| 5     | Retrieval                 | Done           |
-| 6     | Q&A (Agentic Chat)        | Done           |
-| 7     | CLI polish                | Done           |
-| 8     | Structured format parsers | Done           |
-| 9     | Text format parsers       | Done           |
+| Phase | What                      | Status          |
+| ----- | ------------------------- | --------------- |
+| 1     | Project scaffold          | Done            |
+| 2     | DB schema                 | Done            |
+| 3     | Book ingestion            | Done            |
+| 4     | Embeddings                | Done            |
+| 5     | Retrieval                 | Done            |
+| 6     | Q&A (Agentic Chat)        | Done            |
+| 7     | CLI polish                | Done            |
+| 8     | Structured format parsers | Done            |
+| 9     | Text format parsers       | Done            |
 | 10    | iOS/macOS/visionOS app    | **In Progress** |
 
 ### Phase 10 Sub-Phases
 
-| Sub-Phase | What                  | Status   |
-| --------- | --------------------- | -------- |
-| A         | Project scaffold      | Done     |
-| B         | Domain layer          | Done     |
-| C         | Storage layer         | Done     |
+| Sub-Phase | What                   | Status   |
+| --------- | ---------------------- | -------- |
+| A         | Project scaffold       | Done     |
+| B         | Domain layer           | Done     |
+| C         | Storage layer          | Done     |
 | D         | sqlite-vec integration | **Next** |
-| E–N       | Remaining phases      | Pending  |
+| E–N       | Remaining phases       | Pending  |
 
 See `docs/app_build_plan.md` for the full Phase A–N breakdown.
 See `docs/technical_design.md` → "Build Order" for details on each phase. See "Directory Layout" for the full project tree.
@@ -92,47 +92,47 @@ The Swift app replicates the Python CLI's full pipeline in native Swift. It shar
 
 #### Key Decisions (already resolved — do not re-ask)
 
-| Decision              | Choice                                                                                                                       |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Persistence           | Raw SQLite via system C library. No ORM, no SwiftData. Shared SQL migrations are the source of truth.                        |
-| Adapter naming        | Swift infra adapters use prefixed names (`SQLiteBookRepository`) unlike Python (which relies on module paths for disambiguation). This is because Swift's single-target SPM layout lacks Python's implicit namespace separation. |
-| Sendability           | Repository classes are `final class` + `@unchecked Sendable`. The underlying SQLite connection is thread-safe via WAL mode.  |
-| Test helpers          | `StorageTestHelper` provides in-memory DB setup and entity factory methods for storage integration tests.                    |
-| SQL column constants  | Repository classes use a `private static let selectColumns` constant to avoid repeating column lists across queries.         |
-| SQLiteValue helpers   | `SQLiteValue` enum has `textValue` / `integerValue` computed properties for concise optional extraction.                     |
-| Platform versions     | `Package.swift` uses the highest available SPM platform enums. Will update to `.v26` when Xcode 26 GM ships.                |
-| SQLite on Linux       | `CSQLite` system library target bridges `libsqlite3-dev` for Linux. Conditional dependency — Apple platforms use the native `SQLite3` framework. Use `#if canImport(SQLite3)` guard in source files. |
+| Decision             | Choice                                                                                                                                                                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Persistence          | Raw SQLite via system C library. No ORM, no SwiftData. Shared SQL migrations are the source of truth.                                                                                                                                                                                             |
+| Adapter naming       | Swift infra adapters use prefixed names (`SQLiteBookRepository`) unlike Python (which relies on module paths for disambiguation). This is because Swift's single-target SPM layout lacks Python's implicit namespace separation.                                                                  |
+| Sendability          | Repository classes are `final class` + `@unchecked Sendable`. The underlying SQLite connection is thread-safe via WAL mode.                                                                                                                                                                       |
+| Test helpers         | `StorageTestHelper` provides in-memory DB setup and entity factory methods for storage integration tests.                                                                                                                                                                                         |
+| SQL column constants | Repository classes use a `private static let selectColumns` constant to avoid repeating column lists across queries.                                                                                                                                                                              |
+| SQLiteValue helpers  | `SQLiteValue` enum has `textValue` / `integerValue` computed properties for concise optional extraction.                                                                                                                                                                                          |
+| Platform versions    | `Package.swift` uses `.iOS(.v17)`, `.macOS(.v14)`, `.visionOS(.v1)` (highest in PackageDescription 5.10). Will update when tools-version is raised.                                                                                                                                               |
+| Swift tools version  | `swift-tools-version: 5.10` for Linux/nixpkgs compatibility. All Swift 6 features used (e.g. `nonisolated(unsafe)`) are available in 5.10. Strict concurrency is not enforced (Swift 5 language mode). macOS uses system Swift (Xcode), Linux cloud sessions use nixpkgs Swift 5.10.1 via Devbox. |
+| SQLite on Linux      | `CSQLite` system library target bridges `libsqlite3-dev` for Linux. Conditional dependency — Apple platforms use the native `SQLite3` framework. Use `#if canImport(SQLite3)` guard in source files.                                                                                              |
 
 ## First-Time Setup
 
 ### Prerequisites
 
-- [uv](https://docs.astral.sh/uv/) — Python package manager
-- [direnv](https://direnv.net/) — required for loading environment variables
-- [SwiftLint](https://github.com/realm/SwiftLint) — Swift linter (`brew install swiftlint`)
-- [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) — Swift auto-formatter (`brew install swiftformat`)
+- [Devbox](https://www.jetify.com/devbox) — reproducible dev environment (provides uv, direnv, SwiftFormat; plus Swift on Linux)
+- **macOS**: Xcode (Swift toolchain), `brew install swiftlint` (SwiftLint can't use Devbox — nixpkgs build crashes due to SourceKit mismatch with Xcode)
+- **Linux (cloud)**: Devbox also provides Swift 5.10.1 via nixpkgs. SwiftLint is skipped (no Linux builds).
 
-### Python CLI
+### Quick Start
 
 ```bash
 cp .env.example .env          # fill in API keys (see below)
 cp .envrc.example .envrc      # direnv config
-direnv allow                  # or: eval "$(direnv export zsh)"
+direnv allow                  # auto-installs Devbox packages + activates env
 cd python/
-uv sync                       # install dependencies
+uv sync                       # install Python dependencies
 uv run pytest -x              # verify everything works
 ```
 
 ### Environment Variables
 
-| Variable            | Required | Notes                                                  |
-| ------------------- | -------- | ------------------------------------------------------ |
-| `ANTHROPIC_API_KEY` | Yes      | Default chat provider                                  |
-| `OPENAI_API_KEY`    | No       | For OpenAI embeddings or chat                          |
-| `OLLAMA_BASE_URL`   | No       | Local LLM endpoint (default: `http://localhost:11434`) |
-| `MILVUS_ADDRESS`    | No       | Milvus vector DB address for claude-context MCP        |
-| `MILVUS_TOKEN`      | No       | Milvus authentication token                            |
-| `GITHUB_PERSONAL_ACCESS_TOKEN` | No | GitHub PAT for GitHub MCP server                |
+| Variable                       | Required | Notes                                                  |
+| ------------------------------ | -------- | ------------------------------------------------------ |
+| `ANTHROPIC_API_KEY`            | Yes      | Default chat provider                                  |
+| `OPENAI_API_KEY`               | No       | For OpenAI embeddings or chat                          |
+| `OLLAMA_BASE_URL`              | No       | Local LLM endpoint (default: `http://localhost:11434`) |
+| `MILVUS_ADDRESS`               | No       | Milvus vector DB address for claude-context MCP        |
+| `MILVUS_TOKEN`                 | No       | Milvus authentication token                            |
+| `GITHUB_PERSONAL_ACCESS_TOKEN` | No       | GitHub PAT for GitHub MCP server                       |
 
 ### Supported Book Formats
 
@@ -179,27 +179,30 @@ swiftlint lint --strict        # lint (warnings = errors)
 ```
 
 The Swift package has two targets:
+
 - `InteractiveBooksCore` (library) — Domain, Infra layers. All business logic.
 - `CLI` (executable `interactive-books`) — ArgumentParser commands wired to Core.
 
-Platform targets in `Package.swift` use the highest versions available in the current toolchain (`.iOS(.v18)`, `.macOS(.v15)`, `.visionOS(.v2)`). These will be updated to `.v26` when Xcode 26 GM ships with the corresponding SPM platform enum cases.
+Platform targets in `Package.swift` use the highest versions available in PackageDescription 5.10 (`.iOS(.v17)`, `.macOS(.v14)`, `.visionOS(.v1)`). These will be raised when `swift-tools-version` is updated.
 
 #### Swift Dev Tools
 
-Dev tools are installed via **Homebrew** (not SPM plugins or Mint). They run as standalone CLI tools, not as package dependencies.
+SwiftFormat is provided by **Devbox** (all platforms). SwiftLint is installed via **Homebrew** on macOS only — it can't use Devbox because the nixpkgs build crashes due to SourceKit mismatch with Xcode, and there are no Linux builds in nixpkgs.
 
-| Tool | Purpose | Install | Config |
-|------|---------|---------|--------|
-| **SwiftFormat** | Auto-formatter (rewrites code) | `brew install swiftformat` | `.swiftformat` |
-| **SwiftLint** | Linter (catches bad patterns) | `brew install swiftlint` | `.swiftlint.yml` |
+| Tool            | Purpose                        | Install                    | Config           |
+| --------------- | ------------------------------ | -------------------------- | ---------------- |
+| **SwiftFormat** | Auto-formatter (rewrites code) | Devbox (via Nix)           | `.swiftformat`   |
+| **SwiftLint**   | Linter (catches bad patterns)  | `brew install swiftlint`   | `.swiftlint.yml` |
 
 **SwiftFormat** uses standard defaults — minimal config (Swift version, indent, max width). It is authoritative for formatting. SwiftLint handles correctness rules only. When rules conflict, the SwiftLint rule is disabled (not the SwiftFormat rule).
 
 Key SwiftFormat settings (`.swiftformat`):
-- Swift 6.1, 4-space indent, 120-char max width
+
+- Swift 5.10, 4-space indent, 120-char max width
 - All other settings use SwiftFormat defaults (`--indentcase false`, `--stripunusedargs always`, etc.)
 
 Key SwiftLint settings (`.swiftlint.yml`) — **strict mode**:
+
 - `--strict` in CI (warnings become errors)
 - Correctness rules: `first_where`, `last_where`, `sorted_first_last`, `array_init`, `toggle_bool`, `yoda_condition`, `legacy_multiple`
 - Safety rules: `force_unwrapping`, `implicitly_unwrapped_optional`, `fatal_error_message`, `unavailable_function`
@@ -208,6 +211,7 @@ Key SwiftLint settings (`.swiftlint.yml`) — **strict mode**:
 - Limits: function body 25 lines (warn) / 40 (error), file 500/1000, type 300/500
 
 **Workflow: always format before linting.**
+
 ```bash
 swiftformat .              # Step 1: fix formatting
 swiftlint lint --strict    # Step 2: catch real issues

@@ -1,2 +1,4 @@
+#!/bin/bash
 dotenv_if_exists
+eval "$(devbox generate direnv --print-envrc)"
 source python/.venv/bin/activate
