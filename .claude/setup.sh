@@ -1,10 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# Only run in remote (Claude Code on the web) environments
-if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
-  exit 0
-fi
+# Cloud environment setup script for Swift development.
+# Paste into the "Setup script" field in Claude Code cloud environment settings.
+# Runs once on new sessions (skipped on resume). Uses "Trusted" network access.
 
 SWIFT_VERSION="6.1.2"
 SWIFT_TAG="swift-${SWIFT_VERSION}-RELEASE"
