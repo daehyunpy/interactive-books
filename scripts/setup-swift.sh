@@ -82,7 +82,23 @@ install_github_release() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. Install apt packages (gh, git-lfs, and Swift system dependencies)
+# 1. Detect Ubuntu version (needed for GCC package versions and Swift URL)
+# ---------------------------------------------------------------------------
+UBUNTU_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+case "$UBUNTU_CODENAME" in
+  noble)   GCC_VERSION=13 ; SWIFT_PLATFORM="ubuntu2404" ; SWIFT_OS="ubuntu24.04" ;;
+  jammy)   GCC_VERSION=12 ; SWIFT_PLATFORM="ubuntu2204" ; SWIFT_OS="ubuntu22.04" ;;
+  focal)   GCC_VERSION=9  ; SWIFT_PLATFORM="ubuntu2004" ; SWIFT_OS="ubuntu20.04" ;;
+  *)
+    echo "WARNING: Unsupported Ubuntu version ($UBUNTU_CODENAME). Attempting noble defaults..."
+    GCC_VERSION=13
+    SWIFT_PLATFORM="ubuntu2404"
+    SWIFT_OS="ubuntu24.04"
+    ;;
+esac
+
+# ---------------------------------------------------------------------------
+# 2. Install apt packages (gh, git-lfs, and Swift system dependencies)
 # ---------------------------------------------------------------------------
 sudo apt-get update -qq || true
 
@@ -99,10 +115,10 @@ DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
   libc6-dev \
   libcurl4-openssl-dev \
   libedit2 \
-  libgcc-13-dev \
+  "libgcc-${GCC_VERSION}-dev" \
   libpython3-dev \
   libsqlite3-dev \
-  libstdc++-13-dev \
+  "libstdc++-${GCC_VERSION}-dev" \
   libxml2-dev \
   libz3-dev \
   pkg-config \
@@ -112,21 +128,10 @@ DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
   > /dev/null 2>&1 || echo "WARNING: Some Swift system dependencies could not be installed."
 
 # ---------------------------------------------------------------------------
-# 2. Install Swift toolchain via official tarball
+# 3. Install Swift toolchain via official tarball
 # ---------------------------------------------------------------------------
 if ! command -v swift &>/dev/null; then
   echo "Installing Swift toolchain..."
-  UBUNTU_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
-  case "$UBUNTU_CODENAME" in
-    noble)   SWIFT_PLATFORM="ubuntu2404" ; SWIFT_OS="ubuntu24.04" ;;
-    jammy)   SWIFT_PLATFORM="ubuntu2204" ; SWIFT_OS="ubuntu22.04" ;;
-    focal)   SWIFT_PLATFORM="ubuntu2004" ; SWIFT_OS="ubuntu20.04" ;;
-    *)
-      echo "WARNING: Unsupported Ubuntu version ($UBUNTU_CODENAME). Attempting noble..."
-      SWIFT_PLATFORM="ubuntu2404"
-      SWIFT_OS="ubuntu24.04"
-      ;;
-  esac
   SWIFT_VERSION="${SWIFT_VERSION:-6.1.2}"
   SWIFT_URL="https://download.swift.org/swift-${SWIFT_VERSION}-release/${SWIFT_PLATFORM}/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-${SWIFT_OS}.tar.gz"
   echo "Downloading Swift ${SWIFT_VERSION} for ${SWIFT_OS}..."
@@ -143,7 +148,7 @@ if ! command -v swift &>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Install SwiftLint & SwiftFormat (latest from GitHub releases)
+# 4. Install SwiftLint & SwiftFormat (latest from GitHub releases)
 # ---------------------------------------------------------------------------
 install_github_release swiftlint realm/SwiftLint version
 install_github_release swiftformat nicklockwood/SwiftFormat --version
