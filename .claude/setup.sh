@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # General-purpose Swift development setup for Claude Code cloud environments.
-# Installs Swift toolchain, SwiftLint, and SwiftFormat.
+# Installs the latest Swift toolchain, SwiftLint, and SwiftFormat.
 
 # ---------------------------------------------------------------------------
 # 1. Install Swift toolchain via official apt repository
@@ -10,7 +10,6 @@ set -euo pipefail
 if ! command -v swift &>/dev/null; then
   echo "Installing Swift toolchain via apt..."
 
-  # Add the Swift signing key and apt repository
   curl -fsSL https://download.swift.org/swift-signing-key-4.asc \
     | gpg --dearmor -o /usr/share/keyrings/swift-archive-keyring.gpg
   echo "deb [signed-by=/usr/share/keyrings/swift-archive-keyring.gpg] https://download.swift.org/apt/ubuntu2404 noble main" \
@@ -23,14 +22,13 @@ if ! command -v swift &>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Install SwiftLint (from GitHub releases — Linux amd64 static binary)
+# 2. Install SwiftLint (latest from GitHub releases)
 # ---------------------------------------------------------------------------
 if ! command -v swiftlint &>/dev/null; then
-  echo "Installing SwiftLint..."
-  SWIFTLINT_VERSION="0.63.2"
-  SWIFTLINT_URL="https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/swiftlint_linux_amd64.zip"
+  echo "Installing SwiftLint (latest)..."
 
-  curl -fsSL "$SWIFTLINT_URL" -o /tmp/swiftlint.zip
+  curl -fsSL "https://github.com/realm/SwiftLint/releases/latest/download/swiftlint_linux_amd64.zip" \
+    -o /tmp/swiftlint.zip
   unzip -oq /tmp/swiftlint.zip -d /tmp/swiftlint
   install -m 755 /tmp/swiftlint/swiftlint-static /usr/local/bin/swiftlint
   rm -rf /tmp/swiftlint.zip /tmp/swiftlint
@@ -39,14 +37,13 @@ if ! command -v swiftlint &>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Install SwiftFormat (from GitHub releases — Linux binary)
+# 3. Install SwiftFormat (latest from GitHub releases)
 # ---------------------------------------------------------------------------
 if ! command -v swiftformat &>/dev/null; then
-  echo "Installing SwiftFormat..."
-  SWIFTFORMAT_VERSION="0.59.1"
-  SWIFTFORMAT_URL="https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat_linux.zip"
+  echo "Installing SwiftFormat (latest)..."
 
-  curl -fsSL "$SWIFTFORMAT_URL" -o /tmp/swiftformat.zip
+  curl -fsSL "https://github.com/nicklockwood/SwiftFormat/releases/latest/download/swiftformat_linux.zip" \
+    -o /tmp/swiftformat.zip
   unzip -oq /tmp/swiftformat.zip -d /tmp/swiftformat
   install -m 755 /tmp/swiftformat/swiftformat_linux /usr/local/bin/swiftformat
   rm -rf /tmp/swiftformat.zip /tmp/swiftformat
