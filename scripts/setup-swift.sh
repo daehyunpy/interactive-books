@@ -1,13 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 # General-purpose Swift development setup for Claude Code cloud environments.
-# Installs the Swift toolchain, SwiftLint, and SwiftFormat.
+# Installs the Swift toolchain, SwiftLint, SwiftFormat, gh, and git-lfs.
 #
 # Environment variables:
 #   SWIFT_VERSION  Swift toolchain version to install (default: 6.0.3)
 
 # ---------------------------------------------------------------------------
-# 1. Install Swift toolchain via official tarball
+# 1. Install apt packages (gh, git-lfs)
+# ---------------------------------------------------------------------------
+apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+  curl gnupg2 unzip gh git-lfs > /dev/null 2>&1
+
+# ---------------------------------------------------------------------------
+# 2. Install Swift toolchain via official tarball
 # ---------------------------------------------------------------------------
 if ! command -v swift &>/dev/null; then
   echo "Installing Swift toolchain..."
@@ -22,10 +29,6 @@ if ! command -v swift &>/dev/null; then
       SWIFT_OS="ubuntu24.04"
       ;;
   esac
-  # Install prerequisites
-  apt-get update -qq
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-    curl gnupg2 unzip > /dev/null 2>&1
   SWIFT_VERSION="${SWIFT_VERSION:-6.0.3}"
   SWIFT_URL="https://download.swift.org/swift-${SWIFT_VERSION}-release/${SWIFT_PLATFORM}/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-${SWIFT_OS}.tar.gz"
   echo "Downloading Swift ${SWIFT_VERSION} for ${SWIFT_OS}..."
@@ -41,7 +44,7 @@ if ! command -v swift &>/dev/null; then
   fi
 fi
 # ---------------------------------------------------------------------------
-# 2. Install SwiftLint (latest from GitHub releases)
+# 3. Install SwiftLint (latest from GitHub releases)
 # ---------------------------------------------------------------------------
 if ! command -v swiftlint &>/dev/null; then
   echo "Installing SwiftLint (latest)..."
@@ -52,7 +55,6 @@ if ! command -v swiftlint &>/dev/null; then
   if [ -n "$SWIFTLINT_URL" ]; then
     curl -fsSL "$SWIFTLINT_URL" -o /tmp/swiftlint.zip
     unzip -oq /tmp/swiftlint.zip -d /tmp/swiftlint
-    # Match the binary by exact name to avoid picking up shared libs
     SWIFTLINT_BIN=$(find /tmp/swiftlint -type f -name 'swiftlint' | head -1)
     if [ -z "$SWIFTLINT_BIN" ]; then
       echo "WARNING: Could not locate swiftlint binary in archive — skipping."
@@ -67,7 +69,7 @@ if ! command -v swiftlint &>/dev/null; then
   fi
 fi
 # ---------------------------------------------------------------------------
-# 3. Install SwiftFormat (latest from GitHub releases)
+# 4. Install SwiftFormat (latest from GitHub releases)
 # ---------------------------------------------------------------------------
 if ! command -v swiftformat &>/dev/null; then
   echo "Installing SwiftFormat (latest)..."
@@ -78,7 +80,6 @@ if ! command -v swiftformat &>/dev/null; then
   if [ -n "$SWIFTFORMAT_URL" ]; then
     curl -fsSL "$SWIFTFORMAT_URL" -o /tmp/swiftformat.zip
     unzip -oq /tmp/swiftformat.zip -d /tmp/swiftformat
-    # Match the binary by exact name to avoid picking up shared libs
     SWIFTFORMAT_BIN=$(find /tmp/swiftformat -type f -name 'swiftformat' | head -1)
     if [ -z "$SWIFTFORMAT_BIN" ]; then
       echo "WARNING: Could not locate swiftformat binary in archive — skipping."
