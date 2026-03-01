@@ -82,16 +82,15 @@ install_github_release() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. Detect Ubuntu version (needed for GCC package versions and Swift URL)
+# 1. Detect Ubuntu version (needed for Swift download URL)
 # ---------------------------------------------------------------------------
 UBUNTU_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
 case "$UBUNTU_CODENAME" in
-  noble)   GCC_VERSION=13 ; SWIFT_PLATFORM="ubuntu2404" ; SWIFT_OS="ubuntu24.04" ;;
-  jammy)   GCC_VERSION=12 ; SWIFT_PLATFORM="ubuntu2204" ; SWIFT_OS="ubuntu22.04" ;;
-  focal)   GCC_VERSION=9  ; SWIFT_PLATFORM="ubuntu2004" ; SWIFT_OS="ubuntu20.04" ;;
+  noble)   SWIFT_PLATFORM="ubuntu2404" ; SWIFT_OS="ubuntu24.04" ;;
+  jammy)   SWIFT_PLATFORM="ubuntu2204" ; SWIFT_OS="ubuntu22.04" ;;
+  focal)   SWIFT_PLATFORM="ubuntu2004" ; SWIFT_OS="ubuntu20.04" ;;
   *)
     echo "WARNING: Unsupported Ubuntu version ($UBUNTU_CODENAME). Attempting noble defaults..."
-    GCC_VERSION=13
     SWIFT_PLATFORM="ubuntu2404"
     SWIFT_OS="ubuntu24.04"
     ;;
@@ -101,6 +100,11 @@ esac
 # 2. Install apt packages (gh, git-lfs, and Swift system dependencies)
 # ---------------------------------------------------------------------------
 sudo apt-get update -qq || true
+
+# Resolve the default GCC version from the gcc meta-package (e.g. gcc -> gcc-13).
+GCC_VERSION=$(apt-cache depends gcc 2>/dev/null \
+  | grep -oP 'gcc-\K[0-9]+' | head -1 || true)
+GCC_VERSION="${GCC_VERSION:-13}"
 
 # gh and git-lfs
 if ! command -v gh &>/dev/null || ! command -v git-lfs &>/dev/null; then
