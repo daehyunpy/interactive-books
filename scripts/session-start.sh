@@ -13,14 +13,12 @@ ARCH=$(uname -m)
 echo "Detected OS: $OS, Architecture: $ARCH"
 
 # ---------------------------------------------------------------------------
-# Platform-specific setup (Linux only)
+# Platform-specific setup (Linux remote only)
 # ---------------------------------------------------------------------------
-case "$OS" in
-    Linux)
-        echo "Running Linux-specific setup scripts..."
-        "$SCRIPT_DIR/setup-swift.sh"
-        ;;
-esac
+if [ "$OS" = "Linux" ] && [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
+    echo "Running Linux-specific setup scripts..."
+    "$SCRIPT_DIR/setup-swift.sh"
+fi
 
 # ---------------------------------------------------------------------------
 # Universal dependency sync (all platforms)
