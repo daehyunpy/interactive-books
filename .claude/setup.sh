@@ -1,9 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Cloud environment setup script for Swift development.
-# Paste into the "Setup script" field in Claude Code cloud environment settings.
-# Runs once on new sessions (skipped on resume). Uses "Trusted" network access.
+# General-purpose Swift development setup for Claude Code cloud environments.
+# Installs Swift toolchain, SwiftLint, and SwiftFormat.
 
 # ---------------------------------------------------------------------------
 # 1. Install Swift toolchain via official apt repository
@@ -53,15 +52,6 @@ if ! command -v swiftformat &>/dev/null; then
   rm -rf /tmp/swiftformat.zip /tmp/swiftformat
 
   echo "Installed SwiftFormat $(swiftformat --version)"
-fi
-
-# ---------------------------------------------------------------------------
-# 4. Resolve Swift package dependencies
-# ---------------------------------------------------------------------------
-if command -v swift &>/dev/null; then
-  echo "Resolving Swift package dependencies..."
-  cd "$CLAUDE_PROJECT_DIR/swift/InteractiveBooks"
-  swift package resolve
 fi
 
 echo "Swift development environment ready."
