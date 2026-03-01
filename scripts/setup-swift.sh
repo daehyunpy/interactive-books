@@ -9,8 +9,8 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # 1. Install apt packages (gh, git-lfs)
 # ---------------------------------------------------------------------------
-apt-get update -qq
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+sudo apt-get update -qq
+DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
   gh git-lfs > /dev/null 2>&1
 
 # ---------------------------------------------------------------------------
@@ -34,7 +34,7 @@ if ! command -v swift &>/dev/null; then
   echo "Downloading Swift ${SWIFT_VERSION} for ${SWIFT_OS}..."
   curl -fsSL "$SWIFT_URL" -o /tmp/swift.tar.gz
   echo "Extracting..."
-  tar -xzf /tmp/swift.tar.gz -C /usr/local --strip-components=2
+  sudo tar -xzf /tmp/swift.tar.gz -C /usr/local --strip-components=2
   rm /tmp/swift.tar.gz
   if command -v swift &>/dev/null; then
     echo "Installed $(swift --version 2>&1 | head -1)"
@@ -60,7 +60,7 @@ if ! command -v swiftlint &>/dev/null; then
       echo "WARNING: Could not locate swiftlint binary in archive — skipping."
     else
       chmod +x "$SWIFTLINT_BIN"
-      install -m 755 "$SWIFTLINT_BIN" /usr/local/bin/swiftlint
+      sudo install -m 755 "$SWIFTLINT_BIN" /usr/local/bin/swiftlint
       echo "Installed SwiftLint $(swiftlint version)"
     fi
     rm -rf /tmp/swiftlint.zip /tmp/swiftlint
@@ -85,7 +85,7 @@ if ! command -v swiftformat &>/dev/null; then
       echo "WARNING: Could not locate swiftformat binary in archive — skipping."
     else
       chmod +x "$SWIFTFORMAT_BIN"
-      install -m 755 "$SWIFTFORMAT_BIN" /usr/local/bin/swiftformat
+      sudo install -m 755 "$SWIFTFORMAT_BIN" /usr/local/bin/swiftformat
       echo "Installed SwiftFormat $(swiftformat --version)"
     fi
     rm -rf /tmp/swiftformat.zip /tmp/swiftformat
