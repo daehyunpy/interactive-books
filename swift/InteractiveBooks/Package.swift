@@ -26,8 +26,15 @@ let package = Package(
         ),
     ],
     targets: [
+        .systemLibrary(
+            name: "CSQLite3",
+            path: "Sources/CSQLite3",
+        ),
         .target(
             name: "InteractiveBooksCore",
+            dependencies: [
+                .target(name: "CSQLite3", condition: .when(platforms: [.linux])),
+            ],
             path: "Sources/InteractiveBooksCore",
         ),
         .executableTarget(
