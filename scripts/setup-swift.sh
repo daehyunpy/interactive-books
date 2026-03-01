@@ -3,6 +3,10 @@ set -euo pipefail
 # General-purpose Swift development setup for Claude Code cloud environments.
 # Installs the Swift toolchain, SwiftLint, SwiftFormat, gh, and git-lfs.
 #
+# Optimized for speed: starts the large Swift toolchain download (~878 MB)
+# immediately in the background, then installs apt packages and dev tools
+# concurrently. Total wall time ≈ max(Swift download, apt + dev tools).
+#
 # Environment variables:
 #   SWIFT_VERSION  Swift toolchain version to install (default: 6.1.2)
 
@@ -17,7 +21,34 @@ case "$ARCH" in
 esac
 
 # ---------------------------------------------------------------------------
-# Helper: install a tool from its GitHub release (latest Linux zip)
+# Detect Ubuntu version (needed for Swift download URL)
+# ---------------------------------------------------------------------------
+UBUNTU_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+case "$UBUNTU_CODENAME" in
+  noble)   SWIFT_PLATFORM="ubuntu2404" ; SWIFT_OS="ubuntu24.04" ;;
+  jammy)   SWIFT_PLATFORM="ubuntu2204" ; SWIFT_OS="ubuntu22.04" ;;
+  focal)   SWIFT_PLATFORM="ubuntu2004" ; SWIFT_OS="ubuntu20.04" ;;
+  *)
+    echo "WARNING: Unsupported Ubuntu version ($UBUNTU_CODENAME). Attempting noble defaults..."
+    SWIFT_PLATFORM="ubuntu2404"
+    SWIFT_OS="ubuntu24.04"
+    ;;
+esac
+
+# ---------------------------------------------------------------------------
+# 1. Start Swift toolchain download immediately (biggest bottleneck: ~878 MB)
+# ---------------------------------------------------------------------------
+SWIFT_DOWNLOAD_PID=""
+if ! command -v swift &>/dev/null; then
+  SWIFT_VERSION="${SWIFT_VERSION:-6.1.2}"
+  SWIFT_URL="https://download.swift.org/swift-${SWIFT_VERSION}-release/${SWIFT_PLATFORM}/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-${SWIFT_OS}.tar.gz"
+  echo "Downloading Swift ${SWIFT_VERSION} for ${SWIFT_OS} (background)..."
+  curl -fsSL "$SWIFT_URL" -o /tmp/swift.tar.gz &
+  SWIFT_DOWNLOAD_PID=$!
+fi
+
+# ---------------------------------------------------------------------------
+# Helper: install a tool from its GitHub release (latest Linux binary)
 # Usage: install_github_release <cmd_name> <repo> <version_flag>
 # ---------------------------------------------------------------------------
 install_github_release() {
@@ -82,22 +113,7 @@ install_github_release() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. Detect Ubuntu version (needed for Swift download URL)
-# ---------------------------------------------------------------------------
-UBUNTU_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
-case "$UBUNTU_CODENAME" in
-  noble)   SWIFT_PLATFORM="ubuntu2404" ; SWIFT_OS="ubuntu24.04" ;;
-  jammy)   SWIFT_PLATFORM="ubuntu2204" ; SWIFT_OS="ubuntu22.04" ;;
-  focal)   SWIFT_PLATFORM="ubuntu2004" ; SWIFT_OS="ubuntu20.04" ;;
-  *)
-    echo "WARNING: Unsupported Ubuntu version ($UBUNTU_CODENAME). Attempting noble defaults..."
-    SWIFT_PLATFORM="ubuntu2404"
-    SWIFT_OS="ubuntu24.04"
-    ;;
-esac
-
-# ---------------------------------------------------------------------------
-# 2. Install apt packages (gh, git-lfs, and Swift system dependencies)
+# 2. Install apt packages while Swift downloads in parallel
 # ---------------------------------------------------------------------------
 sudo apt-get update -qq || true
 
@@ -127,30 +143,33 @@ DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
   > /dev/null 2>&1 || echo "WARNING: Some Swift system dependencies could not be installed."
 
 # ---------------------------------------------------------------------------
-# 3. Install Swift toolchain via official tarball
-# ---------------------------------------------------------------------------
-if ! command -v swift &>/dev/null; then
-  echo "Installing Swift toolchain..."
-  SWIFT_VERSION="${SWIFT_VERSION:-6.1.2}"
-  SWIFT_URL="https://download.swift.org/swift-${SWIFT_VERSION}-release/${SWIFT_PLATFORM}/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-${SWIFT_OS}.tar.gz"
-  echo "Downloading Swift ${SWIFT_VERSION} for ${SWIFT_OS}..."
-  curl -fsSL "$SWIFT_URL" -o /tmp/swift.tar.gz
-  echo "Extracting..."
-  sudo tar -xzf /tmp/swift.tar.gz -C /usr/local --strip-components=2
-  rm /tmp/swift.tar.gz
-  if command -v swift &>/dev/null; then
-    echo "Installed $(swift --version 2>&1 | head -1)"
-  else
-    echo "ERROR: Swift installation failed."
-    exit 1
-  fi
-fi
-
-# ---------------------------------------------------------------------------
-# 4. Install SwiftLint & SwiftFormat (latest from GitHub releases)
+# 3. Install SwiftLint & SwiftFormat (parallel, while Swift still downloads)
 # ---------------------------------------------------------------------------
 install_github_release swiftlint realm/SwiftLint version &
 install_github_release swiftformat nicklockwood/SwiftFormat --version &
-wait
+wait %?swiftlint 2>/dev/null || true
+wait %?swiftformat 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# 4. Wait for Swift download and extract
+# ---------------------------------------------------------------------------
+if [ -n "$SWIFT_DOWNLOAD_PID" ]; then
+  echo "Waiting for Swift download to finish..."
+  if wait "$SWIFT_DOWNLOAD_PID"; then
+    echo "Extracting Swift toolchain..."
+    sudo tar -xzf /tmp/swift.tar.gz -C /usr/local --strip-components=2
+    rm -f /tmp/swift.tar.gz
+    if command -v swift &>/dev/null; then
+      echo "Installed $(swift --version 2>&1 | head -1)"
+    else
+      echo "ERROR: Swift installation failed — binary not found after extraction."
+      exit 1
+    fi
+  else
+    echo "ERROR: Swift download failed."
+    rm -f /tmp/swift.tar.gz
+    exit 1
+  fi
+fi
 
 echo "Swift development environment ready."
