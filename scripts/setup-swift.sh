@@ -7,6 +7,16 @@ set -euo pipefail
 #   SWIFT_VERSION  Swift toolchain version to install (default: 6.1.2)
 
 # ---------------------------------------------------------------------------
+# Detect architecture for selecting correct release binaries
+# ---------------------------------------------------------------------------
+ARCH=$(uname -m)
+case "$ARCH" in
+  x86_64)  ARCH_PATTERN="amd64\|x86_64" ;;
+  aarch64) ARCH_PATTERN="arm64\|aarch64" ;;
+  *)       ARCH_PATTERN="$ARCH" ;;
+esac
+
+# ---------------------------------------------------------------------------
 # Helper: install a tool from its GitHub release (latest Linux zip)
 # Usage: install_github_release <cmd_name> <repo> <version_flag>
 # ---------------------------------------------------------------------------
@@ -21,20 +31,45 @@ install_github_release() {
 
   echo "Installing ${cmd} (latest)..."
   local url
-  url=$(curl -fsSL "https://api.github.com/repos/${repo}/releases/latest" \
-    | grep -o '"browser_download_url": *"[^"]*linux[^"]*"' \
-    | head -1 \
-    | cut -d'"' -f4)
 
-  if [ -z "$url" ]; then
+  # Prefer gh CLI (authenticated, avoids rate limits) if available.
+  if command -v gh &>/dev/null; then
+    url=$(gh release view --repo "$repo" --json assets -q \
+      ".assets[].url" 2>/dev/null \
+      | grep -i "linux" \
+      | grep -i "$ARCH_PATTERN" \
+      | head -1) || true
+  fi
+
+  # Fall back to unauthenticated GitHub API.
+  if [ -z "${url:-}" ]; then
+    url=$(curl -fsSL "https://api.github.com/repos/${repo}/releases/latest" \
+      | grep -oi '"browser_download_url": *"[^"]*linux[^"]*"' \
+      | grep -i "$ARCH_PATTERN" \
+      | head -1 \
+      | cut -d'"' -f4) || true
+  fi
+
+  if [ -z "${url:-}" ]; then
     echo "WARNING: Could not determine ${cmd} download URL — skipping."
     return
   fi
 
-  curl -fsSL "$url" -o "/tmp/${cmd}.zip"
-  unzip -oq "/tmp/${cmd}.zip" -d "/tmp/${cmd}"
+  local archive="/tmp/${cmd}-archive"
+  curl -fsSL -L "$url" -o "$archive"
+
+  local extract_dir="/tmp/${cmd}-extract"
+  rm -rf "$extract_dir"
+  mkdir -p "$extract_dir"
+
+  # Handle both .zip and .tar.gz archives.
+  case "$url" in
+    *.tar.gz|*.tgz) tar -xzf "$archive" -C "$extract_dir" ;;
+    *)              unzip -oq "$archive" -d "$extract_dir" ;;
+  esac
+
   local bin
-  bin=$(find "/tmp/${cmd}" -type f -name "$cmd" | head -1)
+  bin=$(find "$extract_dir" -type f -name "$cmd" | head -1)
 
   if [ -z "$bin" ]; then
     echo "WARNING: Could not locate ${cmd} binary in archive — skipping."
@@ -43,17 +78,38 @@ install_github_release() {
     echo "Installed ${cmd} $(${cmd} ${version_flag})"
   fi
 
-  rm -rf "/tmp/${cmd}.zip" "/tmp/${cmd}"
+  rm -rf "$archive" "$extract_dir"
 }
 
 # ---------------------------------------------------------------------------
-# 1. Install apt packages (gh, git-lfs)
+# 1. Install apt packages (gh, git-lfs, and Swift system dependencies)
 # ---------------------------------------------------------------------------
+sudo apt-get update -qq || true
+
+# gh and git-lfs
 if ! command -v gh &>/dev/null || ! command -v git-lfs &>/dev/null; then
-  sudo apt-get update -qq || true
   DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
     gh git-lfs > /dev/null 2>&1 || echo "WARNING: apt-get install failed — gh/git-lfs may be unavailable."
 fi
+
+# Swift system dependencies (required for the toolchain and SPM builds).
+DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
+  binutils \
+  gnupg2 \
+  libc6-dev \
+  libcurl4-openssl-dev \
+  libedit2 \
+  libgcc-13-dev \
+  libpython3-dev \
+  libsqlite3-dev \
+  libstdc++-13-dev \
+  libxml2-dev \
+  libz3-dev \
+  pkg-config \
+  tzdata \
+  unzip \
+  zlib1g-dev \
+  > /dev/null 2>&1 || echo "WARNING: Some Swift system dependencies could not be installed."
 
 # ---------------------------------------------------------------------------
 # 2. Install Swift toolchain via official tarball
