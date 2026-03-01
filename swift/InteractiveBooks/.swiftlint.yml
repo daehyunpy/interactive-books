@@ -1,17 +1,32 @@
 disabled_rules:
   - trailing_comma
   - opening_brace
-  - switch_case_alignment
-  - superfluous_disable_command
 
 opt_in_rules:
+  # Correctness
   - empty_count
-  - closure_spacing
   - contains_over_first_not_nil
-  - fatal_error_message
+  - contains_over_filter_count
+  - first_where
+  - last_where
+  - sorted_first_last
+  - flatmap_over_map_reduce
+  - array_init
+  - toggle_bool
+  - legacy_multiple
+  - yoda_condition
+  # Safety
   - force_unwrapping
   - implicitly_unwrapped_optional
+  - fatal_error_message
   - overridden_super_call
+  - unavailable_function
+  # Style
+  - closure_spacing
+  - closure_end_indentation
+  - modifier_order
+  - redundant_nil_coalescing
+  - redundant_type_annotation
 
 excluded:
   - .build
@@ -31,8 +46,8 @@ file_length:
   error: 1000
 
 function_body_length:
-  warning: 30
-  error: 50
+  warning: 25
+  error: 40
 
 identifier_name:
   min_length:

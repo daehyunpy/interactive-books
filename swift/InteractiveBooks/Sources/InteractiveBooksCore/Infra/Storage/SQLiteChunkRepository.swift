@@ -10,7 +10,7 @@ public final class SQLiteChunkRepository: ChunkRepository, @unchecked Sendable {
         self.database = database
     }
 
-    public func saveChunks(bookId: String, chunks: [Chunk]) throws {
+    public func saveChunks(bookId _: String, chunks: [Chunk]) throws {
         try database.transaction {
             for chunk in chunks {
                 try database.run(

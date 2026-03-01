@@ -108,6 +108,8 @@ The Swift app replicates the Python CLI's full pipeline in native Swift. It shar
 
 - [uv](https://docs.astral.sh/uv/) — Python package manager
 - [direnv](https://direnv.net/) — required for loading environment variables
+- [SwiftLint](https://github.com/realm/SwiftLint) — Swift linter (`brew install swiftlint`)
+- [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) — Swift auto-formatter (`brew install swiftformat`)
 
 ### Python CLI
 
@@ -171,6 +173,8 @@ cd swift/InteractiveBooks/
 swift build                    # build all targets
 swift test                     # run tests
 swift run interactive-books books   # list books from DB
+swiftformat .                  # auto-format all Swift files
+swiftlint lint --strict        # lint (warnings = errors)
 ```
 
 The Swift package has two targets:
@@ -179,14 +183,49 @@ The Swift package has two targets:
 
 Platform targets in `Package.swift` use the highest versions available in the current toolchain (`.iOS(.v18)`, `.macOS(.v15)`, `.visionOS(.v2)`). These will be updated to `.v26` when Xcode 26 GM ships with the corresponding SPM platform enum cases.
 
-**CI:** `macos-15` runners include Xcode 16.4 + Swift 6.1.2. Don't add `setup-swift` — it's unnecessary and can cause toolchain conflicts.
+#### Swift Dev Tools
+
+Dev tools are installed via **Homebrew** (not SPM plugins or Mint). They run as standalone CLI tools, not as package dependencies.
+
+| Tool | Purpose | Install | Config |
+|------|---------|---------|--------|
+| **SwiftFormat** | Auto-formatter (rewrites code) | `brew install swiftformat` | `.swiftformat` |
+| **SwiftLint** | Linter (catches bad patterns) | `brew install swiftlint` | `.swiftlint.yml` |
+
+**SwiftFormat** uses standard defaults — minimal config (Swift version, indent, max width). It is authoritative for formatting. SwiftLint handles correctness rules only. When rules conflict, the SwiftLint rule is disabled (not the SwiftFormat rule).
+
+Key SwiftFormat settings (`.swiftformat`):
+- Swift 6.1, 4-space indent, 120-char max width
+- All other settings use SwiftFormat defaults (`--indentcase false`, `--stripunusedargs always`, etc.)
+
+Key SwiftLint settings (`.swiftlint.yml`) — **strict mode**:
+- `--strict` in CI (warnings become errors)
+- Correctness rules: `first_where`, `last_where`, `sorted_first_last`, `array_init`, `toggle_bool`, `yoda_condition`, `legacy_multiple`
+- Safety rules: `force_unwrapping`, `implicitly_unwrapped_optional`, `fatal_error_message`, `unavailable_function`
+- Style rules: `modifier_order`, `closure_end_indentation`, `redundant_nil_coalescing`, `redundant_type_annotation`
+- Disabled rules: `trailing_comma`, `opening_brace` (owned by SwiftFormat)
+- Limits: function body 25 lines (warn) / 40 (error), file 500/1000, type 300/500
+
+**Workflow: always format before linting.**
+```bash
+swiftformat .              # Step 1: fix formatting
+swiftlint lint --strict    # Step 2: catch real issues
+```
+
+#### CI
+
+CI runs on `macos-15` (Xcode 16.4 + Swift 6.1.2). Don't add `setup-swift` — it's unnecessary and can cause toolchain conflicts.
+
+CI steps: `swift build` → `swift test` → `swiftlint lint --strict` → `swiftformat --lint .`
+
+SwiftFormat uses `--lint` mode in CI (check-only, no rewrites). Locally, run `swiftformat .` to auto-fix.
 
 ### Swift Gotchas
 
 - **SPM basename collisions** — SPM uses file basenames for `.o` files. Two files named `BookRepository.swift` in different directories of the same target cause "multiple producers" build error. Infra files must be named after their class (`SQLiteBookRepository.swift`).
 - **SQLite WAL + in-memory DBs** — `:memory:` databases silently ignore `PRAGMA journal_mode=WAL` (returns `"memory"`). Tests asserting WAL mode need a file-based temp database.
 - **`nonisolated(unsafe)`** — only needed for non-`Sendable` static properties accessed across isolation domains. Don't apply it to `private` properties or types that are already safe (e.g., `NSRegularExpression` in a `let`).
-- **SwiftLint vs SwiftFormat** — SwiftFormat is authoritative for formatting. When rules conflict, disable the SwiftLint rule (e.g., `switch_case_alignment` disabled because SwiftFormat indents `case`).
+- **SwiftLint vs SwiftFormat** — SwiftFormat is authoritative for formatting. When rules conflict, disable the SwiftLint rule (e.g., `trailing_comma` and `opening_brace` are disabled because SwiftFormat owns them).
 
 ## Quick Commands
 

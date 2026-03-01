@@ -165,17 +165,17 @@ public final class Database: @unchecked Sendable {
         for (index, value) in values.enumerated() {
             let position = Int32(index + 1)
             let result: Int32 = switch value {
-                case let .text(string):
-                    sqlite3_bind_text(
-                        stmt, position, string, -1,
-                        unsafeBitCast(-1, to: sqlite3_destructor_type.self),
-                    )
-                case let .integer(int):
-                    sqlite3_bind_int64(stmt, position, Int64(int))
-                case let .real(double):
-                    sqlite3_bind_double(stmt, position, double)
-                case .null:
-                    sqlite3_bind_null(stmt, position)
+            case let .text(string):
+                sqlite3_bind_text(
+                    stmt, position, string, -1,
+                    unsafeBitCast(-1, to: sqlite3_destructor_type.self),
+                )
+            case let .integer(int):
+                sqlite3_bind_int64(stmt, position, Int64(int))
+            case let .real(double):
+                sqlite3_bind_double(stmt, position, double)
+            case .null:
+                sqlite3_bind_null(stmt, position)
             }
             guard result == SQLITE_OK else {
                 throw storageError(message: "Failed to bind parameter at index \(index)")
@@ -189,14 +189,14 @@ public final class Database: @unchecked Sendable {
         row.reserveCapacity(count)
         for col in 0 ..< Int32(count) {
             switch sqlite3_column_type(stmt, col) {
-                case SQLITE_TEXT:
-                    row.append(.text(String(cString: sqlite3_column_text(stmt, col))))
-                case SQLITE_INTEGER:
-                    row.append(.integer(Int(sqlite3_column_int64(stmt, col))))
-                case SQLITE_FLOAT:
-                    row.append(.real(sqlite3_column_double(stmt, col)))
-                default:
-                    row.append(.null)
+            case SQLITE_TEXT:
+                row.append(.text(String(cString: sqlite3_column_text(stmt, col))))
+            case SQLITE_INTEGER:
+                row.append(.integer(Int(sqlite3_column_int64(stmt, col))))
+            case SQLITE_FLOAT:
+                row.append(.real(sqlite3_column_double(stmt, col)))
+            default:
+                row.append(.null)
             }
         }
         return row
