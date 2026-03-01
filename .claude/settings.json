@@ -42,6 +42,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "./scripts/setup-env.sh"
+          },
+          {
+            "type": "command",
             "command": "./scripts/setup-devbox.sh"
           },
           {
@@ -55,6 +59,10 @@
           {
             "type": "command",
             "command": "cd python && uv sync"
+          },
+          {
+            "type": "command",
+            "command": "bun install"
           }
         ]
       }
