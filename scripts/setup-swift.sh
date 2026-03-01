@@ -149,7 +149,8 @@ fi
 # ---------------------------------------------------------------------------
 # 4. Install SwiftLint & SwiftFormat (latest from GitHub releases)
 # ---------------------------------------------------------------------------
-install_github_release swiftlint realm/SwiftLint version
-install_github_release swiftformat nicklockwood/SwiftFormat --version
+install_github_release swiftlint realm/SwiftLint version &
+install_github_release swiftformat nicklockwood/SwiftFormat --version &
+wait
 
 echo "Swift development environment ready."
