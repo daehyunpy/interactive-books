@@ -101,6 +101,7 @@ The Swift app replicates the Python CLI's full pipeline in native Swift. It shar
 | SQL column constants  | Repository classes use a `private static let selectColumns` constant to avoid repeating column lists across queries.         |
 | SQLiteValue helpers   | `SQLiteValue` enum has `textValue` / `integerValue` computed properties for concise optional extraction.                     |
 | Platform versions     | `Package.swift` uses the highest available SPM platform enums. Will update to `.v26` when Xcode 26 GM ships.                |
+| SQLite on Linux       | `CSQLite` system library target wraps `libsqlite3-dev` for Linux. Conditional dependency — Apple platforms use the native `SQLite3` framework. Use `#if canImport(SQLite3)` guard in source files. |
 
 ## First-Time Setup
 
@@ -226,6 +227,7 @@ SwiftFormat uses `--lint` mode in CI (check-only, no rewrites). Locally, run `sw
 - **SQLite WAL + in-memory DBs** — `:memory:` databases silently ignore `PRAGMA journal_mode=WAL` (returns `"memory"`). Tests asserting WAL mode need a file-based temp database.
 - **`nonisolated(unsafe)`** — only needed for non-`Sendable` static properties accessed across isolation domains. Don't apply it to `private` properties or types that are already safe (e.g., `NSRegularExpression` in a `let`).
 - **SwiftLint vs SwiftFormat** — SwiftFormat is authoritative for formatting. When rules conflict, disable the SwiftLint rule (e.g., `trailing_comma` and `opening_brace` are disabled because SwiftFormat owns them).
+- **SQLite3 on Linux** — `import SQLite3` only works on Apple platforms (system framework). On Linux, the `CSQLite` system library target bridges to `libsqlite3-dev`. Use `#if canImport(SQLite3)` / `#else import CSQLite` in any file that calls sqlite3 C functions. The dependency is conditional: `.target(name: "CSQLite", condition: .when(platforms: [.linux]))` so Apple builds are unaffected.
 
 ## Quick Commands
 
