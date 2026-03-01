@@ -10,15 +10,18 @@ set -euo pipefail
 if ! command -v swift &>/dev/null; then
   echo "Installing Swift toolchain via apt..."
 
-  curl -fsSL https://download.swift.org/swift-signing-key-4.asc \
-    | gpg --dearmor -o /usr/share/keyrings/swift-archive-keyring.gpg
-  echo "deb [signed-by=/usr/share/keyrings/swift-archive-keyring.gpg] https://download.swift.org/apt/ubuntu2404 noble main" \
-    > /etc/apt/sources.list.d/swift.list
+  if curl -fsSL https://download.swift.org/swift-signing-key-4.asc \
+       | gpg --dearmor -o /usr/share/keyrings/swift-archive-keyring.gpg 2>/dev/null; then
+    echo "deb [signed-by=/usr/share/keyrings/swift-archive-keyring.gpg] https://download.swift.org/apt/ubuntu2404 noble main" \
+      > /etc/apt/sources.list.d/swift.list
 
-  apt-get update -qq
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq swiftlang > /dev/null 2>&1
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq swiftlang > /dev/null 2>&1
 
-  echo "Installed $(swift --version 2>&1 | head -1)"
+    echo "Installed $(swift --version 2>&1 | head -1)"
+  else
+    echo "WARNING: Could not reach download.swift.org — skipping Swift toolchain."
+  fi
 fi
 
 # ---------------------------------------------------------------------------
