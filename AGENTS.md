@@ -101,7 +101,7 @@ The Swift app replicates the Python CLI's full pipeline in native Swift. It shar
 | SQL column constants  | Repository classes use a `private static let selectColumns` constant to avoid repeating column lists across queries.         |
 | SQLiteValue helpers   | `SQLiteValue` enum has `textValue` / `integerValue` computed properties for concise optional extraction.                     |
 | Platform versions     | `Package.swift` uses the highest available SPM platform enums. Will update to `.v26` when Xcode 26 GM ships.                |
-| SQLite on Linux       | `CSQLite` system library target wraps `libsqlite3-dev` for Linux. Conditional dependency — Apple platforms use the native `SQLite3` framework. Use `#if canImport(SQLite3)` guard in source files. |
+| SQLite on Linux       | `CSQLite` system library target bridges `libsqlite3-dev` for Linux. Conditional dependency — Apple platforms use the native `SQLite3` framework. Use `#if canImport(SQLite3)` guard in source files. |
 
 ## First-Time Setup
 
