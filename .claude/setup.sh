@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # General-purpose Swift development setup for Claude Code cloud environments.
-# Installs the latest Swift toolchain, SwiftLint, and SwiftFormat.
+# Installs the Swift toolchain, SwiftLint, and SwiftFormat.
 
 # ---------------------------------------------------------------------------
 # 1. Install Swift toolchain via official apt repository
@@ -10,9 +10,27 @@ set -euo pipefail
 if ! command -v swift &>/dev/null; then
   echo "Installing Swift toolchain via apt..."
 
+  # Detect Ubuntu version automatically
+  UBUNTU_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+  case "$UBUNTU_CODENAME" in
+    noble)   SWIFT_REPO="ubuntu2404" ;;
+    jammy)   SWIFT_REPO="ubuntu2204" ;;
+    focal)   SWIFT_REPO="ubuntu2004" ;;
+    *)
+      echo "WARNING: Unsupported Ubuntu version ($UBUNTU_CODENAME). Attempting noble..."
+      UBUNTU_CODENAME="noble"
+      SWIFT_REPO="ubuntu2404"
+      ;;
+  esac
+
+  # Install prerequisites
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    curl gnupg2 unzip > /dev/null 2>&1
+
   if curl -fsSL https://download.swift.org/swift-signing-key-4.asc \
        | gpg --dearmor -o /usr/share/keyrings/swift-archive-keyring.gpg 2>/dev/null; then
-    echo "deb [signed-by=/usr/share/keyrings/swift-archive-keyring.gpg] https://download.swift.org/apt/ubuntu2404 noble main" \
+    echo "deb [signed-by=/usr/share/keyrings/swift-archive-keyring.gpg] https://download.swift.org/apt/${SWIFT_REPO} ${UBUNTU_CODENAME} main" \
       > /etc/apt/sources.list.d/swift.list
 
     apt-get update -qq
@@ -20,7 +38,8 @@ if ! command -v swift &>/dev/null; then
 
     echo "Installed $(swift --version 2>&1 | head -1)"
   else
-    echo "WARNING: Could not reach download.swift.org — skipping Swift toolchain."
+    echo "ERROR: Could not reach download.swift.org — Swift not installed."
+    exit 1
   fi
 fi
 
@@ -30,13 +49,28 @@ fi
 if ! command -v swiftlint &>/dev/null; then
   echo "Installing SwiftLint (latest)..."
 
-  curl -fsSL "https://github.com/realm/SwiftLint/releases/latest/download/swiftlint_linux_amd64.zip" \
-    -o /tmp/swiftlint.zip
-  unzip -oq /tmp/swiftlint.zip -d /tmp/swiftlint
-  install -m 755 /tmp/swiftlint/swiftlint-static /usr/local/bin/swiftlint
-  rm -rf /tmp/swiftlint.zip /tmp/swiftlint
+  SWIFTLINT_URL=$(curl -fsSL "https://api.github.com/repos/realm/SwiftLint/releases/latest" \
+    | grep -o '"browser_download_url": *"[^"]*linux[^"]*"' \
+    | head -1 \
+    | cut -d'"' -f4)
 
-  echo "Installed SwiftLint $(swiftlint version)"
+  if [ -n "$SWIFTLINT_URL" ]; then
+    curl -fsSL "$SWIFTLINT_URL" -o /tmp/swiftlint.zip
+    unzip -oq /tmp/swiftlint.zip -d /tmp/swiftlint
+
+    # Find the actual binary (name varies across releases)
+    SWIFTLINT_BIN=$(find /tmp/swiftlint -type f -executable | head -1)
+    if [ -z "$SWIFTLINT_BIN" ]; then
+      SWIFTLINT_BIN=$(find /tmp/swiftlint -name '*swiftlint*' -type f | head -1)
+      chmod +x "$SWIFTLINT_BIN"
+    fi
+    install -m 755 "$SWIFTLINT_BIN" /usr/local/bin/swiftlint
+    rm -rf /tmp/swiftlint.zip /tmp/swiftlint
+
+    echo "Installed SwiftLint $(swiftlint version)"
+  else
+    echo "WARNING: Could not determine SwiftLint download URL — skipping."
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -45,13 +79,36 @@ fi
 if ! command -v swiftformat &>/dev/null; then
   echo "Installing SwiftFormat (latest)..."
 
-  curl -fsSL "https://github.com/nicklockwood/SwiftFormat/releases/latest/download/swiftformat_linux.zip" \
-    -o /tmp/swiftformat.zip
-  unzip -oq /tmp/swiftformat.zip -d /tmp/swiftformat
-  install -m 755 /tmp/swiftformat/swiftformat_linux /usr/local/bin/swiftformat
-  rm -rf /tmp/swiftformat.zip /tmp/swiftformat
+  SWIFTFORMAT_URL=$(curl -fsSL "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/latest" \
+    | grep -o '"browser_download_url": *"[^"]*linux[^"]*"' \
+    | head -1 \
+    | cut -d'"' -f4)
 
-  echo "Installed SwiftFormat $(swiftformat --version)"
+  if [ -n "$SWIFTFORMAT_URL" ]; then
+    curl -fsSL "$SWIFTFORMAT_URL" -o /tmp/swiftformat.zip
+    unzip -oq /tmp/swiftformat.zip -d /tmp/swiftformat
+
+    # Find the actual binary
+    SWIFTFORMAT_BIN=$(find /tmp/swiftformat -type f -executable | head -1)
+    if [ -z "$SWIFTFORMAT_BIN" ]; then
+      SWIFTFORMAT_BIN=$(find /tmp/swiftformat -name '*swiftformat*' -type f | head -1)
+      chmod +x "$SWIFTFORMAT_BIN"
+    fi
+    install -m 755 "$SWIFTFORMAT_BIN" /usr/local/bin/swiftformat
+    rm -rf /tmp/swiftformat.zip /tmp/swiftformat
+
+    echo "Installed SwiftFormat $(swiftformat --version)"
+  else
+    echo "WARNING: Could not determine SwiftFormat download URL — skipping."
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# 4. Resolve Swift packages if applicable
+# ---------------------------------------------------------------------------
+if [ -f "Package.swift" ]; then
+  echo "Resolving Swift packages..."
+  swift package resolve
 fi
 
 echo "Swift development environment ready."
