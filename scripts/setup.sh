@@ -3,10 +3,6 @@ set -euo pipefail
 # General-purpose Swift development setup for Claude Code cloud environments.
 # Installs the Swift toolchain, SwiftLint, and SwiftFormat.
 #
-# Usage: ./setup.sh [project-dir]
-#   project-dir  Optional path to a directory containing Package.swift.
-#                If omitted, the script skips SPM package resolution.
-#
 # Environment variables:
 #   SWIFT_VERSION  Swift toolchain version to install (default: 6.0.3)
 
@@ -111,16 +107,5 @@ if ! command -v swiftformat &>/dev/null; then
   else
     echo "WARNING: Could not determine SwiftFormat download URL — skipping."
   fi
-fi
-# ---------------------------------------------------------------------------
-# 4. Resolve Swift packages if applicable
-# ---------------------------------------------------------------------------
-PROJECT_DIR="${1:-}"
-if [ -n "$PROJECT_DIR" ] && [ -f "$PROJECT_DIR/Package.swift" ]; then
-  echo "Resolving Swift packages in $PROJECT_DIR..."
-  (cd "$PROJECT_DIR" && swift package resolve)
-elif [ -f "Package.swift" ]; then
-  echo "Resolving Swift packages..."
-  swift package resolve
 fi
 echo "Swift development environment ready."
