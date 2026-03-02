@@ -8,6 +8,21 @@
 
 set -euo pipefail
 
+SYSTEM_NIX_PROFILE="/etc/profile.d/nix.sh"
+DEFAULT_PROFILE="/nix/var/nix/profiles/default"
+CURRENT_USER="$(whoami)"
+PROFILE_DIR="/nix/var/nix/profiles/per-user/$CURRENT_USER"
+
+source_nix_profile() {
+    local script="$1"
+    if [ -f "$script" ]; then
+        set +u  # nix.sh references unset variables
+        # shellcheck disable=SC1090
+        . "$script"
+        set -u
+    fi
+}
+
 # --- Scenario 1: Nix already works ---
 if command -v nix &>/dev/null; then
     exit 0
@@ -27,58 +42,37 @@ if [ -d /nix/store ]; then
     # Find a working nix binary in the store.
     NIX_BIN=""
     for candidate in /nix/store/*/bin/nix; do
-        if [ -x "$candidate" ] && "$candidate" --version &>/dev/null; then
+        if [ -x "$candidate" ]; then
             NIX_BIN="$candidate"
             break
         fi
     done
 
     if [ -n "$NIX_BIN" ]; then
-        NIX_STORE_DIR="$(dirname "$(dirname "$NIX_BIN")")"
-        PROFILE_DIR="/nix/var/nix/profiles/per-user/root"
+        NIX_STORE_DIR="${NIX_BIN%/bin/nix}"
 
-        # Create the profile symlink if missing.
+        # Wire up profile symlinks. ln -sfn is idempotent — no guards needed.
         mkdir -p "$PROFILE_DIR"
-        if [ ! -e "$PROFILE_DIR/profile" ]; then
-            ln -sfn "$NIX_STORE_DIR" "$PROFILE_DIR/profile"
-            echo "Created profile symlink: $PROFILE_DIR/profile -> $NIX_STORE_DIR"
-        fi
+        ln -sfn "$NIX_STORE_DIR" "$PROFILE_DIR/profile"
+        ln -sfn "$PROFILE_DIR/profile" "$DEFAULT_PROFILE"
+        ln -sfn "$PROFILE_DIR/profile" "$HOME/.nix-profile"
 
-        # Ensure the default profile points to the per-user profile.
-        if [ ! -e /nix/var/nix/profiles/default ] || [ ! -e "$(readlink -f /nix/var/nix/profiles/default)/bin/nix" ]; then
-            ln -sfn "$PROFILE_DIR/profile" /nix/var/nix/profiles/default
-            echo "Fixed default profile symlink."
-        fi
-
-        # Ensure ~/.nix-profile exists.
-        if [ ! -e "$HOME/.nix-profile" ] || [ ! -e "$(readlink -f "$HOME/.nix-profile")/bin/nix" ]; then
-            ln -sfn "$PROFILE_DIR/profile" "$HOME/.nix-profile"
-            echo "Fixed ~/.nix-profile symlink."
-        fi
-
-        # Install shell integration into /etc/profile.d/ so subsequent hooks see nix.
+        # Install shell integration so subsequent hooks see nix.
         NIX_PROFILE_SCRIPT="$NIX_STORE_DIR/etc/profile.d/nix-daemon.sh"
         if [ ! -f "$NIX_PROFILE_SCRIPT" ]; then
             NIX_PROFILE_SCRIPT="$NIX_STORE_DIR/etc/profile.d/nix.sh"
         fi
-        if [ -f "$NIX_PROFILE_SCRIPT" ] && [ ! -f /etc/profile.d/nix.sh ]; then
-            cp "$NIX_PROFILE_SCRIPT" /etc/profile.d/nix.sh
-            echo "Installed /etc/profile.d/nix.sh"
+        if [ -f "$NIX_PROFILE_SCRIPT" ] && [ ! -f "$SYSTEM_NIX_PROFILE" ]; then
+            cp "$NIX_PROFILE_SCRIPT" "$SYSTEM_NIX_PROFILE"
+            echo "Installed $SYSTEM_NIX_PROFILE"
         fi
 
-        # Source it now so the rest of this session can use nix.
-        if [ -f /etc/profile.d/nix.sh ]; then
-            set +u  # nix.sh uses unset variables
-            # shellcheck disable=SC1091
-            . /etc/profile.d/nix.sh
-            set -u
-        fi
+        source_nix_profile "$SYSTEM_NIX_PROFILE"
 
-        # Also add to bashrc for interactive shells.
-        BASHRC="/root/.bashrc"
+        # Add to bashrc for interactive shells (guard prevents duplicate appends).
+        BASHRC="$HOME/.bashrc"
         if [ -f "$BASHRC" ] && ! grep -q 'profile.d/nix.sh' "$BASHRC" 2>/dev/null; then
-            printf '\n# Nix\nif [ -e /etc/profile.d/nix.sh ]; then . /etc/profile.d/nix.sh; fi\n' >> "$BASHRC"
-            echo "Added nix sourcing to $BASHRC"
+            printf '\n# Nix\nif [ -e %s ]; then . %s; fi\n' "$SYSTEM_NIX_PROFILE" "$SYSTEM_NIX_PROFILE" >> "$BASHRC"
         fi
 
         if command -v nix &>/dev/null; then
@@ -94,7 +88,7 @@ if [ -d /nix/store ]; then
     # Clean up the broken installation before reinstalling.
     if [ -x /nix/nix-installer ]; then
         echo "Uninstalling broken Nix installation..."
-        /nix/nix-installer uninstall --no-confirm 2>/dev/null || true
+        /nix/nix-installer uninstall --no-confirm || true
     fi
 fi
 
@@ -103,12 +97,6 @@ echo "Installing Nix..."
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | \
     sh -s -- install linux --no-confirm --init none
 
-# Source the newly installed profile.
-if [ -f /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
-    set +u
-    # shellcheck disable=SC1091
-    . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-    set -u
-fi
+source_nix_profile "$DEFAULT_PROFILE/etc/profile.d/nix-daemon.sh"
 
 echo "Nix installed: $(nix --version 2>/dev/null || echo 'unknown version')"
