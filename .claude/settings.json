@@ -50,6 +50,10 @@
           },
           {
             "type": "command",
+            "command": "./scripts/setup-nix.sh"
+          },
+          {
+            "type": "command",
             "command": "./scripts/setup-devbox.sh"
           },
           {

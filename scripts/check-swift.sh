@@ -8,9 +8,7 @@ if command -v swift &>/dev/null; then
     exit 0
 fi
 
-if [ "$(uname)" != "Darwin" ]; then
-    exit 0
+if [ "$(uname)" != "Linux" ]; then
+    echo "Error: Swift not found. Please install Swift and restart the session."
+    exit 1
 fi
-
-echo "Error: Swift not found. Please install Swift and restart the session."
-exit 1
