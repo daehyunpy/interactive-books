@@ -81,6 +81,7 @@
     ]
   },
   "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "BASH_ENV": "/home/user/interactive-books/scripts/bash-env.sh"
   }
 }
