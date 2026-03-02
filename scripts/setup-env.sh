@@ -4,10 +4,12 @@
 
 set -euo pipefail
 
-if [ ! -f .envrc ] && [ -f .envrc.example ]; then
-    cp .envrc.example .envrc
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ ! -f "$ROOT/.envrc" ] && [ -f "$ROOT/.envrc.example" ]; then
+    cp "$ROOT/.envrc.example" "$ROOT/.envrc"
 fi
 
-if [ ! -f .env ] && [ -f .env.example ]; then
-    cp .env.example .env
+if [ ! -f "$ROOT/.env" ] && [ -f "$ROOT/.env.example" ]; then
+    cp "$ROOT/.env.example" "$ROOT/.env"
 fi

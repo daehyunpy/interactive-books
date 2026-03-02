@@ -46,11 +46,19 @@
           },
           {
             "type": "command",
+            "command": "./scripts/setup-direnv.sh"
+          },
+          {
+            "type": "command",
             "command": "./scripts/setup-devbox.sh"
           },
           {
             "type": "command",
             "command": "devbox install"
+          },
+          {
+            "type": "command",
+            "command": "direnv allow"
           },
           {
             "type": "command",

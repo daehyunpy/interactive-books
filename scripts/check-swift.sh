@@ -4,11 +4,11 @@
 
 set -euo pipefail
 
-if [ "$(uname)" != "Darwin" ]; then
+if command -v swift &>/dev/null; then
     exit 0
 fi
 
-if command -v swift &>/dev/null; then
+if [ "$(uname)" != "Darwin" ]; then
     exit 0
 fi
 

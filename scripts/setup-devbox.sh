@@ -9,12 +9,13 @@
 
 set -euo pipefail
 
-if [ "$(uname)" != "Linux" ]; then
+if command -v devbox &>/dev/null; then
     exit 0
 fi
 
-if command -v devbox &>/dev/null; then
-    exit 0
+if [ "$(uname)" != "Linux" ]; then
+    echo "Visit https://www.jetify.com/devbox to install it."
+    exit 1
 fi
 
 # Install Devbox (which installs Nix as a dependency)
