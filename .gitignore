@@ -9,6 +9,11 @@ dist/
 # uv
 .uv/
 
+# Node
+node_modules/
+bun.lock
+bun.lockb
+
 # Environment
 .env
 .envrc
